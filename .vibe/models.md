@@ -30,3 +30,10 @@ Defined in: `packages/core/src/maze.ts`
 | height | number | must be a positive integer |
 | seed | number | same seed reproduces the same maze |
 Defined in: `packages/core/src/maze.ts`
+
+## MazePosition
+| Field | Type | Notes |
+|---|---|---|
+| x | number | column index |
+| y | number | row index |
+Defined in: `packages/core/src/maze-solver.ts`
