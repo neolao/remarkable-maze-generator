@@ -1,0 +1,19 @@
+{
+	"name": "remarkable-maze-generator",
+	"private": true,
+	"type": "module",
+	"workspaces": ["packages/*"],
+	"scripts": {
+		"test": "vitest run",
+		"lint": "biome check --write .",
+		"build": "npm run build --workspaces --if-present",
+		"cli": "npm run start --workspace packages/cli",
+		"web": "npm run dev --workspace packages/web"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/node": "^26.1.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.5"
+	}
+}

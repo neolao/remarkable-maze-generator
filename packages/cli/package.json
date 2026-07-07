@@ -1,0 +1,21 @@
+{
+	"name": "@remarkable-maze-generator/cli",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"remarkable-maze": "./dist/index.js"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"start": "tsx src/index.ts"
+	},
+	"dependencies": {
+		"@remarkable-maze-generator/core": "*",
+		"commander": "^13.1.0"
+	},
+	"devDependencies": {
+		"tsx": "^4.19.2",
+		"typescript": "^5.7.3"
+	}
+}
