@@ -12,6 +12,7 @@
 		"build": "tsc -p tsconfig.json"
 	},
 	"dependencies": {
+		"fflate": "^0.8.3",
 		"pdf-lib": "^1.17.1"
 	},
 	"devDependencies": {

@@ -79,3 +79,11 @@ Defined in: `packages/core/src/remarkable-auth.ts`
 | fetch | typeof fetch | optional, injectable for testing; defaults to the global `fetch` |
 | baseUrl | string | optional, injectable for testing; defaults to the real reMarkable Cloud API |
 Defined in: `packages/core/src/remarkable-auth.ts`
+
+## UploadPdfOptions
+| Field | Type | Notes |
+|---|---|---|
+| readFile | (path: string) => Promise\<Uint8Array\> | required, no default — caller supplies file access (e.g. `node:fs/promises.readFile`) |
+| fetch | typeof fetch | optional, injectable for testing; defaults to the global `fetch` |
+| baseUrl | string | optional, injectable for testing; defaults to the real reMarkable Cloud document-storage API |
+Defined in: `packages/core/src/remarkable-upload.ts`

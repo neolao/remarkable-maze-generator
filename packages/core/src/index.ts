@@ -34,3 +34,5 @@ export {
 	refreshUserToken,
 	registerDevice,
 } from "./remarkable-auth.js";
+export type { UploadPdfOptions } from "./remarkable-upload.js";
+export { uploadPdf } from "./remarkable-upload.js";
