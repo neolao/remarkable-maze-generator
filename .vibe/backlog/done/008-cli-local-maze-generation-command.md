@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: done
 depends_on: [003]
 ---
 # CLI Local Maze Generation Command
