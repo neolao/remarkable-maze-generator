@@ -2,6 +2,7 @@
 import { CORE_VERSION } from "@remarkable-maze-generator/core";
 import { Command } from "commander";
 import { parseIntegerOption } from "./cli-options.js";
+import { runGenerateAndSend } from "./generate-and-send.js";
 import { runGenerate } from "./generate.js";
 import { runSend } from "./send.js";
 
@@ -70,6 +71,58 @@ program
 				});
 				console.log(
 					`Uploaded "${file}" to reMarkable Cloud as "${visibleName}"${opts.folder ? ` in "${opts.folder}"` : ""}.`,
+				);
+			} catch (error) {
+				console.error(`Error: ${(error as Error).message}`);
+				process.exitCode = 1;
+			}
+		},
+	);
+
+program
+	.command("generate-and-send")
+	.description(
+		"Generate a maze, save it as a PDF, and upload it to reMarkable Cloud in one step",
+	)
+	.requiredOption("--width <number>", "maze width in cells")
+	.requiredOption("--height <number>", "maze height in cells")
+	.option("--seed <number>", "random seed (defaults to a random value)")
+	.option("--output <path>", "output PDF file path (defaults to ./maze.pdf)")
+	.option(
+		"--visible-name <name>",
+		"name to show on the reMarkable tablet (defaults to rectangle-<width>x<height>-<seed>)",
+	)
+	.option(
+		"--folder <name>",
+		"reMarkable Cloud folder to upload into (must already exist)",
+	)
+	.action(
+		async (opts: {
+			width: string;
+			height: string;
+			seed?: string;
+			output?: string;
+			visibleName?: string;
+			folder?: string;
+		}) => {
+			try {
+				const width = parseIntegerOption(opts.width, "--width");
+				const height = parseIntegerOption(opts.height, "--height");
+				const seed =
+					opts.seed === undefined
+						? undefined
+						: parseIntegerOption(opts.seed, "--seed");
+
+				const { outputPath, visibleName } = await runGenerateAndSend({
+					width,
+					height,
+					seed,
+					output: opts.output,
+					visibleName: opts.visibleName,
+					folder: opts.folder,
+				});
+				console.log(
+					`Maze written to ${outputPath} and uploaded to reMarkable Cloud as "${visibleName}"${opts.folder ? ` in "${opts.folder}"` : ""}.`,
 				);
 			} catch (error) {
 				console.error(`Error: ${(error as Error).message}`);

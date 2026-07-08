@@ -3,7 +3,7 @@
 
 ## Modules
 - [`modules/core.md`](modules/core.md) — shared core (maze generation, solution path, PDF rendering incl. batch, reMarkable Cloud auth + upload via `rmapi-js`, verified against a real account)
-- [`modules/cli.md`](modules/cli.md) — CLI (Commander) consuming `core` — `generate` and `send` commands implemented; combined generate-and-send still to come
+- [`modules/cli.md`](modules/cli.md) — CLI (Commander) consuming `core` — `generate`, `send`, and combined `generate-and-send` commands implemented
 - [`modules/web.md`](modules/web.md) — web server (Fastify) + static frontend consuming `core` — currently a skeleton
 
 ## Observed patterns

@@ -10,6 +10,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Generate a maze PDF directly from the command line
 - Authenticate with reMarkable Cloud using a one-time pairing code, remembered for later uploads
 - Upload a local PDF file to your reMarkable Cloud account from the command line, optionally into a specific folder
+- Generate a maze PDF and upload it to your reMarkable Cloud account in a single command
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
@@ -50,6 +51,20 @@ Or, using the `send.sh` shortcut at the repository root:
 ```
 
 The first time, you'll be prompted for a one-time pairing code (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, so later uploads don't ask again. Use `--visible-name <name>` to control how the file is named on the tablet (defaults to the file name). Use `--folder <name>` to send it into a specific reMarkable Cloud folder (the folder must already exist).
+
+Generate a maze PDF and upload it to your reMarkable Cloud account in a single command:
+
+```bash
+npm run start --workspace packages/cli -- generate-and-send --width 20 --height 15
+```
+
+Or, using the `generate-and-send.sh` shortcut at the repository root:
+
+```bash
+./generate-and-send.sh --width 20 --height 15
+```
+
+Accepts the same `--width`, `--height`, `--seed` and `--output` options as `generate`, plus the same `--visible-name` and `--folder` options as `send` (the visible name defaults to `rectangle-<width>x<height>-<seed>` if not given). If generation succeeds but the upload fails, the local PDF is kept and the error is reported clearly.
 
 See the CLI's built-in help:
 

@@ -105,3 +105,17 @@ Defined in: `packages/cli/src/generate.ts`
 | credentialsPath | string | optional, injectable for testing; defaults to `~/.config/remarkable-maze-generator/credentials.json` |
 | promptPairingCode | () => Promise\<string\> | optional, injectable for testing; defaults to an interactive terminal prompt |
 Defined in: `packages/cli/src/send.ts`
+
+## GenerateAndSendOptions (CLI)
+| Field | Type | Notes |
+|---|---|---|
+| width | number | maze width in cells |
+| height | number | maze height in cells |
+| seed | number | optional, defaults to a random value |
+| output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
+| cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
+| visibleName | string | optional, defaults to `rectangle-<width>x<height>-<seed>` (see ADR 014) |
+| folder | string | optional; forwarded to `core`'s `uploadPdf` — target folder must already exist |
+| credentialsPath | string | optional, injectable for testing; defaults to `~/.config/remarkable-maze-generator/credentials.json` |
+| promptPairingCode | () => Promise\<string\> | optional, injectable for testing; defaults to an interactive terminal prompt |
+Defined in: `packages/cli/src/generate-and-send.ts`
