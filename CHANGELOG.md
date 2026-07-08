@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Users can now generate a maze PDF through the web API by sending its parameters (size, seed, difficulty, and solution display mode) to `POST /api/mazes/generate`, receiving the PDF directly in response
+
 ## [0.3.0] - 2026-07-09
 
 ### Added
