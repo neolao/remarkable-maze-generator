@@ -3,6 +3,7 @@ import { CORE_VERSION } from "@remarkable-maze-generator/core";
 import { Command } from "commander";
 import { parseIntegerOption } from "./cli-options.js";
 import { runGenerate } from "./generate.js";
+import { runSend } from "./send.js";
 
 const program = new Command();
 
@@ -46,5 +47,31 @@ program
 			}
 		},
 	);
+
+program
+	.command("send")
+	.description("Upload a local PDF file to reMarkable Cloud")
+	.argument("<file>", "path to the local PDF file to upload")
+	.option(
+		"--visible-name <name>",
+		"name to show on the reMarkable tablet (defaults to the file name)",
+	)
+	.action(async (file: string, opts: { visibleName?: string }) => {
+		try {
+			const { visibleName } = await runSend({
+				filePath: file,
+				visibleName: opts.visibleName,
+				// Internal test hooks, not part of the public CLI surface.
+				credentialsPath: process.env.REMARKABLE_MAZE_CREDENTIALS_PATH,
+				baseUrl: process.env.REMARKABLE_MAZE_BASE_URL,
+			});
+			console.log(
+				`Uploaded "${file}" to reMarkable Cloud as "${visibleName}".`,
+			);
+		} catch (error) {
+			console.error(`Error: ${(error as Error).message}`);
+			process.exitCode = 1;
+		}
+	});
 
 program.parse();

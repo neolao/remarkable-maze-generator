@@ -1,5 +1,5 @@
 # Module: cli
-**Role:** Command-line interface (Commander) generating mazes as PDF and, eventually, sending them to reMarkable. The `generate` command (width/height/seed/output) is implemented; authentication and upload commands are not yet added.
-**Files:** `packages/cli/src/index.ts`, `packages/cli/src/generate.ts`, `packages/cli/src/cli-options.ts`
-**Exports:** `remarkable-maze` binary (entry point `program.parse()`, subcommand `generate`), `runGenerate(options: GenerateOptions): Promise<GenerateResult>`, `parseIntegerOption(value, flagName): number`
+**Role:** Command-line interface (Commander) generating mazes as PDF and sending them to reMarkable. The `generate` (width/height/seed/output) and `send` (upload a local PDF, with interactive first-time pairing) commands are implemented; a combined generate-and-send command is not yet added.
+**Files:** `packages/cli/src/index.ts`, `packages/cli/src/generate.ts`, `packages/cli/src/cli-options.ts`, `packages/cli/src/send.ts`, `packages/cli/src/credential-store.ts`
+**Exports:** `remarkable-maze` binary (entry point `program.parse()`, subcommands `generate` and `send`), `runGenerate(options: GenerateOptions): Promise<GenerateResult>`, `parseIntegerOption(value, flagName): number`, `runSend(options: SendOptions): Promise<SendResult>` (prompts interactively for a pairing code on first use, per ADR 011), `createFileCredentialStore(filePath): CredentialStore` (JSON file at `~/.config/remarkable-maze-generator/credentials.json` by default, mode `0600`)
 **Depends on:** [`modules/core.md`](core.md)

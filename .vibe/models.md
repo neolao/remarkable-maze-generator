@@ -97,3 +97,14 @@ Defined in: `packages/core/src/remarkable-upload.ts`
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 Defined in: `packages/cli/src/generate.ts`
+
+## SendOptions (CLI)
+| Field | Type | Notes |
+|---|---|---|
+| filePath | string | local PDF file to upload; checked to exist before any prompt or network call |
+| visibleName | string | optional, defaults to the file name without extension |
+| credentialsPath | string | optional, injectable for testing; defaults to `~/.config/remarkable-maze-generator/credentials.json` |
+| promptPairingCode | () => Promise\<string\> | optional, injectable for testing; defaults to an interactive terminal prompt |
+| fetch | typeof fetch | optional, injectable for testing; forwarded to `core`'s `authenticate()` and `uploadPdf()` |
+| baseUrl | string | optional, injectable for testing; forwarded to `core`'s `authenticate()` and `uploadPdf()` |
+Defined in: `packages/cli/src/send.ts`

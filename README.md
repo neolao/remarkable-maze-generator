@@ -36,6 +36,14 @@ Or, using the `generate.sh` shortcut at the repository root:
 
 Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--output` (optional, defaults to `./maze.pdf`).
 
+Upload a local PDF file to your reMarkable Cloud account:
+
+```bash
+npm run start --workspace packages/cli -- send maze.pdf
+```
+
+The first time, you'll be prompted for a one-time pairing code (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, so later uploads don't ask again. Use `--visible-name <name>` to control how the file is named on the tablet (defaults to the file name).
+
 See the CLI's built-in help:
 
 ```bash
