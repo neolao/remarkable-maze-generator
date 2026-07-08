@@ -1,6 +1,6 @@
 ---
 date: 2026-07-08
-status: accepted
+status: superseded by 012
 ---
 # reMarkable Cloud PDF upload design
 

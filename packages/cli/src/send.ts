@@ -19,8 +19,6 @@ export interface SendOptions {
 	visibleName?: string;
 	credentialsPath?: string;
 	promptPairingCode?: () => Promise<string>;
-	fetch?: typeof fetch;
-	baseUrl?: string;
 }
 
 export interface SendResult {
@@ -55,18 +53,13 @@ export async function runSend(options: SendOptions): Promise<SendResult> {
 		options.promptPairingCode ?? defaultPromptPairingCode;
 	const pairingCode = existing ? "" : await promptPairingCode();
 
-	const session = await authenticate(store, pairingCode, {
-		fetch: options.fetch,
-		baseUrl: options.baseUrl,
-	});
+	const session = await authenticate(store, pairingCode);
 	const visibleName =
 		options.visibleName ??
 		basename(options.filePath, extname(options.filePath));
 
 	await uploadPdf(session, options.filePath, visibleName, {
 		readFile: (path) => readFile(path),
-		fetch: options.fetch,
-		baseUrl: options.baseUrl,
 	});
 
 	return { visibleName };

@@ -61,9 +61,6 @@ program
 			const { visibleName } = await runSend({
 				filePath: file,
 				visibleName: opts.visibleName,
-				// Internal test hooks, not part of the public CLI surface.
-				credentialsPath: process.env.REMARKABLE_MAZE_CREDENTIALS_PATH,
-				baseUrl: process.env.REMARKABLE_MAZE_BASE_URL,
 			});
 			console.log(
 				`Uploaded "${file}" to reMarkable Cloud as "${visibleName}".`,

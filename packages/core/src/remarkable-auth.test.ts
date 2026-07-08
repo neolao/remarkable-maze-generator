@@ -1,16 +1,26 @@
-import { describe, expect, it, vi } from "vitest";
-import {
-	authenticate,
-	refreshUserToken,
-	registerDevice,
-} from "./remarkable-auth.js";
+import { ResponseError, register, remarkable } from "rmapi-js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticate } from "./remarkable-auth.js";
 import type {
 	CredentialStore,
 	RemarkableCredentials,
 } from "./remarkable-credential-store.js";
 
+vi.mock("rmapi-js", () => {
+	class ResponseError extends Error {
+		status: number;
+		statusText: string;
+		constructor(status: number, statusText: string, message: string) {
+			super(message);
+			this.status = status;
+			this.statusText = statusText;
+		}
+	}
+	return { register: vi.fn(), remarkable: vi.fn(), ResponseError };
+});
+
 class InMemoryCredentialStore implements CredentialStore {
-	private credentials: RemarkableCredentials | null = null;
+	private credentials: RemarkableCredentials | null;
 
 	constructor(initial: RemarkableCredentials | null = null) {
 		this.credentials = initial;
@@ -25,114 +35,80 @@ class InMemoryCredentialStore implements CredentialStore {
 	}
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
-	return new Response(typeof body === "string" ? body : JSON.stringify(body), {
-		status,
-	});
-}
+const registerMock = vi.mocked(register);
+const remarkableMock = vi.mocked(remarkable);
 
-describe("registerDevice", () => {
-	it("exchanges a valid pairing code for a device token", async () => {
-		const fetchMock = vi.fn(async () => jsonResponse("device-token-abc"));
-
-		const credentials = await registerDevice("12345678", { fetch: fetchMock });
-
-		expect(credentials).toEqual({ deviceToken: "device-token-abc" });
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		const [url, init] = fetchMock.mock.calls[0];
-		expect(String(url)).toContain("/token/json/2/device/new");
-		expect(JSON.parse(init.body as string)).toMatchObject({ code: "12345678" });
-	});
-
-	it("throws a clear error for an invalid or expired pairing code", async () => {
-		const fetchMock = vi.fn(async () => jsonResponse("bad code", 400));
-
-		await expect(registerDevice("wrong", { fetch: fetchMock })).rejects.toThrow(
-			/pairing code/i,
-		);
-	});
-
-	it("throws a clear error when the network call fails unexpectedly", async () => {
-		const fetchMock = vi.fn(async () => {
-			throw new Error("network down");
-		});
-
-		await expect(
-			registerDevice("12345678", { fetch: fetchMock }),
-		).rejects.toThrow();
-	});
-});
-
-describe("refreshUserToken", () => {
-	it("exchanges a device token for a user token", async () => {
-		const fetchMock = vi.fn(async () => jsonResponse("user-token-xyz"));
-
-		const result = await refreshUserToken("device-token-abc", {
-			fetch: fetchMock,
-		});
-
-		expect(result).toEqual({ userToken: "user-token-xyz" });
-		const [, init] = fetchMock.mock.calls[0];
-		expect((init.headers as Record<string, string>).Authorization).toBe(
-			"Bearer device-token-abc",
-		);
-	});
-
-	it("throws a clear error when the device token is rejected", async () => {
-		const fetchMock = vi.fn(async () => jsonResponse("unauthorized", 401));
-
-		await expect(
-			refreshUserToken("stale-token", { fetch: fetchMock }),
-		).rejects.toThrow();
-	});
+beforeEach(() => {
+	registerMock.mockReset();
+	remarkableMock.mockReset();
 });
 
 describe("authenticate", () => {
 	it("pairs a new device and stores its credentials when none exist yet", async () => {
+		registerMock.mockResolvedValue("new-device-token");
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the rmapi-js session shape
+		remarkableMock.mockResolvedValue(fakeSession as any);
+
 		const store = new InMemoryCredentialStore();
-		const fetchMock = vi.fn(async (url: string | URL) => {
-			return String(url).includes("device/new")
-				? jsonResponse("device-token-abc")
-				: jsonResponse("user-token-xyz");
-		});
+		const session = await authenticate(store, "12345678");
 
-		const session = await authenticate(store, "12345678", { fetch: fetchMock });
-
-		expect(session).toEqual({
-			deviceToken: "device-token-abc",
-			userToken: "user-token-xyz",
-		});
+		expect(registerMock).toHaveBeenCalledWith("12345678", expect.anything());
+		expect(remarkableMock).toHaveBeenCalledWith(
+			"new-device-token",
+			expect.anything(),
+		);
+		expect(session).toBe(fakeSession);
 		await expect(store.load()).resolves.toEqual({
-			deviceToken: "device-token-abc",
+			deviceToken: "new-device-token",
 		});
 	});
 
-	it("reuses an already-paired device without calling the pairing endpoint again", async () => {
+	it("reuses an already-paired device without registering again", async () => {
 		const store = new InMemoryCredentialStore({
-			deviceToken: "existing-device-token",
+			deviceToken: "existing-token",
 		});
-		const fetchMock = vi.fn(async () => jsonResponse("fresh-user-token"));
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the rmapi-js session shape
+		remarkableMock.mockResolvedValue(fakeSession as any);
 
-		const session = await authenticate(store, "unused-code", {
-			fetch: fetchMock,
-		});
+		const session = await authenticate(store, "unused-code");
 
-		expect(session).toEqual({
-			deviceToken: "existing-device-token",
-			userToken: "fresh-user-token",
-		});
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		const [url] = fetchMock.mock.calls[0];
-		expect(String(url)).toContain("user/new");
+		expect(registerMock).not.toHaveBeenCalled();
+		expect(remarkableMock).toHaveBeenCalledWith(
+			"existing-token",
+			expect.anything(),
+		);
+		expect(session).toBe(fakeSession);
 	});
 
-	it("rejects with a clear error for an invalid pairing code and does not save partial credentials", async () => {
-		const store = new InMemoryCredentialStore();
-		const fetchMock = vi.fn(async () => jsonResponse("bad code", 400));
+	it("throws a clear error for an invalid or expired pairing code", async () => {
+		registerMock.mockRejectedValue(
+			new ResponseError(400, "Bad Request", "bad code"),
+		);
 
-		await expect(
-			authenticate(store, "wrong-code", { fetch: fetchMock }),
-		).rejects.toThrow(/pairing code/i);
-		await expect(store.load()).resolves.toBeNull();
+		const store = new InMemoryCredentialStore();
+		await expect(authenticate(store, "wrong-code")).rejects.toThrow(
+			/pairing code/i,
+		);
+	});
+
+	it("throws a clear error when reMarkable Cloud cannot be reached while pairing", async () => {
+		registerMock.mockRejectedValue(new TypeError("fetch failed"));
+
+		const store = new InMemoryCredentialStore();
+		await expect(authenticate(store, "12345678")).rejects.toThrow(
+			/reMarkable Cloud/i,
+		);
+	});
+
+	it("throws a clear error when the session cannot be created after registering", async () => {
+		registerMock.mockResolvedValue("device-token");
+		remarkableMock.mockRejectedValue(new Error("boom"));
+
+		const store = new InMemoryCredentialStore();
+		await expect(authenticate(store, "12345678")).rejects.toThrow(
+			/reMarkable Cloud/i,
+		);
 	});
 });

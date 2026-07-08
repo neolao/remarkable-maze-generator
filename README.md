@@ -12,7 +12,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
-Prerequisite: Node.js 20+ (recommended: 22).
+Prerequisite: Node.js 25+ (required by the reMarkable Cloud integration; see `.nvmrc`).
 
 ```bash
 npm install

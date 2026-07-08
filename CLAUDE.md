@@ -7,7 +7,7 @@
 
 Maze generator that exports to PDF, designed to be sent to a reMarkable tablet. The project provides two interfaces — a CLI and a web UI — sharing the same generation core (maze, PDF layout, reMarkable Cloud API client).
 
-**Stack:** Node.js 22 / TypeScript, npm workspaces (monorepo), Vitest, Biome
+**Stack:** Node.js 25+ / TypeScript, npm workspaces (monorepo), Vitest, Biome
 **Type:** Full-stack (CLI + web API/server + shared core)
 
 ## Architecture

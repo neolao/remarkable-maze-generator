@@ -67,25 +67,22 @@ Defined in: `packages/core/src/remarkable-credential-store.ts`
 Defined in: `packages/core/src/remarkable-credential-store.ts`
 
 ## RemarkableSession
-| Field | Type | Notes |
-|---|---|---|
-| deviceToken | string | long-lived, reused across sessions |
-| userToken | string | short-lived, refreshed on each `authenticate()` call |
-Defined in: `packages/core/src/remarkable-auth.ts`
+Opaque type alias for `rmapi-js`'s `RemarkableApi` client instance (not a plain data object — callers should not introspect it, only pass it to `uploadPdf()`). Exposes `.uploadPdf(visibleName, buffer)` internally, among other `rmapi-js` methods.
+Defined in: `packages/core/src/remarkable-auth.ts` (see ADR 012)
 
 ## RemarkableAuthOptions
+Alias for `rmapi-js`'s `RemarkableOptions`.
 | Field | Type | Notes |
 |---|---|---|
-| fetch | typeof fetch | optional, injectable for testing; defaults to the global `fetch` |
-| baseUrl | string | optional, injectable for testing; defaults to the real reMarkable Cloud API |
+| authHost | string | optional, injectable for testing; defaults to the real reMarkable auth host |
+| uploadHost | string | optional, injectable for testing |
+| rawHost | string | optional, injectable for testing |
 Defined in: `packages/core/src/remarkable-auth.ts`
 
 ## UploadPdfOptions
 | Field | Type | Notes |
 |---|---|---|
 | readFile | (path: string) => Promise\<Uint8Array\> | required, no default — caller supplies file access (e.g. `node:fs/promises.readFile`) |
-| fetch | typeof fetch | optional, injectable for testing; defaults to the global `fetch` |
-| baseUrl | string | optional, injectable for testing; defaults to the real reMarkable Cloud document-storage API |
 Defined in: `packages/core/src/remarkable-upload.ts`
 
 ## GenerateOptions (CLI)
@@ -105,6 +102,4 @@ Defined in: `packages/cli/src/generate.ts`
 | visibleName | string | optional, defaults to the file name without extension |
 | credentialsPath | string | optional, injectable for testing; defaults to `~/.config/remarkable-maze-generator/credentials.json` |
 | promptPairingCode | () => Promise\<string\> | optional, injectable for testing; defaults to an interactive terminal prompt |
-| fetch | typeof fetch | optional, injectable for testing; forwarded to `core`'s `authenticate()` and `uploadPdf()` |
-| baseUrl | string | optional, injectable for testing; forwarded to `core`'s `authenticate()` and `uploadPdf()` |
 Defined in: `packages/cli/src/send.ts`

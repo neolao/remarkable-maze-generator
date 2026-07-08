@@ -10,6 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Users can now upload a local PDF file to their reMarkable Cloud account directly from the command line with `remarkable-maze send <file>`, with a guided one-time pairing prompt on first use
 
+### Changed
+
+- Raised the minimum required Node.js version to 25+, needed by the updated reMarkable Cloud integration
+
+### Fixed
+
+- Fixed reMarkable Cloud uploads failing outright because the cloud service they relied on had been retired; uploads now go through reMarkable's current protocol and have been verified against a real account
+- Fixed unclear error messages when reMarkable Cloud cannot be reached during authentication or upload
+
 ## [0.1.0] - 2026-07-08
 
 ### Added

@@ -12,8 +12,8 @@
 		"build": "tsc -p tsconfig.json"
 	},
 	"dependencies": {
-		"fflate": "^0.8.3",
-		"pdf-lib": "^1.17.1"
+		"pdf-lib": "^1.17.1",
+		"rmapi-js": "^11.0.0"
 	},
 	"devDependencies": {
 		"typescript": "^5.7.3"

@@ -29,10 +29,6 @@ export type {
 	RemarkableAuthOptions,
 	RemarkableSession,
 } from "./remarkable-auth.js";
-export {
-	authenticate,
-	refreshUserToken,
-	registerDevice,
-} from "./remarkable-auth.js";
+export { authenticate } from "./remarkable-auth.js";
 export type { UploadPdfOptions } from "./remarkable-upload.js";
 export { uploadPdf } from "./remarkable-upload.js";

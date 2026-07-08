@@ -1,8 +1,17 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { authenticate, uploadPdf } from "@remarkable-maze-generator/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runSend } from "./send.js";
+
+vi.mock("@remarkable-maze-generator/core", () => ({
+	authenticate: vi.fn(),
+	uploadPdf: vi.fn(),
+}));
+
+const authenticateMock = vi.mocked(authenticate);
+const uploadPdfMock = vi.mocked(uploadPdf);
 
 let workDir: string;
 let pdfPath: string;
@@ -11,107 +20,62 @@ beforeEach(async () => {
 	workDir = await mkdtemp(join(tmpdir(), "remarkable-maze-send-test-"));
 	pdfPath = join(workDir, "maze.pdf");
 	await writeFile(pdfPath, Buffer.from("%PDF-1.7 fake content"));
+	authenticateMock.mockReset();
+	uploadPdfMock.mockReset();
 });
 
 afterEach(async () => {
 	await rm(workDir, { recursive: true, force: true });
 });
 
-function textResponse(body: string, status = 200): Response {
-	return new Response(body, { status });
-}
-
-function createFakeCloudFetch(baseUrl: string) {
-	return vi.fn(async (url: string | URL, init?: RequestInit) => {
-		const href = String(url);
-
-		if (href === `${baseUrl}/token/json/2/device/new`) {
-			return textResponse("fake-device-token");
-		}
-		if (href === `${baseUrl}/token/json/2/user/new`) {
-			return textResponse("fake-user-token");
-		}
-		if (href === `${baseUrl}/document-storage/json/2/upload/request`) {
-			const [payload] = JSON.parse(init?.body as string);
-			return textResponse(
-				JSON.stringify([
-					{
-						ID: payload.ID,
-						Version: 1,
-						Success: true,
-						BlobURLPut: `${baseUrl}/blob/put-url`,
-					},
-				]),
-			);
-		}
-		if (href === `${baseUrl}/blob/put-url`) {
-			return textResponse("");
-		}
-		if (href === `${baseUrl}/document-storage/json/2/upload/update-status`) {
-			return textResponse(JSON.stringify([{ Success: true }]));
-		}
-
-		throw new Error(`Unexpected fetch call to ${href}`);
-	});
-}
-
 describe("runSend", () => {
 	it("uploads using already-stored credentials without prompting", async () => {
-		const baseUrl = "https://fake-remarkable.test";
 		const credentialsPath = join(workDir, "credentials.json");
 		await writeFile(
 			credentialsPath,
 			JSON.stringify({ deviceToken: "existing-token" }),
 		);
 
-		const fetchMock = createFakeCloudFetch(baseUrl);
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
 		const promptPairingCode = vi.fn();
 
 		const result = await runSend({
 			filePath: pdfPath,
 			credentialsPath,
 			promptPairingCode,
-			fetch: fetchMock,
-			baseUrl,
 		});
 
 		expect(result.visibleName).toBe("maze");
 		expect(promptPairingCode).not.toHaveBeenCalled();
+		expect(uploadPdfMock).toHaveBeenCalledWith(
+			fakeSession,
+			pdfPath,
+			"maze",
+			expect.anything(),
+		);
 	});
 
-	it("prompts for a pairing code on first use and remembers it for next time", async () => {
-		const baseUrl = "https://fake-remarkable.test";
+	it("prompts for a pairing code on first use", async () => {
 		const credentialsPath = join(workDir, "credentials.json");
-		const fetchMock = createFakeCloudFetch(baseUrl);
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue({} as any);
+		uploadPdfMock.mockResolvedValue(undefined);
 		const promptPairingCode = vi.fn(async () => "12345678");
 
-		await runSend({
-			filePath: pdfPath,
-			credentialsPath,
-			promptPairingCode,
-			fetch: fetchMock,
-			baseUrl,
-		});
+		await runSend({ filePath: pdfPath, credentialsPath, promptPairingCode });
 
 		expect(promptPairingCode).toHaveBeenCalledTimes(1);
-		const saved = JSON.parse(await readFile(credentialsPath, "utf8"));
-		expect(saved).toEqual({ deviceToken: "fake-device-token" });
-
-		const promptAgain = vi.fn();
-		await runSend({
-			filePath: pdfPath,
-			credentialsPath,
-			promptPairingCode: promptAgain,
-			fetch: fetchMock,
-			baseUrl,
-		});
-		expect(promptAgain).not.toHaveBeenCalled();
+		expect(authenticateMock).toHaveBeenCalledWith(
+			expect.anything(),
+			"12345678",
+		);
 	});
 
-	it("rejects with a clear error when the local file does not exist, without prompting or calling the network", async () => {
-		const baseUrl = "https://fake-remarkable.test";
+	it("rejects with a clear error when the local file does not exist, without prompting or authenticating", async () => {
 		const credentialsPath = join(workDir, "credentials.json");
-		const fetchMock = createFakeCloudFetch(baseUrl);
 		const promptPairingCode = vi.fn();
 
 		await expect(
@@ -119,12 +83,10 @@ describe("runSend", () => {
 				filePath: join(workDir, "missing.pdf"),
 				credentialsPath,
 				promptPairingCode,
-				fetch: fetchMock,
-				baseUrl,
 			}),
 		).rejects.toThrow(/not found/i);
 
 		expect(promptPairingCode).not.toHaveBeenCalled();
-		expect(fetchMock).not.toHaveBeenCalled();
+		expect(authenticateMock).not.toHaveBeenCalled();
 	});
 });
