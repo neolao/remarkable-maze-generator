@@ -87,3 +87,13 @@ Defined in: `packages/core/src/remarkable-auth.ts`
 | fetch | typeof fetch | optional, injectable for testing; defaults to the global `fetch` |
 | baseUrl | string | optional, injectable for testing; defaults to the real reMarkable Cloud document-storage API |
 Defined in: `packages/core/src/remarkable-upload.ts`
+
+## GenerateOptions (CLI)
+| Field | Type | Notes |
+|---|---|---|
+| width | number | maze width in cells |
+| height | number | maze height in cells |
+| seed | number | optional, defaults to a random value |
+| output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
+| cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
+Defined in: `packages/cli/src/generate.ts`

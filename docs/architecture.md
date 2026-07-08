@@ -4,7 +4,7 @@
 
 remarkable-maze-generator is organized into three main parts, grouped in a single repository (monorepo):
 
-- **The core (`core`)** — this is where maze generation, PDF layout, and the connection to the reMarkable Cloud API for sending documents to the tablet live (or will live). This core is shared: business logic is written only once here.
+- **The core (`core`)** — maze generation, PDF layout, and the connection to the reMarkable Cloud API for sending documents to the tablet all live here. This core is shared: business logic is written only once.
 - **The CLI** — a command-line interface that relies on the core to generate a maze and produce the corresponding PDF from a terminal.
 - **The web UI** — a web server that also relies on the core, serving both a visual interface (web page) and an API to generate mazes from a browser.
 
@@ -25,4 +25,6 @@ The CLI and the web UI contain no generation logic of their own: they call the c
 
 ## Current status
 
-The project is at the scaffold stage: the structure of the three parts is in place and tested, but maze generation, PDF rendering, and reMarkable Cloud integration still need to be implemented in the core.
+- **Core**: maze generation, automatic solution solving, PDF export (sized for the reMarkable 2, with an optional solution page or overlay), batch generation, and reMarkable Cloud authentication and upload are all implemented. The reMarkable Cloud upload has not yet been validated against a real account.
+- **CLI**: its first real command is available — generating a maze and saving it as a PDF from the terminal. Commands to authenticate with and send documents to reMarkable Cloud are still to come.
+- **Web UI**: still a skeleton (a single diagnostic endpoint); the maze configuration form and API are not implemented yet.

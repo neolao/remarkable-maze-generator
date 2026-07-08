@@ -15,3 +15,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Users can now generate a batch of several mazes at once, as either one combined PDF (one maze per page) or several separate PDF files
 - The system can now authenticate with reMarkable Cloud using a one-time pairing code, and reuses that pairing on later calls without asking for a new code
 - Users can now upload a generated maze PDF directly to their reMarkable Cloud account
+- Users can now generate a maze PDF from the command line with `remarkable-maze generate --width <n> --height <n>`, with an optional seed and output path
