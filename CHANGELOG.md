@@ -11,3 +11,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Users can now generate a maze by specifying its width, height, and a random seed, with the same seed always reproducing the same maze
 - The system can now compute the solution path from a maze's entrance to its exit
 - Users can now render a generated maze as a PDF sized for the reMarkable 2 tablet
+- Users can now include the maze's solution in the PDF, either on a separate page or overlaid on the maze

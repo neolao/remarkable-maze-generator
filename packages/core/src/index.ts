@@ -4,6 +4,10 @@ export type { Cell, CellWalls, GenerateMazeOptions, Maze } from "./maze.js";
 export { generateMaze } from "./maze.js";
 export type { MazePosition } from "./maze-solver.js";
 export { solveMaze } from "./maze-solver.js";
+export type {
+	RenderMazeToPdfOptions,
+	SolutionDisplayMode,
+} from "./maze-pdf.js";
 export {
 	REMARKABLE_2_PAGE_HEIGHT_PT,
 	REMARKABLE_2_PAGE_WIDTH_PT,

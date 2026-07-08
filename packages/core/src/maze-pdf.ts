@@ -1,4 +1,6 @@
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument, type PDFPage, rgb } from "pdf-lib";
+import type { MazePosition } from "./maze-solver.js";
+import { solveMaze } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
 
 export const REMARKABLE_2_PAGE_WIDTH_PT = (1404 / 226) * 72;
@@ -7,6 +9,20 @@ export const REMARKABLE_2_PAGE_HEIGHT_PT = (1872 / 226) * 72;
 const PAGE_MARGIN_PT = 24;
 const WALL_THICKNESS_PT = 1.5;
 const WALL_COLOR = rgb(0, 0, 0);
+const SOLUTION_THICKNESS_PT = 2;
+const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
+
+export type SolutionDisplayMode = "none" | "extra-page" | "overlay";
+
+export interface RenderMazeToPdfOptions {
+	solution?: SolutionDisplayMode;
+}
+
+interface MazeLayout {
+	cellSize: number;
+	leftOffset: number;
+	topOffset: number;
+}
 
 function validateMaze(maze: Maze): void {
 	if (
@@ -27,18 +43,7 @@ function validateMaze(maze: Maze): void {
 	}
 }
 
-export async function renderMazeToPdf(maze: Maze): Promise<Uint8Array> {
-	validateMaze(maze);
-
-	const document = await PDFDocument.create();
-	document.setCreationDate(new Date(0));
-	document.setModificationDate(new Date(0));
-
-	const page = document.addPage([
-		REMARKABLE_2_PAGE_WIDTH_PT,
-		REMARKABLE_2_PAGE_HEIGHT_PT,
-	]);
-
+function computeLayout(maze: Maze): MazeLayout {
 	const drawableWidth = REMARKABLE_2_PAGE_WIDTH_PT - 2 * PAGE_MARGIN_PT;
 	const drawableHeight = REMARKABLE_2_PAGE_HEIGHT_PT - 2 * PAGE_MARGIN_PT;
 	const cellSize = Math.min(
@@ -48,16 +53,25 @@ export async function renderMazeToPdf(maze: Maze): Promise<Uint8Array> {
 
 	const mazeWidthPt = cellSize * maze.width;
 	const mazeHeightPt = cellSize * maze.height;
-	const leftOffset = PAGE_MARGIN_PT + (drawableWidth - mazeWidthPt) / 2;
-	const topOffset = PAGE_MARGIN_PT + (drawableHeight - mazeHeightPt) / 2;
 
-	const toPdfY = (mazeY: number) =>
-		REMARKABLE_2_PAGE_HEIGHT_PT - topOffset - mazeY;
+	return {
+		cellSize,
+		leftOffset: PAGE_MARGIN_PT + (drawableWidth - mazeWidthPt) / 2,
+		topOffset: PAGE_MARGIN_PT + (drawableHeight - mazeHeightPt) / 2,
+	};
+}
+
+function toPdfY(layout: MazeLayout, mazeY: number): number {
+	return REMARKABLE_2_PAGE_HEIGHT_PT - layout.topOffset - mazeY;
+}
+
+function drawMazeWalls(page: PDFPage, maze: Maze, layout: MazeLayout): void {
+	const { cellSize, leftOffset } = layout;
 
 	const drawWall = (x1: number, y1: number, x2: number, y2: number) => {
 		page.drawLine({
-			start: { x: leftOffset + x1, y: toPdfY(y1) },
-			end: { x: leftOffset + x2, y: toPdfY(y2) },
+			start: { x: leftOffset + x1, y: toPdfY(layout, y1) },
+			end: { x: leftOffset + x2, y: toPdfY(layout, y2) },
 			thickness: WALL_THICKNESS_PT,
 			color: WALL_COLOR,
 		});
@@ -76,6 +90,61 @@ export async function renderMazeToPdf(maze: Maze): Promise<Uint8Array> {
 			if (y === maze.height - 1 && cell.walls.south)
 				drawWall(px, py + cellSize, px + cellSize, py + cellSize);
 		}
+	}
+}
+
+function drawSolutionPath(
+	page: PDFPage,
+	path: MazePosition[],
+	layout: MazeLayout,
+): void {
+	const { cellSize, leftOffset } = layout;
+	const cellCenter = (position: MazePosition) => ({
+		x: leftOffset + position.x * cellSize + cellSize / 2,
+		y: toPdfY(layout, position.y * cellSize + cellSize / 2),
+	});
+
+	for (let i = 0; i < path.length - 1; i++) {
+		const from = cellCenter(path[i]);
+		const to = cellCenter(path[i + 1]);
+
+		page.drawLine({
+			start: from,
+			end: to,
+			thickness: SOLUTION_THICKNESS_PT,
+			color: SOLUTION_COLOR,
+		});
+	}
+}
+
+export async function renderMazeToPdf(
+	maze: Maze,
+	options: RenderMazeToPdfOptions = {},
+): Promise<Uint8Array> {
+	validateMaze(maze);
+	const solutionMode = options.solution ?? "none";
+
+	const document = await PDFDocument.create();
+	document.setCreationDate(new Date(0));
+	document.setModificationDate(new Date(0));
+
+	const layout = computeLayout(maze);
+
+	const mazePage = document.addPage([
+		REMARKABLE_2_PAGE_WIDTH_PT,
+		REMARKABLE_2_PAGE_HEIGHT_PT,
+	]);
+	drawMazeWalls(mazePage, maze, layout);
+
+	if (solutionMode === "overlay") {
+		drawSolutionPath(mazePage, solveMaze(maze), layout);
+	} else if (solutionMode === "extra-page") {
+		const solutionPage = document.addPage([
+			REMARKABLE_2_PAGE_WIDTH_PT,
+			REMARKABLE_2_PAGE_HEIGHT_PT,
+		]);
+		drawMazeWalls(solutionPage, maze, layout);
+		drawSolutionPath(solutionPage, solveMaze(maze), layout);
 	}
 
 	return document.save();

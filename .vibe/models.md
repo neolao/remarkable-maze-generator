@@ -37,3 +37,9 @@ Defined in: `packages/core/src/maze.ts`
 | x | number | column index |
 | y | number | row index |
 Defined in: `packages/core/src/maze-solver.ts`
+
+## RenderMazeToPdfOptions
+| Field | Type | Notes |
+|---|---|---|
+| solution | SolutionDisplayMode | optional, defaults to `"none"` |
+Defined in: `packages/core/src/maze-pdf.ts`

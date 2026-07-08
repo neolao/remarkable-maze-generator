@@ -51,4 +51,41 @@ describe("renderMazeToPdf", () => {
 
 		await expect(renderMazeToPdf(invalidMaze)).rejects.toThrow();
 	});
+
+	it("produces a single page with no solution when the option is not set", async () => {
+		const maze = generateMaze({ width: 6, height: 6, seed: 3 });
+		const pdfBytes = await renderMazeToPdf(maze);
+
+		const doc = await PDFDocument.load(pdfBytes);
+		expect(doc.getPageCount()).toBe(1);
+	});
+
+	it("produces two pages when the solution is requested as an extra page", async () => {
+		const maze = generateMaze({ width: 6, height: 6, seed: 3 });
+		const pdfBytes = await renderMazeToPdf(maze, { solution: "extra-page" });
+
+		const doc = await PDFDocument.load(pdfBytes);
+		expect(doc.getPageCount()).toBe(2);
+	});
+
+	it("produces a single page with the solution overlaid when requested", async () => {
+		const maze = generateMaze({ width: 6, height: 6, seed: 3 });
+		const withoutSolution = await renderMazeToPdf(maze);
+		const withOverlay = await renderMazeToPdf(maze, { solution: "overlay" });
+
+		const doc = await PDFDocument.load(withOverlay);
+		expect(doc.getPageCount()).toBe(1);
+		expect(Buffer.from(withOverlay)).not.toEqual(Buffer.from(withoutSolution));
+	});
+
+	it("does not error when rendering a 1x1 maze with the solution enabled", async () => {
+		const maze = generateMaze({ width: 1, height: 1, seed: 1 });
+
+		await expect(
+			renderMazeToPdf(maze, { solution: "extra-page" }),
+		).resolves.toBeInstanceOf(Uint8Array);
+		await expect(
+			renderMazeToPdf(maze, { solution: "overlay" }),
+		).resolves.toBeInstanceOf(Uint8Array);
+	});
 });
