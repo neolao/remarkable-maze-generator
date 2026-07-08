@@ -1,3 +1,4 @@
+import { inflateSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import {
@@ -9,6 +10,31 @@ import {
 } from "./maze-pdf.js";
 import { generateMaze, generateMazeBatch } from "./maze.js";
 import type { Maze } from "./maze.js";
+
+function countStrokedLines(pdfBytes: Uint8Array): number {
+	const text = Buffer.from(pdfBytes).toString("latin1");
+	const streamMatch = text.match(/stream\r?\n([\s\S]*?)endstream/);
+	if (!streamMatch) throw new Error("No content stream found in PDF");
+
+	const compressed = Buffer.from(streamMatch[1], "latin1");
+	const content = inflateSync(compressed).toString("latin1");
+
+	return (content.match(/^S$/gm) || []).length;
+}
+
+function countExpectedWalls(maze: Maze): number {
+	let count = 0;
+	for (let y = 0; y < maze.height; y++) {
+		for (let x = 0; x < maze.width; x++) {
+			const cell = maze.cells[y][x];
+			if (cell.walls.north) count++;
+			if (cell.walls.west) count++;
+			if (x === maze.width - 1 && cell.walls.east) count++;
+			if (y === maze.height - 1 && cell.walls.south) count++;
+		}
+	}
+	return count;
+}
 
 describe("renderMazeToPdf", () => {
 	it("produces a valid PDF file from a generated maze", async () => {
@@ -89,6 +115,23 @@ describe("renderMazeToPdf", () => {
 		await expect(
 			renderMazeToPdf(maze, { solution: "overlay" }),
 		).resolves.toBeInstanceOf(Uint8Array);
+	});
+
+	it("leaves a visible opening in the boundary at the entrance and the exit", async () => {
+		const maze = generateMaze({ width: 8, height: 6, seed: 3 });
+		const pdfBytes = await renderMazeToPdf(maze);
+
+		const strokedLines = countStrokedLines(pdfBytes);
+		const expectedWalls = countExpectedWalls(maze);
+
+		expect(strokedLines).toBe(expectedWalls - 2);
+	});
+
+	it("still shows an opening on a 1x1 maze, where entrance and exit are the same cell", async () => {
+		const maze = generateMaze({ width: 1, height: 1, seed: 1 });
+		const pdfBytes = await renderMazeToPdf(maze);
+
+		expect(countStrokedLines(pdfBytes)).toBe(2);
 	});
 });
 

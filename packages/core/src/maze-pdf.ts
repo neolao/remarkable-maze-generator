@@ -82,12 +82,14 @@ function drawMazeWalls(page: PDFPage, maze: Maze, layout: MazeLayout): void {
 			const cell = maze.cells[y][x];
 			const px = x * cellSize;
 			const py = y * cellSize;
+			const isEntrance = x === 0 && y === 0;
+			const isExit = x === maze.width - 1 && y === maze.height - 1;
 
-			if (cell.walls.north) drawWall(px, py, px + cellSize, py);
+			if (cell.walls.north && !isEntrance) drawWall(px, py, px + cellSize, py);
 			if (cell.walls.west) drawWall(px, py, px, py + cellSize);
 			if (x === maze.width - 1 && cell.walls.east)
 				drawWall(px + cellSize, py, px + cellSize, py + cellSize);
-			if (y === maze.height - 1 && cell.walls.south)
+			if (y === maze.height - 1 && cell.walls.south && !isExit)
 				drawWall(px, py + cellSize, px + cellSize, py + cellSize);
 		}
 	}

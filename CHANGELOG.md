@@ -16,3 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The system can now authenticate with reMarkable Cloud using a one-time pairing code, and reuses that pairing on later calls without asking for a new code
 - Users can now upload a generated maze PDF directly to their reMarkable Cloud account
 - Users can now generate a maze PDF from the command line with `remarkable-maze generate --width <n> --height <n>`, with an optional seed and output path
+
+### Fixed
+
+- Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
