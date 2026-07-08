@@ -4,10 +4,21 @@ import { uploadPdf } from "./remarkable-upload.js";
 
 const FAKE_PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
 
+interface FakeEntry {
+	id: string;
+	hash: string;
+}
+
+interface FakeMetadata {
+	type: string;
+	visibleName: string;
+	parent: string;
+}
+
 interface FakeSessionOverrides {
 	uploadPdf?: (name: string, buffer: Uint8Array) => Promise<unknown>;
-	listItems?: () => Promise<unknown[]>;
-	putFolder?: (name: string) => Promise<{ id: string; hash: string }>;
+	listIds?: () => Promise<FakeEntry[]>;
+	getMetadata?: (id: string, hash: string) => Promise<FakeMetadata>;
 	putPdf?: (
 		name: string,
 		buffer: Uint8Array,
@@ -18,9 +29,10 @@ interface FakeSessionOverrides {
 function createFakeSession(overrides: FakeSessionOverrides = {}) {
 	return {
 		uploadPdf: vi.fn(overrides.uploadPdf ?? (async () => ({}))),
-		listItems: vi.fn(overrides.listItems ?? (async () => [])),
-		putFolder: vi.fn(
-			overrides.putFolder ?? (async () => ({ id: "new-folder-id", hash: "h" })),
+		listIds: vi.fn(overrides.listIds ?? (async () => [])),
+		getMetadata: vi.fn(
+			overrides.getMetadata ??
+				(async () => ({ type: "DocumentType", visibleName: "", parent: "" })),
 		),
 		putPdf: vi.fn(overrides.putPdf ?? (async () => ({}))),
 	} as unknown as RemarkableSession;
@@ -78,16 +90,22 @@ describe("uploadPdf", () => {
 		).rejects.toThrow(/upload/i);
 	});
 
-	it("uploads into an existing folder by resolving its id", async () => {
+	it("uploads into an existing folder by resolving its id, throttling the lookup", async () => {
+		const entries: FakeEntry[] = Array.from({ length: 40 }, (_, i) => ({
+			id: `id-${i}`,
+			hash: `hash-${i}`,
+		}));
 		const session = createFakeSession({
-			listItems: async () => [
-				{
-					type: "CollectionType",
-					id: "folder-123",
-					visibleName: "Mazes",
+			listIds: async () => entries,
+			getMetadata: async (id) => {
+				if (id === "id-20")
+					return { type: "CollectionType", visibleName: "Mazes", parent: "" };
+				return {
+					type: "DocumentType",
+					visibleName: "Something else",
 					parent: "",
-				},
-			],
+				};
+			},
 		});
 		const readFile = vi.fn(async () => FAKE_PDF_BYTES);
 
@@ -99,22 +117,19 @@ describe("uploadPdf", () => {
 		// biome-ignore lint/suspicious/noExplicitAny: accessing the fake session's mocked methods
 		const fakeSession = session as any;
 		expect(fakeSession.putPdf).toHaveBeenCalledWith("My Maze", FAKE_PDF_BYTES, {
-			parent: "folder-123",
+			parent: "id-20",
 		});
-		expect(fakeSession.putFolder).not.toHaveBeenCalled();
 		expect(fakeSession.uploadPdf).not.toHaveBeenCalled();
 	});
 
 	it("rejects with a clear error when the named folder does not exist", async () => {
 		const session = createFakeSession({
-			listItems: async () => [
-				{
-					type: "CollectionType",
-					id: "other-id",
-					visibleName: "Other Folder",
-					parent: "",
-				},
-			],
+			listIds: async () => [{ id: "other-id", hash: "other-hash" }],
+			getMetadata: async () => ({
+				type: "CollectionType",
+				visibleName: "Other Folder",
+				parent: "",
+			}),
 		});
 		const readFile = vi.fn(async () => FAKE_PDF_BYTES);
 
@@ -127,7 +142,6 @@ describe("uploadPdf", () => {
 
 		// biome-ignore lint/suspicious/noExplicitAny: accessing the fake session's mocked methods
 		const fakeSession = session as any;
-		expect(fakeSession.putFolder).not.toHaveBeenCalled();
 		expect(fakeSession.putPdf).not.toHaveBeenCalled();
 	});
 
@@ -139,8 +153,7 @@ describe("uploadPdf", () => {
 
 		// biome-ignore lint/suspicious/noExplicitAny: accessing the fake session's mocked methods
 		const fakeSession = session as any;
-		expect(fakeSession.listItems).not.toHaveBeenCalled();
-		expect(fakeSession.putFolder).not.toHaveBeenCalled();
+		expect(fakeSession.listIds).not.toHaveBeenCalled();
 		expect(fakeSession.uploadPdf).toHaveBeenCalledWith(
 			"My Maze",
 			FAKE_PDF_BYTES,
@@ -149,7 +162,7 @@ describe("uploadPdf", () => {
 
 	it("wraps a folder resolution failure with a clear error", async () => {
 		const session = createFakeSession({
-			listItems: async () => {
+			listIds: async () => {
 				throw new Error("network blip");
 			},
 		});

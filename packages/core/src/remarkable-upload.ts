@@ -5,23 +5,50 @@ export interface UploadPdfOptions {
 	folder?: string;
 }
 
+// Looking up a folder by name requires fetching metadata for every entry in the
+// account. rmapi-js's own listItems() does this with unbounded concurrency
+// (one to three requests per entry, all fired at once), which reliably causes
+// connection timeouts on accounts with hundreds of entries. Walking entries
+// with a small, fixed concurrency avoids that without needing a heavier fix
+// upstream. See ADR 013.
+const FOLDER_LOOKUP_CONCURRENCY = 15;
+
 async function resolveFolderId(
 	session: RemarkableSession,
 	folderName: string,
 ): Promise<string> {
-	const items = await session.listItems();
-	const existing = items.find(
-		(item) =>
-			item.type === "CollectionType" &&
-			item.visibleName === folderName &&
-			(!item.parent || item.parent === ""),
+	const ids = await session.listIds();
+	let cursor = 0;
+	let foundId: string | undefined;
+
+	async function worker(): Promise<void> {
+		while (cursor < ids.length && !foundId) {
+			const entry = ids[cursor];
+			cursor++;
+			const metadata = await session.getMetadata(entry.id, entry.hash);
+			if (
+				metadata.type === "CollectionType" &&
+				metadata.visibleName === folderName &&
+				!metadata.parent
+			) {
+				foundId = entry.id;
+			}
+		}
+	}
+
+	await Promise.all(
+		Array.from(
+			{ length: Math.min(FOLDER_LOOKUP_CONCURRENCY, ids.length) },
+			() => worker(),
+		),
 	);
-	if (!existing) {
+
+	if (!foundId) {
 		throw new Error(
 			`Folder "${folderName}" was not found on reMarkable Cloud. Create it first, then try again.`,
 		);
 	}
-	return existing.id;
+	return foundId;
 }
 
 export async function uploadPdf(

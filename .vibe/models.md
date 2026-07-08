@@ -83,7 +83,7 @@ Defined in: `packages/core/src/remarkable-auth.ts`
 | Field | Type | Notes |
 |---|---|---|
 | readFile | (path: string) => Promise\<Uint8Array\> | required, no default — caller supplies file access (e.g. `node:fs/promises.readFile`) |
-| folder | string | optional; target reMarkable Cloud folder by name — must already exist, throws a clear error otherwise (no auto-create, see ADR 013) |
+| folder | string | optional; target reMarkable Cloud folder by name — must already exist, throws a clear error otherwise; resolved with throttled concurrency (15 at a time) to avoid connection exhaustion on accounts with many items, see ADR 013 |
 Defined in: `packages/core/src/remarkable-upload.ts`
 
 ## GenerateOptions (CLI)
