@@ -29,6 +29,7 @@ Defined in: `packages/core/src/maze.ts`
 | width | number | must be a positive integer |
 | height | number | must be a positive integer |
 | seed | number | same seed reproduces the same maze |
+| difficulty | number | optional integer 1–5, defaults to 1 (easiest); controls branch-point density, see ADR 015 |
 Defined in: `packages/core/src/maze.ts`
 
 ## GenerateMazeBatchOptions
@@ -38,6 +39,7 @@ Defined in: `packages/core/src/maze.ts`
 | height | number | must be a positive integer, shared by every maze in the batch |
 | seed | number | starting seed; maze at index i uses `seed + i` |
 | count | number | must be a positive integer, number of mazes to generate |
+| difficulty | number | optional integer 1–5, defaults to 1; applied to every maze in the batch, see ADR 015 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazePosition
@@ -92,6 +94,7 @@ Defined in: `packages/core/src/remarkable-upload.ts`
 | width | number | maze width in cells |
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
+| difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 Defined in: `packages/cli/src/generate.ts`
@@ -112,6 +115,7 @@ Defined in: `packages/cli/src/send.ts`
 | width | number | maze width in cells |
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
+| difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 | visibleName | string | optional, defaults to `rectangle-<width>x<height>-<seed>` (see ADR 014) |

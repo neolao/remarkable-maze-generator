@@ -24,6 +24,22 @@ function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
 	return visited.size;
 }
 
+function countBranchPoints(maze: ReturnType<typeof generateMaze>): number {
+	let branchPoints = 0;
+	for (const row of maze.cells) {
+		for (const cell of row) {
+			const openings = [
+				cell.walls.north,
+				cell.walls.south,
+				cell.walls.east,
+				cell.walls.west,
+			].filter((wall) => !wall).length;
+			if (openings >= 3) branchPoints++;
+		}
+	}
+	return branchPoints;
+}
+
 describe("generateMaze", () => {
 	it("generates a maze with the given width and height", () => {
 		const maze = generateMaze({ width: 5, height: 4, seed: 1 });
@@ -65,6 +81,64 @@ describe("generateMaze", () => {
 		"rejects invalid dimensions width=$width height=$height",
 		({ width, height }) => {
 			expect(() => generateMaze({ width, height, seed: 1 })).toThrow();
+		},
+	);
+
+	it("produces a maze with more branch points at higher difficulty, for the same size and seed", () => {
+		const easy = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 3,
+			difficulty: 1,
+		});
+		const hard = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 3,
+			difficulty: 5,
+		});
+
+		expect(countBranchPoints(hard)).toBeGreaterThan(countBranchPoints(easy));
+	});
+
+	it("defaults to the easiest difficulty (fewest branch points) when not specified", () => {
+		const withoutOption = generateMaze({ width: 10, height: 10, seed: 5 });
+		const explicitEasy = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			difficulty: 1,
+		});
+
+		expect(withoutOption.cells).toEqual(explicitEasy.cells);
+	});
+
+	it("keeps every cell reachable at the hardest difficulty", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 7,
+			difficulty: 5,
+		});
+
+		expect(countReachableCells(maze)).toBe(10 * 10);
+	});
+
+	it.each([{ difficulty: 1 }, { difficulty: 5 }])(
+		"accepts the boundary difficulty value $difficulty",
+		({ difficulty }) => {
+			expect(() =>
+				generateMaze({ width: 5, height: 5, seed: 1, difficulty }),
+			).not.toThrow();
+		},
+	);
+
+	it.each([{ difficulty: 0 }, { difficulty: 6 }, { difficulty: 2.5 }])(
+		"rejects an invalid difficulty=$difficulty",
+		({ difficulty }) => {
+			expect(() =>
+				generateMaze({ width: 5, height: 5, seed: 1, difficulty }),
+			).toThrow();
 		},
 	);
 });
@@ -117,4 +191,22 @@ describe("generateMazeBatch", () => {
 			).toThrow();
 		},
 	);
+
+	it("applies the given difficulty to every maze in the batch", () => {
+		const [batchMaze] = generateMazeBatch({
+			width: 8,
+			height: 6,
+			seed: 42,
+			count: 1,
+			difficulty: 5,
+		});
+		const singleMaze = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 42,
+			difficulty: 5,
+		});
+
+		expect(batchMaze).toEqual(singleMaze);
+	});
 });

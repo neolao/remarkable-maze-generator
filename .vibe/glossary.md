@@ -25,6 +25,11 @@
 **Code:** `solveMaze()`, `MazePosition[]` in `packages/core/src/maze-solver.ts`
 **Do not confuse with:** —
 
+## Difficulty
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `difficulty` field of `GenerateMazeOptions` / `GenerateMazeBatchOptions`, integer 1–5, in `packages/core/src/maze.ts` (see ADR 015)
+**Do not confuse with:** —
+
 ## Pairing code
 **Definition:** [what this concept means in the domain — fill in]
 **Code:** `pairingCode` parameter of `registerDevice()` / `authenticate()` in `packages/core/src/remarkable-auth.ts`

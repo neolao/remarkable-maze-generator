@@ -78,4 +78,40 @@ describe("runGenerate", () => {
 			).rejects.toThrow();
 		},
 	);
+
+	it("forwards the difficulty option, producing a different maze than the default difficulty", async () => {
+		const easy = await runGenerate({
+			width: 16,
+			height: 16,
+			seed: 3,
+			output: join(workDir, "easy.pdf"),
+			cwd: workDir,
+		});
+		const hard = await runGenerate({
+			width: 16,
+			height: 16,
+			seed: 3,
+			difficulty: 5,
+			output: join(workDir, "hard.pdf"),
+			cwd: workDir,
+		});
+
+		const [easyBytes, hardBytes] = await Promise.all([
+			readFile(easy.outputPath),
+			readFile(hard.outputPath),
+		]);
+		expect(easyBytes).not.toEqual(hardBytes);
+	});
+
+	it("rejects an invalid difficulty with a clear error", async () => {
+		await expect(
+			runGenerate({
+				width: 5,
+				height: 5,
+				seed: 1,
+				difficulty: 9,
+				cwd: workDir,
+			}),
+		).rejects.toThrow();
+	});
 });

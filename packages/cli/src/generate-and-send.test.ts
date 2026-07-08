@@ -167,6 +167,27 @@ describe("runGenerateAndSend", () => {
 		);
 	});
 
+	it("forwards the difficulty option to maze generation", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		await expect(
+			runGenerateAndSend({
+				width: 5,
+				height: 5,
+				seed: 1,
+				difficulty: 9,
+				cwd: workDir,
+				credentialsPath,
+				promptPairingCode: vi.fn(),
+			}),
+		).rejects.toThrow();
+		expect(authenticateMock).not.toHaveBeenCalled();
+		expect(uploadPdfMock).not.toHaveBeenCalled();
+	});
+
 	it("prompts for a pairing code on first use, like the standalone send command", async () => {
 		const freshCredentialsPath = join(workDir, "fresh-credentials.json");
 		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type

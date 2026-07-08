@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Users can now generate a maze PDF and upload it to their reMarkable Cloud account in a single command with `remarkable-maze generate-and-send --width <n> --height <n>`, keeping the local PDF and reporting a clear error if the upload fails after generation succeeds
+- Users can now control how hard a maze is to solve with a `--difficulty` option (1 to 5, defaults to 1) on the maze generation command — higher values produce more branch points and decision points
 
 ## [0.2.0] - 2026-07-08
 

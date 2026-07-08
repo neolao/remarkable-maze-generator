@@ -4,6 +4,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 
 <!-- vibe:begin:features -->
 - Generate mazes with a custom width, height, and a reproducible random seed
+- Choose a difficulty level to control how many branch points and decision points the maze has
 - Automatically compute a maze's solution path
 - Export any maze as a PDF sized for the reMarkable 2 tablet, with an optional solution page or overlay
 - Generate a batch of several mazes at once, as one combined PDF or as separate files
@@ -36,7 +37,7 @@ Or, using the `generate.sh` shortcut at the repository root:
 ./generate.sh --width 20 --height 15
 ```
 
-Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--output` (optional, defaults to `./maze.pdf`).
+Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--difficulty` (optional, 1 to 5, defaults to 1 — higher values produce more branch points and make the maze harder to solve), `--output` (optional, defaults to `./maze.pdf`).
 
 Upload a local PDF file to your reMarkable Cloud account:
 
@@ -64,7 +65,7 @@ Or, using the `generate-and-send.sh` shortcut at the repository root:
 ./generate-and-send.sh --width 20 --height 15
 ```
 
-Accepts the same `--width`, `--height`, `--seed` and `--output` options as `generate`, plus the same `--visible-name` and `--folder` options as `send` (the visible name defaults to `rectangle-<width>x<height>-<seed>` if not given). If generation succeeds but the upload fails, the local PDF is kept and the error is reported clearly.
+Accepts the same `--width`, `--height`, `--seed`, `--difficulty` and `--output` options as `generate`, plus the same `--visible-name` and `--folder` options as `send` (the visible name defaults to `rectangle-<width>x<height>-<seed>` if not given). If generation succeeds but the upload fails, the local PDF is kept and the error is reported clearly.
 
 See the CLI's built-in help:
 

@@ -8,6 +8,7 @@ export interface GenerateOptions {
 	width: number;
 	height: number;
 	seed?: number;
+	difficulty?: number;
 	output?: string;
 	cwd?: string;
 }
@@ -27,6 +28,7 @@ export async function runGenerate(
 		width: options.width,
 		height: options.height,
 		seed,
+		difficulty: options.difficulty,
 	});
 	const pdfBytes = await renderMazeToPdf(maze);
 	await writeFile(outputPath, pdfBytes);

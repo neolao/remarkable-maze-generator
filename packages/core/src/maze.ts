@@ -19,6 +19,7 @@ export interface GenerateMazeOptions {
 	width: number;
 	height: number;
 	seed: number;
+	difficulty?: number;
 }
 
 export interface GenerateMazeBatchOptions {
@@ -26,7 +27,11 @@ export interface GenerateMazeBatchOptions {
 	height: number;
 	seed: number;
 	count: number;
+	difficulty?: number;
 }
+
+const MIN_DIFFICULTY = 1;
+const MAX_DIFFICULTY = 5;
 
 interface Direction {
 	dx: number;
@@ -73,12 +78,26 @@ function validateDimensions(width: number, height: number): void {
 	}
 }
 
+function validateDifficulty(difficulty: number): void {
+	if (
+		!Number.isInteger(difficulty) ||
+		difficulty < MIN_DIFFICULTY ||
+		difficulty > MAX_DIFFICULTY
+	) {
+		throw new Error(
+			`Maze difficulty must be an integer between ${MIN_DIFFICULTY} and ${MAX_DIFFICULTY}, got difficulty=${difficulty}`,
+		);
+	}
+}
+
 export function generateMaze({
 	width,
 	height,
 	seed,
+	difficulty = MIN_DIFFICULTY,
 }: GenerateMazeOptions): Maze {
 	validateDimensions(width, height);
+	validateDifficulty(difficulty);
 
 	const random = createSeededRandom(seed);
 	const cells = createGrid(width, height);
@@ -86,11 +105,22 @@ export function generateMaze({
 		new Array<boolean>(width).fill(false),
 	);
 
-	const stack: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
+	// Growing tree algorithm (see ADR 015): picking the most recently added
+	// active cell (probability 0) reduces to the recursive backtracker (long
+	// corridors, few branch points); picking a random active cell (probability
+	// 1) is structurally equivalent to Prim's algorithm (many branch points).
+	const randomSelectionProbability =
+		(difficulty - MIN_DIFFICULTY) / (MAX_DIFFICULTY - MIN_DIFFICULTY);
+
+	const active: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
 	visited[0][0] = true;
 
-	while (stack.length > 0) {
-		const current = stack[stack.length - 1];
+	while (active.length > 0) {
+		const index =
+			randomSelectionProbability > 0 && random() < randomSelectionProbability
+				? Math.floor(random() * active.length)
+				: active.length - 1;
+		const current = active[index];
 
 		const unvisitedNeighbors = DIRECTIONS.map((direction) => ({
 			direction,
@@ -106,7 +136,7 @@ export function generateMaze({
 		);
 
 		if (unvisitedNeighbors.length === 0) {
-			stack.pop();
+			active.splice(index, 1);
 			continue;
 		}
 
@@ -117,7 +147,7 @@ export function generateMaze({
 		cells[chosen.y][chosen.x].walls[chosen.direction.opposite] = false;
 
 		visited[chosen.y][chosen.x] = true;
-		stack.push({ x: chosen.x, y: chosen.y });
+		active.push({ x: chosen.x, y: chosen.y });
 	}
 
 	return { width, height, cells };
@@ -128,6 +158,7 @@ export function generateMazeBatch({
 	height,
 	seed,
 	count,
+	difficulty,
 }: GenerateMazeBatchOptions): Maze[] {
 	if (!Number.isInteger(count) || count <= 0) {
 		throw new Error(
@@ -136,6 +167,6 @@ export function generateMazeBatch({
 	}
 
 	return Array.from({ length: count }, (_, index) =>
-		generateMaze({ width, height, seed: seed + index }),
+		generateMaze({ width, height, seed: seed + index, difficulty }),
 	);
 }

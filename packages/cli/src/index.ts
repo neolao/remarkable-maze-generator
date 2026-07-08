@@ -19,12 +19,17 @@ program
 	.requiredOption("--width <number>", "maze width in cells")
 	.requiredOption("--height <number>", "maze height in cells")
 	.option("--seed <number>", "random seed (defaults to a random value)")
+	.option(
+		"--difficulty <number>",
+		"difficulty from 1 (easiest, fewest branch points) to 5 (hardest, most branch points); defaults to 1",
+	)
 	.option("--output <path>", "output PDF file path (defaults to ./maze.pdf)")
 	.action(
 		async (opts: {
 			width: string;
 			height: string;
 			seed?: string;
+			difficulty?: string;
 			output?: string;
 		}) => {
 			try {
@@ -34,11 +39,16 @@ program
 					opts.seed === undefined
 						? undefined
 						: parseIntegerOption(opts.seed, "--seed");
+				const difficulty =
+					opts.difficulty === undefined
+						? undefined
+						: parseIntegerOption(opts.difficulty, "--difficulty");
 
 				const { outputPath } = await runGenerate({
 					width,
 					height,
 					seed,
+					difficulty,
 					output: opts.output,
 				});
 				console.log(`Maze written to ${outputPath}`);
@@ -87,6 +97,10 @@ program
 	.requiredOption("--width <number>", "maze width in cells")
 	.requiredOption("--height <number>", "maze height in cells")
 	.option("--seed <number>", "random seed (defaults to a random value)")
+	.option(
+		"--difficulty <number>",
+		"difficulty from 1 (easiest, fewest branch points) to 5 (hardest, most branch points); defaults to 1",
+	)
 	.option("--output <path>", "output PDF file path (defaults to ./maze.pdf)")
 	.option(
 		"--visible-name <name>",
@@ -101,6 +115,7 @@ program
 			width: string;
 			height: string;
 			seed?: string;
+			difficulty?: string;
 			output?: string;
 			visibleName?: string;
 			folder?: string;
@@ -112,11 +127,16 @@ program
 					opts.seed === undefined
 						? undefined
 						: parseIntegerOption(opts.seed, "--seed");
+				const difficulty =
+					opts.difficulty === undefined
+						? undefined
+						: parseIntegerOption(opts.difficulty, "--difficulty");
 
 				const { outputPath, visibleName } = await runGenerateAndSend({
 					width,
 					height,
 					seed,
+					difficulty,
 					output: opts.output,
 					visibleName: opts.visibleName,
 					folder: opts.folder,
