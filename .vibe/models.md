@@ -83,6 +83,7 @@ Defined in: `packages/core/src/remarkable-auth.ts`
 | Field | Type | Notes |
 |---|---|---|
 | readFile | (path: string) => Promise\<Uint8Array\> | required, no default — caller supplies file access (e.g. `node:fs/promises.readFile`) |
+| folder | string | optional; target reMarkable Cloud folder by name — must already exist, throws a clear error otherwise (no auto-create, see ADR 013) |
 Defined in: `packages/core/src/remarkable-upload.ts`
 
 ## GenerateOptions (CLI)
@@ -100,6 +101,7 @@ Defined in: `packages/cli/src/generate.ts`
 |---|---|---|
 | filePath | string | local PDF file to upload; checked to exist before any prompt or network call |
 | visibleName | string | optional, defaults to the file name without extension |
+| folder | string | optional; forwarded to `core`'s `uploadPdf` — target folder must already exist |
 | credentialsPath | string | optional, injectable for testing; defaults to `~/.config/remarkable-maze-generator/credentials.json` |
 | promptPairingCode | () => Promise\<string\> | optional, injectable for testing; defaults to an interactive terminal prompt |
 Defined in: `packages/cli/src/send.ts`

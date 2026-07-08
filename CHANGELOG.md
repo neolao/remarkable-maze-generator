@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Users can now upload a local PDF file to their reMarkable Cloud account directly from the command line with `remarkable-maze send <file>`, with a guided one-time pairing prompt on first use
+- Users can now send a PDF into a specific reMarkable Cloud folder with `remarkable-maze send <file> --folder <name>` (the folder must already exist)
 
 ### Changed
 

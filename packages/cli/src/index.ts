@@ -56,19 +56,26 @@ program
 		"--visible-name <name>",
 		"name to show on the reMarkable tablet (defaults to the file name)",
 	)
-	.action(async (file: string, opts: { visibleName?: string }) => {
-		try {
-			const { visibleName } = await runSend({
-				filePath: file,
-				visibleName: opts.visibleName,
-			});
-			console.log(
-				`Uploaded "${file}" to reMarkable Cloud as "${visibleName}".`,
-			);
-		} catch (error) {
-			console.error(`Error: ${(error as Error).message}`);
-			process.exitCode = 1;
-		}
-	});
+	.option(
+		"--folder <name>",
+		"reMarkable Cloud folder to upload into (must already exist)",
+	)
+	.action(
+		async (file: string, opts: { visibleName?: string; folder?: string }) => {
+			try {
+				const { visibleName } = await runSend({
+					filePath: file,
+					visibleName: opts.visibleName,
+					folder: opts.folder,
+				});
+				console.log(
+					`Uploaded "${file}" to reMarkable Cloud as "${visibleName}"${opts.folder ? ` in "${opts.folder}"` : ""}.`,
+				);
+			} catch (error) {
+				console.error(`Error: ${(error as Error).message}`);
+				process.exitCode = 1;
+			}
+		},
+	);
 
 program.parse();

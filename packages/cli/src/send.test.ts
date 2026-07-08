@@ -74,6 +74,33 @@ describe("runSend", () => {
 		);
 	});
 
+	it("forwards the target folder to the upload step", async () => {
+		const credentialsPath = join(workDir, "credentials.json");
+		await writeFile(
+			credentialsPath,
+			JSON.stringify({ deviceToken: "existing-token" }),
+		);
+
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		await runSend({
+			filePath: pdfPath,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+			folder: "Mazes",
+		});
+
+		expect(uploadPdfMock).toHaveBeenCalledWith(
+			fakeSession,
+			pdfPath,
+			"maze",
+			expect.objectContaining({ folder: "Mazes" }),
+		);
+	});
+
 	it("rejects with a clear error when the local file does not exist, without prompting or authenticating", async () => {
 		const credentialsPath = join(workDir, "credentials.json");
 		const promptPairingCode = vi.fn();

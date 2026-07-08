@@ -42,7 +42,13 @@ Upload a local PDF file to your reMarkable Cloud account:
 npm run start --workspace packages/cli -- send maze.pdf
 ```
 
-The first time, you'll be prompted for a one-time pairing code (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, so later uploads don't ask again. Use `--visible-name <name>` to control how the file is named on the tablet (defaults to the file name).
+Or, using the `send.sh` shortcut at the repository root:
+
+```bash
+./send.sh maze.pdf
+```
+
+The first time, you'll be prompted for a one-time pairing code (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, so later uploads don't ask again. Use `--visible-name <name>` to control how the file is named on the tablet (defaults to the file name). Use `--folder <name>` to send it into a specific reMarkable Cloud folder (the folder must already exist).
 
 See the CLI's built-in help:
 

@@ -17,6 +17,7 @@ const PAIRING_INSTRUCTIONS_URL =
 export interface SendOptions {
 	filePath: string;
 	visibleName?: string;
+	folder?: string;
 	credentialsPath?: string;
 	promptPairingCode?: () => Promise<string>;
 }
@@ -60,6 +61,7 @@ export async function runSend(options: SendOptions): Promise<SendResult> {
 
 	await uploadPdf(session, options.filePath, visibleName, {
 		readFile: (path) => readFile(path),
+		folder: options.folder,
 	});
 
 	return { visibleName };
