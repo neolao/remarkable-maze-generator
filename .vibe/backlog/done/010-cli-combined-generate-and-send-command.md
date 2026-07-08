@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 depends_on: [008, 009]
 ---
 # CLI Combined Generate And Send Command
