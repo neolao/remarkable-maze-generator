@@ -23,8 +23,12 @@ remarkable-maze-generator is organized into three main parts, grouped in a singl
 
 The CLI and the web UI contain no generation logic of their own: they call the core and simply expose that logic through a terminal or a browser. This guarantees that a generated maze produces the same result whether it comes from the CLI or the web app.
 
-## Current status (v0.1.0)
+## Current status (v0.2.0)
 
-- **Core**: maze generation, automatic solution solving, and PDF export are all implemented. Generated mazes are sized for the reMarkable 2 tablet and show a clearly visible entrance and exit opening, with an optional solution page or overlay. Several mazes can be generated as a batch, either as one combined PDF or as separate files. reMarkable Cloud authentication and PDF upload are implemented and have been verified against a real reMarkable account.
-- **CLI**: mazes can be generated and saved as a PDF from the terminal (also reachable via the `generate.sh` shortcut at the repository root), and a local PDF can be sent straight to a reMarkable Cloud account, with a guided one-time pairing prompt on first use. A command combining generation and sending in one step is still to come.
+- **Core**: maze generation, automatic solution solving, and PDF export are all implemented. Generated mazes are sized for the reMarkable 2 tablet and show a clearly visible entrance and exit opening, with an optional solution page or overlay. Several mazes can be generated as a batch, either as one combined PDF or as separate files. reMarkable Cloud authentication and PDF upload (including sending into a specific existing folder) are implemented and have been verified against a real reMarkable account.
+- **CLI**: mazes can be generated and saved as a PDF from the terminal (also reachable via the `generate.sh` shortcut at the repository root), and a local PDF can be sent straight to a reMarkable Cloud account — optionally into a named folder — with a guided one-time pairing prompt on first use (also reachable via `send.sh`). A command combining generation and sending in one step is still to come.
 - **Web UI**: still a skeleton (a single diagnostic endpoint); the maze configuration form and API are not implemented yet.
+
+## Requirements
+
+Node.js 25+ is required, mainly for native `Uint8Array` base64/hex support used by the reMarkable Cloud integration (pinned in `.nvmrc`).

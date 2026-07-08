@@ -7,8 +7,9 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Automatically compute a maze's solution path
 - Export any maze as a PDF sized for the reMarkable 2 tablet, with an optional solution page or overlay
 - Generate a batch of several mazes at once, as one combined PDF or as separate files
-- Authenticate with reMarkable Cloud using a one-time pairing code, and upload maze PDFs straight to your tablet
 - Generate a maze PDF directly from the command line
+- Authenticate with reMarkable Cloud using a one-time pairing code, remembered for later uploads
+- Upload a local PDF file to your reMarkable Cloud account from the command line, optionally into a specific folder
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
