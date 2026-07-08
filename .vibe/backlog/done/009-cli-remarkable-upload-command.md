@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: done
 depends_on: [007]
 ---
 # CLI reMarkable Upload Command
