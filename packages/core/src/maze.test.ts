@@ -41,6 +41,20 @@ function countBranchPoints(maze: ReturnType<typeof generateMaze>): number {
 }
 
 describe("generateMaze", () => {
+	it("includes the resolved generation parameters on the returned maze", () => {
+		const maze = generateMaze({ width: 5, height: 4, seed: 7, difficulty: 3 });
+
+		expect(maze.type).toBe("rectangle");
+		expect(maze.seed).toBe(7);
+		expect(maze.difficulty).toBe(3);
+	});
+
+	it("defaults the maze's recorded difficulty to 1 when not specified", () => {
+		const maze = generateMaze({ width: 5, height: 4, seed: 7 });
+
+		expect(maze.difficulty).toBe(1);
+	});
+
 	it("generates a maze with the given width and height", () => {
 		const maze = generateMaze({ width: 5, height: 4, seed: 1 });
 
@@ -208,5 +222,16 @@ describe("generateMazeBatch", () => {
 		});
 
 		expect(batchMaze).toEqual(singleMaze);
+	});
+
+	it("gives each maze in a batch its own resolved seed", () => {
+		const mazes = generateMazeBatch({
+			width: 5,
+			height: 5,
+			seed: 10,
+			count: 3,
+		});
+
+		expect(mazes.map((maze) => maze.seed)).toEqual([10, 11, 12]);
 	});
 });

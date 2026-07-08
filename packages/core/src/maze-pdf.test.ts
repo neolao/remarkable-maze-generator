@@ -22,6 +22,32 @@ function countStrokedLines(pdfBytes: Uint8Array): number {
 	return (content.match(/^S$/gm) || []).length;
 }
 
+function decodeHexStrings(content: string): string {
+	return content.replace(/<([0-9A-Fa-f]+)>/g, (_, hex: string) =>
+		Buffer.from(hex, "hex").toString("latin1"),
+	);
+}
+
+function decompressAllContentStreams(pdfBytes: Uint8Array): string[] {
+	const text = Buffer.from(pdfBytes).toString("latin1");
+	const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+	const streams: string[] = [];
+	let match: RegExpExecArray | null;
+	// biome-ignore lint/suspicious/noAssignInExpressions: standard regex.exec loop
+	while ((match = streamRegex.exec(text)) !== null) {
+		try {
+			streams.push(
+				decodeHexStrings(
+					inflateSync(Buffer.from(match[1], "latin1")).toString("latin1"),
+				),
+			);
+		} catch {
+			// Not a deflate-compressed stream (e.g. an embedded resource); skip it.
+		}
+	}
+	return streams;
+}
+
 function countExpectedWalls(maze: Maze): number {
 	let count = 0;
 	for (let y = 0; y < maze.height; y++) {
@@ -244,5 +270,53 @@ describe("renderMazeBatchToPdfs", () => {
 
 	it("rejects an empty batch instead of returning an empty array", async () => {
 		await expect(renderMazeBatchToPdfs([])).rejects.toThrow();
+	});
+});
+
+describe("renderMazeToPdf parameters footer", () => {
+	it("includes the maze type, dimensions, seed and difficulty when the maze carries them", async () => {
+		const maze = generateMaze({ width: 6, height: 6, seed: 42, difficulty: 3 });
+		const pdfBytes = await renderMazeToPdf(maze);
+
+		const content = decompressAllContentStreams(pdfBytes).join("\n");
+		expect(content).toContain("rectangle");
+		expect(content).toContain("6x6");
+		expect(content).toContain("seed=42");
+		expect(content).toContain("difficulty=3");
+	});
+
+	it("also shows the parameters on the separate solution page", async () => {
+		const maze = generateMaze({ width: 6, height: 6, seed: 7, difficulty: 2 });
+		const pdfBytes = await renderMazeToPdf(maze, { solution: "extra-page" });
+
+		const streams = decompressAllContentStreams(pdfBytes);
+		const streamsWithLabel = streams.filter((content) =>
+			content.includes("seed=7"),
+		);
+		expect(streamsWithLabel).toHaveLength(2);
+	});
+
+	it("does not add a footer or change the output when the maze has no generation parameters", async () => {
+		const generated = generateMaze({ width: 4, height: 4, seed: 1 });
+		const maze: Maze = {
+			width: generated.width,
+			height: generated.height,
+			cells: generated.cells,
+		};
+
+		const withParameters = await renderMazeToPdf(generated);
+		const withoutParameters = await renderMazeToPdf(maze);
+
+		const content = decompressAllContentStreams(withoutParameters).join("\n");
+		expect(content).not.toContain("seed=");
+		expect(Buffer.from(withoutParameters)).not.toEqual(
+			Buffer.from(withParameters),
+		);
+	});
+
+	it("does not error when adding the parameters footer to a 1x1 maze", async () => {
+		const maze = generateMaze({ width: 1, height: 1, seed: 5, difficulty: 1 });
+
+		await expect(renderMazeToPdf(maze)).resolves.toBeInstanceOf(Uint8Array);
 	});
 });

@@ -13,6 +13,9 @@ export interface Maze {
 	width: number;
 	height: number;
 	cells: Cell[][];
+	type?: string;
+	seed?: number;
+	difficulty?: number;
 }
 
 export interface GenerateMazeOptions {
@@ -32,6 +35,7 @@ export interface GenerateMazeBatchOptions {
 
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
+const MAZE_TYPE = "rectangle";
 
 interface Direction {
 	dx: number;
@@ -150,7 +154,7 @@ export function generateMaze({
 		active.push({ x: chosen.x, y: chosen.y });
 	}
 
-	return { width, height, cells };
+	return { width, height, cells, type: MAZE_TYPE, seed, difficulty };
 }
 
 export function generateMazeBatch({

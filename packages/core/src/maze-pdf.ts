@@ -1,4 +1,10 @@
-import { PDFDocument, type PDFPage, rgb } from "pdf-lib";
+import {
+	PDFDocument,
+	type PDFFont,
+	type PDFPage,
+	StandardFonts,
+	rgb,
+} from "pdf-lib";
 import type { MazePosition } from "./maze-solver.js";
 import { solveMaze } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -11,6 +17,9 @@ const WALL_THICKNESS_PT = 1.5;
 const WALL_COLOR = rgb(0, 0, 0);
 const SOLUTION_THICKNESS_PT = 2;
 const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
+const PARAMETERS_LABEL_SIZE_PT = 8;
+const PARAMETERS_LABEL_COLOR = rgb(0.45, 0.45, 0.45);
+const PARAMETERS_LABEL_Y_PT = PAGE_MARGIN_PT / 2;
 
 export type SolutionDisplayMode = "none" | "extra-page" | "overlay";
 
@@ -119,20 +128,46 @@ function drawSolutionPath(
 	}
 }
 
+function formatParametersLabel(maze: Maze): string | undefined {
+	if (maze.seed === undefined) return undefined;
+
+	const type = maze.type ?? "rectangle";
+	const difficulty = maze.difficulty ?? 1;
+	return `${type} ${maze.width}x${maze.height} seed=${maze.seed} difficulty=${difficulty}`;
+}
+
+function drawParametersLabel(
+	page: PDFPage,
+	font: PDFFont,
+	label: string,
+): void {
+	const textWidth = font.widthOfTextAtSize(label, PARAMETERS_LABEL_SIZE_PT);
+	page.drawText(label, {
+		x: (REMARKABLE_2_PAGE_WIDTH_PT - textWidth) / 2,
+		y: PARAMETERS_LABEL_Y_PT,
+		size: PARAMETERS_LABEL_SIZE_PT,
+		font,
+		color: PARAMETERS_LABEL_COLOR,
+	});
+}
+
 function addMazePages(
 	document: PDFDocument,
+	font: PDFFont,
 	maze: Maze,
 	options: RenderMazeToPdfOptions,
 ): void {
 	validateMaze(maze);
 	const solutionMode = options.solution ?? "none";
 	const layout = computeLayout(maze);
+	const parametersLabel = formatParametersLabel(maze);
 
 	const mazePage = document.addPage([
 		REMARKABLE_2_PAGE_WIDTH_PT,
 		REMARKABLE_2_PAGE_HEIGHT_PT,
 	]);
 	drawMazeWalls(mazePage, maze, layout);
+	if (parametersLabel) drawParametersLabel(mazePage, font, parametersLabel);
 
 	if (solutionMode === "overlay") {
 		drawSolutionPath(mazePage, solveMaze(maze), layout);
@@ -143,6 +178,8 @@ function addMazePages(
 		]);
 		drawMazeWalls(solutionPage, maze, layout);
 		drawSolutionPath(solutionPage, solveMaze(maze), layout);
+		if (parametersLabel)
+			drawParametersLabel(solutionPage, font, parametersLabel);
 	}
 }
 
@@ -164,7 +201,8 @@ export async function renderMazeToPdf(
 	options: RenderMazeToPdfOptions = {},
 ): Promise<Uint8Array> {
 	const document = await createEmptyDocument();
-	addMazePages(document, maze, options);
+	const font = await document.embedFont(StandardFonts.Helvetica);
+	addMazePages(document, font, maze, options);
 	return document.save();
 }
 
@@ -175,8 +213,9 @@ export async function renderMazeBatchToPdf(
 	validateBatch(mazes);
 
 	const document = await createEmptyDocument();
+	const font = await document.embedFont(StandardFonts.Helvetica);
 	for (const maze of mazes) {
-		addMazePages(document, maze, options);
+		addMazePages(document, font, maze, options);
 	}
 	return document.save();
 }

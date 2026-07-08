@@ -7,6 +7,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Choose a difficulty level to control how many branch points and decision points the maze has
 - Automatically compute a maze's solution path
 - Export any maze as a PDF sized for the reMarkable 2 tablet, with an optional solution page or overlay
+- See the parameters used to generate a maze (type, dimensions, seed, difficulty) printed on the PDF itself, so it can be regenerated exactly later
 - Generate a batch of several mazes at once, as one combined PDF or as separate files
 - Generate a maze PDF directly from the command line
 - Authenticate with reMarkable Cloud using a one-time pairing code, remembered for later uploads

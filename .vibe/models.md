@@ -6,6 +6,9 @@
 | width | number | grid width in cells |
 | height | number | grid height in cells |
 | cells | Cell[][] | rows (`cells[y][x]`), one entry per grid cell |
+| type | string | optional; set to `"rectangle"` (the only type so far) by `generateMaze()`, absent on hand-built mazes, see ADR 016 |
+| seed | number | optional; the resolved seed used to generate this maze, see ADR 016 |
+| difficulty | number | optional; the resolved difficulty (1–5) used to generate this maze, see ADR 016 |
 Defined in: `packages/core/src/maze.ts`
 
 ## Cell
