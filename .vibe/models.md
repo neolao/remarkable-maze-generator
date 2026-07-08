@@ -52,3 +52,30 @@ Defined in: `packages/core/src/maze-solver.ts`
 |---|---|---|
 | solution | SolutionDisplayMode | optional, defaults to `"none"` |
 Defined in: `packages/core/src/maze-pdf.ts`
+
+## RemarkableCredentials
+| Field | Type | Notes |
+|---|---|---|
+| deviceToken | string | long-lived token obtained by pairing; never logged |
+Defined in: `packages/core/src/remarkable-credential-store.ts`
+
+## CredentialStore (interface)
+| Method | Notes |
+|---|---|
+| `load(): Promise<RemarkableCredentials \| null>` | returns stored credentials, or null if never paired |
+| `save(credentials): Promise<void>` | persists credentials; no built-in implementation ships in `core` (see ADR 007) |
+Defined in: `packages/core/src/remarkable-credential-store.ts`
+
+## RemarkableSession
+| Field | Type | Notes |
+|---|---|---|
+| deviceToken | string | long-lived, reused across sessions |
+| userToken | string | short-lived, refreshed on each `authenticate()` call |
+Defined in: `packages/core/src/remarkable-auth.ts`
+
+## RemarkableAuthOptions
+| Field | Type | Notes |
+|---|---|---|
+| fetch | typeof fetch | optional, injectable for testing; defaults to the global `fetch` |
+| baseUrl | string | optional, injectable for testing; defaults to the real reMarkable Cloud API |
+Defined in: `packages/core/src/remarkable-auth.ts`

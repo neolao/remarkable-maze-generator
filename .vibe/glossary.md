@@ -24,3 +24,18 @@
 **Definition:** [what this concept means in the domain — fill in]
 **Code:** `solveMaze()`, `MazePosition[]` in `packages/core/src/maze-solver.ts`
 **Do not confuse with:** —
+
+## Pairing code
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `pairingCode` parameter of `registerDevice()` / `authenticate()` in `packages/core/src/remarkable-auth.ts`
+**Do not confuse with:** Device token
+
+## Device token
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `RemarkableCredentials.deviceToken` in `packages/core/src/remarkable-credential-store.ts`
+**Do not confuse with:** User token, Pairing code
+
+## User token
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `RemarkableSession.userToken` in `packages/core/src/remarkable-auth.ts`
+**Do not confuse with:** Device token

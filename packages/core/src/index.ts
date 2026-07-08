@@ -21,3 +21,16 @@ export {
 	renderMazeBatchToPdfs,
 	renderMazeToPdf,
 } from "./maze-pdf.js";
+export type {
+	CredentialStore,
+	RemarkableCredentials,
+} from "./remarkable-credential-store.js";
+export type {
+	RemarkableAuthOptions,
+	RemarkableSession,
+} from "./remarkable-auth.js";
+export {
+	authenticate,
+	refreshUserToken,
+	registerDevice,
+} from "./remarkable-auth.js";
