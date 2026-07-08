@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-08
+
 ### Added
 
 - Users can now generate a maze by specifying its width, height, and a random seed, with the same seed always reproducing the same maze
@@ -20,3 +22,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
+
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/neolao/remarkable-maze-generator/releases/tag/v0.1.0

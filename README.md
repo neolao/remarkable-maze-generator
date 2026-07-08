@@ -28,6 +28,12 @@ Generate a maze PDF from the command line:
 npm run start --workspace packages/cli -- generate --width 20 --height 15
 ```
 
+Or, using the `generate.sh` shortcut at the repository root:
+
+```bash
+./generate.sh --width 20 --height 15
+```
+
 Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--output` (optional, defaults to `./maze.pdf`).
 
 See the CLI's built-in help:

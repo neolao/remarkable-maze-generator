@@ -23,8 +23,8 @@ remarkable-maze-generator is organized into three main parts, grouped in a singl
 
 The CLI and the web UI contain no generation logic of their own: they call the core and simply expose that logic through a terminal or a browser. This guarantees that a generated maze produces the same result whether it comes from the CLI or the web app.
 
-## Current status
+## Current status (v0.1.0)
 
-- **Core**: maze generation, automatic solution solving, PDF export (sized for the reMarkable 2, with an optional solution page or overlay), batch generation, and reMarkable Cloud authentication and upload are all implemented. The reMarkable Cloud upload has not yet been validated against a real account.
-- **CLI**: its first real command is available — generating a maze and saving it as a PDF from the terminal. Commands to authenticate with and send documents to reMarkable Cloud are still to come.
+- **Core**: maze generation, automatic solution solving, and PDF export are all implemented. Generated mazes are sized for the reMarkable 2 tablet and show a clearly visible entrance and exit opening, with an optional solution page or overlay. Several mazes can be generated as a batch, either as one combined PDF or as separate files. reMarkable Cloud authentication and PDF upload are implemented, though upload has not yet been validated against a real reMarkable account.
+- **CLI**: its first real command is available — generating a maze and saving it as a PDF from the terminal (also reachable via the `generate.sh` shortcut at the repository root). Commands to authenticate with and send documents to reMarkable Cloud are still to come.
 - **Web UI**: still a skeleton (a single diagnostic endpoint); the maze configuration form and API are not implemented yet.
