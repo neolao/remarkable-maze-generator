@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-09
+
 ### Added
 
 - Users can now generate a maze PDF and upload it to their reMarkable Cloud account in a single command with `remarkable-maze generate-and-send --width <n> --height <n>`, keeping the local PDF and reporting a clear error if the upload fails after generation succeeds
@@ -45,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
 
-[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/neolao/remarkable-maze-generator/releases/tag/v0.1.0
