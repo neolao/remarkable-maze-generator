@@ -12,3 +12,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The system can now compute the solution path from a maze's entrance to its exit
 - Users can now render a generated maze as a PDF sized for the reMarkable 2 tablet
 - Users can now include the maze's solution in the PDF, either on a separate page or overlaid on the maze
+- Users can now generate a batch of several mazes at once, as either one combined PDF (one maze per page) or several separate PDF files

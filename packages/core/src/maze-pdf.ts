@@ -117,17 +117,13 @@ function drawSolutionPath(
 	}
 }
 
-export async function renderMazeToPdf(
+function addMazePages(
+	document: PDFDocument,
 	maze: Maze,
-	options: RenderMazeToPdfOptions = {},
-): Promise<Uint8Array> {
+	options: RenderMazeToPdfOptions,
+): void {
 	validateMaze(maze);
 	const solutionMode = options.solution ?? "none";
-
-	const document = await PDFDocument.create();
-	document.setCreationDate(new Date(0));
-	document.setModificationDate(new Date(0));
-
 	const layout = computeLayout(maze);
 
 	const mazePage = document.addPage([
@@ -146,6 +142,48 @@ export async function renderMazeToPdf(
 		drawMazeWalls(solutionPage, maze, layout);
 		drawSolutionPath(solutionPage, solveMaze(maze), layout);
 	}
+}
 
+async function createEmptyDocument(): Promise<PDFDocument> {
+	const document = await PDFDocument.create();
+	document.setCreationDate(new Date(0));
+	document.setModificationDate(new Date(0));
+	return document;
+}
+
+function validateBatch(mazes: Maze[]): void {
+	if (mazes.length === 0) {
+		throw new Error("Cannot render a maze batch with zero mazes");
+	}
+}
+
+export async function renderMazeToPdf(
+	maze: Maze,
+	options: RenderMazeToPdfOptions = {},
+): Promise<Uint8Array> {
+	const document = await createEmptyDocument();
+	addMazePages(document, maze, options);
 	return document.save();
+}
+
+export async function renderMazeBatchToPdf(
+	mazes: Maze[],
+	options: RenderMazeToPdfOptions = {},
+): Promise<Uint8Array> {
+	validateBatch(mazes);
+
+	const document = await createEmptyDocument();
+	for (const maze of mazes) {
+		addMazePages(document, maze, options);
+	}
+	return document.save();
+}
+
+export async function renderMazeBatchToPdfs(
+	mazes: Maze[],
+	options: RenderMazeToPdfOptions = {},
+): Promise<Uint8Array[]> {
+	validateBatch(mazes);
+
+	return Promise.all(mazes.map((maze) => renderMazeToPdf(maze, options)));
 }

@@ -21,6 +21,13 @@ export interface GenerateMazeOptions {
 	seed: number;
 }
 
+export interface GenerateMazeBatchOptions {
+	width: number;
+	height: number;
+	seed: number;
+	count: number;
+}
+
 interface Direction {
 	dx: number;
 	dy: number;
@@ -114,4 +121,21 @@ export function generateMaze({
 	}
 
 	return { width, height, cells };
+}
+
+export function generateMazeBatch({
+	width,
+	height,
+	seed,
+	count,
+}: GenerateMazeBatchOptions): Maze[] {
+	if (!Number.isInteger(count) || count <= 0) {
+		throw new Error(
+			`Maze batch count must be a positive integer, got count=${count}`,
+		);
+	}
+
+	return Array.from({ length: count }, (_, index) =>
+		generateMaze({ width, height, seed: seed + index }),
+	);
 }

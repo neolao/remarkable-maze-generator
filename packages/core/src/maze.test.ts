@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateMaze } from "./maze.js";
+import { generateMaze, generateMazeBatch } from "./maze.js";
 
 function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
 	const visited = new Set<string>();
@@ -65,6 +65,56 @@ describe("generateMaze", () => {
 		"rejects invalid dimensions width=$width height=$height",
 		({ width, height }) => {
 			expect(() => generateMaze({ width, height, seed: 1 })).toThrow();
+		},
+	);
+});
+
+describe("generateMazeBatch", () => {
+	it("generates the requested number of distinct mazes", () => {
+		const mazes = generateMazeBatch({
+			width: 6,
+			height: 6,
+			seed: 10,
+			count: 5,
+		});
+
+		expect(mazes).toHaveLength(5);
+		const uniqueLayouts = new Set(
+			mazes.map((maze) => JSON.stringify(maze.cells)),
+		);
+		expect(uniqueLayouts.size).toBe(5);
+	});
+
+	it("produces a batch of 1 identical to a single generateMaze call", () => {
+		const [batchMaze] = generateMazeBatch({
+			width: 8,
+			height: 6,
+			seed: 42,
+			count: 1,
+		});
+		const singleMaze = generateMaze({ width: 8, height: 6, seed: 42 });
+
+		expect(batchMaze).toEqual(singleMaze);
+	});
+
+	it("reproduces the exact same batch when given the same starting seed", () => {
+		const first = generateMazeBatch({ width: 5, height: 5, seed: 7, count: 3 });
+		const second = generateMazeBatch({
+			width: 5,
+			height: 5,
+			seed: 7,
+			count: 3,
+		});
+
+		expect(second).toEqual(first);
+	});
+
+	it.each([{ count: 0 }, { count: -2 }])(
+		"rejects an invalid batch count=$count",
+		({ count }) => {
+			expect(() =>
+				generateMazeBatch({ width: 5, height: 5, seed: 1, count }),
+			).toThrow();
 		},
 	);
 });

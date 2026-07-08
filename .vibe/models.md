@@ -31,6 +31,15 @@ Defined in: `packages/core/src/maze.ts`
 | seed | number | same seed reproduces the same maze |
 Defined in: `packages/core/src/maze.ts`
 
+## GenerateMazeBatchOptions
+| Field | Type | Notes |
+|---|---|---|
+| width | number | must be a positive integer, shared by every maze in the batch |
+| height | number | must be a positive integer, shared by every maze in the batch |
+| seed | number | starting seed; maze at index i uses `seed + i` |
+| count | number | must be a positive integer, number of mazes to generate |
+Defined in: `packages/core/src/maze.ts`
+
 ## MazePosition
 | Field | Type | Notes |
 |---|---|---|
