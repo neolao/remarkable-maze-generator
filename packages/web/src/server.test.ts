@@ -7,6 +7,6 @@ describe("web server", () => {
 		const response = await app.inject({ method: "GET", url: "/api/version" });
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toEqual({ core: "0.3.0" });
+		expect(response.json()).toEqual({ core: "0.4.0" });
 	});
 });

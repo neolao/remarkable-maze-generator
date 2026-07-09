@@ -3,6 +3,6 @@ import { describe, expect, it } from "vitest";
 
 describe("cli package", () => {
 	it("can access the core package version", () => {
-		expect(CORE_VERSION).toBe("0.3.0");
+		expect(CORE_VERSION).toBe("0.4.0");
 	});
 });
