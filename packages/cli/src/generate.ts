@@ -1,9 +1,12 @@
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
+	type MazeType,
 	type SolutionDisplayMode,
 	generateMaze,
+	invalidMazeTypeMessage,
 	invalidSolutionModeMessage,
+	isValidMazeType,
 	isValidSolutionMode,
 	renderMazeToPdf,
 } from "@remarkable-maze-generator/core";
@@ -15,6 +18,7 @@ export interface GenerateOptions {
 	height: number;
 	seed?: number;
 	difficulty?: number;
+	type?: string;
 	solution?: string;
 	output?: string;
 	cwd?: string;
@@ -37,12 +41,16 @@ export async function runGenerate(
 	) {
 		throw new Error(invalidSolutionModeMessage(options.solution));
 	}
+	if (options.type !== undefined && !isValidMazeType(options.type)) {
+		throw new Error(invalidMazeTypeMessage(options.type));
+	}
 
 	const maze = generateMaze({
 		width: options.width,
 		height: options.height,
 		seed,
 		difficulty: options.difficulty,
+		type: options.type as MazeType | undefined,
 	});
 	const pdfBytes = await renderMazeToPdf(maze, {
 		solution: options.solution as SolutionDisplayMode | undefined,

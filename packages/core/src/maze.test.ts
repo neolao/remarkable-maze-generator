@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { generateMaze, generateMazeBatch } from "./maze.js";
+import {
+	MAZE_TYPES,
+	generateMaze,
+	generateMazeBatch,
+	invalidMazeTypeMessage,
+	isValidMazeType,
+} from "./maze.js";
 
 function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
 	const visited = new Set<string>();
@@ -157,6 +163,121 @@ describe("generateMaze", () => {
 	);
 });
 
+describe("MAZE_TYPES / isValidMazeType / invalidMazeTypeMessage", () => {
+	it("lists rectangle and rectangle-crossing as the valid maze types", () => {
+		expect(MAZE_TYPES).toEqual(["rectangle", "rectangle-crossing"]);
+	});
+
+	it.each(MAZE_TYPES)("accepts %s as a valid maze type", (type) => {
+		expect(isValidMazeType(type)).toBe(true);
+	});
+
+	it("rejects an unknown maze type", () => {
+		expect(isValidMazeType("hexagon")).toBe(false);
+	});
+
+	it("describes the allowed values in the invalid maze type message", () => {
+		expect(invalidMazeTypeMessage("hexagon")).toBe(
+			'Invalid maze type "hexagon", expected one of: rectangle, rectangle-crossing',
+		);
+	});
+});
+
+describe("generateMaze - type option", () => {
+	it("defaults to the rectangle type when not specified, with no crossings", () => {
+		const maze = generateMaze({ width: 5, height: 5, seed: 1 });
+
+		expect(maze.type).toBe("rectangle");
+		expect(maze.crossings).toBeUndefined();
+	});
+
+	it("rejects an invalid maze type", () => {
+		expect(() =>
+			// biome-ignore lint/suspicious/noExplicitAny: deliberately passing an invalid type to test validation
+			generateMaze({ width: 5, height: 5, seed: 1, type: "hexagon" as any }),
+		).toThrow();
+	});
+
+	it("records at least one crossing for a rectangle-crossing maze of a reasonable size", () => {
+		const maze = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "rectangle-crossing",
+		});
+
+		expect(maze.type).toBe("rectangle-crossing");
+		expect(maze.crossings?.length ?? 0).toBeGreaterThan(0);
+	});
+
+	it("produces no crossings for a maze too small to contain one", () => {
+		const maze = generateMaze({
+			width: 1,
+			height: 1,
+			seed: 1,
+			type: "rectangle-crossing",
+		});
+
+		expect(maze.crossings).toEqual([]);
+	});
+
+	it("never marks the entrance or exit cell as a crossing", () => {
+		const maze = generateMaze({
+			width: 6,
+			height: 6,
+			seed: 9,
+			type: "rectangle-crossing",
+		});
+		const exit = { x: maze.width - 1, y: maze.height - 1 };
+
+		for (const crossing of maze.crossings ?? []) {
+			expect(crossing).not.toEqual({ x: 0, y: 0 });
+			expect(crossing).not.toEqual(exit);
+		}
+	});
+
+	it("marks each recorded crossing cell as a straight-through passage", () => {
+		const maze = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "rectangle-crossing",
+		});
+
+		for (const crossing of maze.crossings ?? []) {
+			const cell = maze.cells[crossing.y][crossing.x];
+			const verticalPassage =
+				!cell.walls.north &&
+				!cell.walls.south &&
+				cell.walls.east &&
+				cell.walls.west;
+			const horizontalPassage =
+				!cell.walls.east &&
+				!cell.walls.west &&
+				cell.walls.north &&
+				cell.walls.south;
+			expect(verticalPassage || horizontalPassage).toBe(true);
+		}
+	});
+
+	it("generates the same crossings for the same seed", () => {
+		const first = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			type: "rectangle-crossing",
+		});
+		const second = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			type: "rectangle-crossing",
+		});
+
+		expect(second.crossings).toEqual(first.crossings);
+	});
+});
+
 describe("generateMazeBatch", () => {
 	it("generates the requested number of distinct mazes", () => {
 		const mazes = generateMazeBatch({
@@ -233,5 +354,19 @@ describe("generateMazeBatch", () => {
 		});
 
 		expect(mazes.map((maze) => maze.seed)).toEqual([10, 11, 12]);
+	});
+
+	it("forwards the maze type to every maze in the batch", () => {
+		const mazes = generateMazeBatch({
+			width: 8,
+			height: 8,
+			seed: 1,
+			count: 2,
+			type: "rectangle-crossing",
+		});
+
+		for (const maze of mazes) {
+			expect(maze.type).toBe("rectangle-crossing");
+		}
 	});
 });

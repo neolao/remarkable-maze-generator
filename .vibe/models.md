@@ -6,10 +6,22 @@
 | width | number | grid width in cells |
 | height | number | grid height in cells |
 | cells | Cell[][] | rows (`cells[y][x]`), one entry per grid cell |
-| type | string | optional; set to `"rectangle"` (the only type so far) by `generateMaze()`, absent on hand-built mazes, see ADR 016 |
+| type | MazeType | optional; `"rectangle"` (default) or `"rectangle-crossing"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016 and ADR 022 |
 | seed | number | optional; the resolved seed used to generate this maze, see ADR 016 |
 | difficulty | number | optional; the resolved difficulty (1–5) used to generate this maze, see ADR 016 |
+| crossings | MazeCrossing[] | optional; cells decorated with a bridge-crossing effect, only populated for `type: "rectangle-crossing"`, see ADR 022 |
 Defined in: `packages/core/src/maze.ts`
+
+## MazeType
+String literal union: `"rectangle" | "rectangle-crossing"`. See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022).
+Defined in: `packages/core/src/maze.ts`
+
+## MazeCrossing
+| Field | Type | Notes |
+|---|---|---|
+| x | number | column index of the crossing cell |
+| y | number | row index of the crossing cell |
+Defined in: `packages/core/src/maze.ts` — never the entrance or exit cell, see ADR 022
 
 ## Cell
 | Field | Type | Notes |
@@ -33,6 +45,7 @@ Defined in: `packages/core/src/maze.ts`
 | height | number | must be a positive integer |
 | seed | number | same seed reproduces the same maze |
 | difficulty | number | optional integer 1–5, defaults to 1 (easiest); controls branch-point density, see ADR 015 |
+| type | MazeType | optional, defaults to `"rectangle"`, see ADR 022 |
 Defined in: `packages/core/src/maze.ts`
 
 ## GenerateMazeBatchOptions
@@ -43,6 +56,7 @@ Defined in: `packages/core/src/maze.ts`
 | seed | number | starting seed; maze at index i uses `seed + i` |
 | count | number | must be a positive integer, number of mazes to generate |
 | difficulty | number | optional integer 1–5, defaults to 1; applied to every maze in the batch, see ADR 015 |
+| type | MazeType | optional, defaults to `"rectangle"`; applied to every maze in the batch, see ADR 022 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazePosition
@@ -113,6 +127,7 @@ Defined in: `packages/core/src/remarkable-upload.ts`
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
 | difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
+| type | string | optional, `"rectangle"` or `"rectangle-crossing"`, defaults to `"rectangle"` (see ADR 022) |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 Defined in: `packages/cli/src/generate.ts`
@@ -133,6 +148,7 @@ Defined in: `packages/cli/src/send.ts`
 | width | string | raw form field value, parsed as a positive integer |
 | height | string | raw form field value, parsed as a positive integer |
 | difficulty | string | raw form field value, parsed as an integer 1–5 |
+| type | string | optional raw form field value, defaults to `"rectangle"` when blank, validated via `core`'s `isValidMazeType` (see ADR 022) |
 Defined in: `packages/web/src/maze-form-validation.ts`
 
 ## MazeFormValidationResult (web)
@@ -152,6 +168,7 @@ Defined in: `packages/web/src/server.ts`
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
 | difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
+| type | string | optional, `"rectangle"` or `"rectangle-crossing"`, defaults to `"rectangle"` (see ADR 022) |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 | visibleName | string | optional, defaults to `rectangle-<width>x<height>-<seed>` (see ADR 014) |

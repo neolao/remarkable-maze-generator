@@ -12,6 +12,7 @@ const REQUIRED_ELEMENT_IDS = [
 	"width",
 	"height",
 	"difficulty",
+	"maze-type",
 	"form-error",
 	"maze-preview",
 	"download-link",

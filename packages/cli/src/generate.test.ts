@@ -178,4 +178,64 @@ describe("runGenerate", () => {
 			}),
 		).rejects.toThrow(/side-panel/);
 	});
+
+	it("defaults to the rectangle type when the type option is omitted", async () => {
+		const withoutType = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			output: join(workDir, "without-type.pdf"),
+			cwd: workDir,
+		});
+		const withExplicitType = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle",
+			output: join(workDir, "with-type.pdf"),
+			cwd: workDir,
+		});
+
+		const [withoutBytes, withBytes] = await Promise.all([
+			readFile(withoutType.outputPath),
+			readFile(withExplicitType.outputPath),
+		]);
+		expect(withoutBytes).toEqual(withBytes);
+	});
+
+	it("forwards the type option, producing a maze with bridge crossings", async () => {
+		const rectangle = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			output: join(workDir, "rectangle.pdf"),
+			cwd: workDir,
+		});
+		const crossing = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "rectangle-crossing",
+			output: join(workDir, "crossing.pdf"),
+			cwd: workDir,
+		});
+
+		const [rectangleBytes, crossingBytes] = await Promise.all([
+			readFile(rectangle.outputPath),
+			readFile(crossing.outputPath),
+		]);
+		expect(crossingBytes).not.toEqual(rectangleBytes);
+	});
+
+	it("rejects an invalid maze type with a clear error", async () => {
+		await expect(
+			runGenerate({
+				width: 5,
+				height: 5,
+				seed: 1,
+				type: "hexagon",
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/hexagon/);
+	});
 });

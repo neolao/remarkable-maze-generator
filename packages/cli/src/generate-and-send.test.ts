@@ -230,6 +230,47 @@ describe("runGenerateAndSend", () => {
 		expect(uploadPdfMock).not.toHaveBeenCalled();
 	});
 
+	it("forwards the type option to maze generation", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		const result = await runGenerateAndSend({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "rectangle-crossing",
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+
+		const doc = await PDFDocument.load(await readFile(result.outputPath));
+		expect(doc.getPageCount()).toBe(1);
+	});
+
+	it("rejects an invalid maze type before attempting to authenticate or upload", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		await expect(
+			runGenerateAndSend({
+				width: 5,
+				height: 5,
+				seed: 1,
+				type: "hexagon",
+				cwd: workDir,
+				credentialsPath,
+				promptPairingCode: vi.fn(),
+			}),
+		).rejects.toThrow(/hexagon/);
+		expect(authenticateMock).not.toHaveBeenCalled();
+		expect(uploadPdfMock).not.toHaveBeenCalled();
+	});
+
 	it("prompts for a pairing code on first use, like the standalone send command", async () => {
 		const freshCredentialsPath = join(workDir, "fresh-credentials.json");
 		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type

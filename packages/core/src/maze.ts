@@ -9,13 +9,31 @@ export interface Cell {
 	walls: CellWalls;
 }
 
+export interface MazeCrossing {
+	x: number;
+	y: number;
+}
+
+export type MazeType = "rectangle" | "rectangle-crossing";
+
+export const MAZE_TYPES: MazeType[] = ["rectangle", "rectangle-crossing"];
+
+export function isValidMazeType(value: string): value is MazeType {
+	return (MAZE_TYPES as string[]).includes(value);
+}
+
+export function invalidMazeTypeMessage(value: string): string {
+	return `Invalid maze type "${value}", expected one of: ${MAZE_TYPES.join(", ")}`;
+}
+
 export interface Maze {
 	width: number;
 	height: number;
 	cells: Cell[][];
-	type?: string;
+	type?: MazeType;
 	seed?: number;
 	difficulty?: number;
+	crossings?: MazeCrossing[];
 }
 
 export interface GenerateMazeOptions {
@@ -23,6 +41,7 @@ export interface GenerateMazeOptions {
 	height: number;
 	seed: number;
 	difficulty?: number;
+	type?: MazeType;
 }
 
 export interface GenerateMazeBatchOptions {
@@ -31,11 +50,12 @@ export interface GenerateMazeBatchOptions {
 	seed: number;
 	count: number;
 	difficulty?: number;
+	type?: MazeType;
 }
 
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
-const MAZE_TYPE = "rectangle";
+const DEFAULT_MAZE_TYPE: MazeType = "rectangle";
 
 interface Direction {
 	dx: number;
@@ -94,14 +114,51 @@ function validateDifficulty(difficulty: number): void {
 	}
 }
 
+function validateType(type: MazeType): void {
+	if (!isValidMazeType(type)) {
+		throw new Error(invalidMazeTypeMessage(type));
+	}
+}
+
+// A crossing cell keeps its real, walkable through-passage (the "over" corridor,
+// already part of the spanning tree) and gets a purely decorative perpendicular
+// stub drawn at render time (see maze-layout.ts) to look like a bridge — no wall
+// is touched here, so the maze keeps its single-solution guarantee (ADR 022).
+function detectCrossings(
+	cells: Cell[][],
+	width: number,
+	height: number,
+): MazeCrossing[] {
+	const crossings: MazeCrossing[] = [];
+
+	for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+			const isEntrance = x === 0 && y === 0;
+			const isExit = x === width - 1 && y === height - 1;
+			if (isEntrance || isExit) continue;
+
+			const { north, south, east, west } = cells[y][x].walls;
+			const verticalPassage = !north && !south && east && west;
+			const horizontalPassage = !east && !west && north && south;
+			if (verticalPassage || horizontalPassage) {
+				crossings.push({ x, y });
+			}
+		}
+	}
+
+	return crossings;
+}
+
 export function generateMaze({
 	width,
 	height,
 	seed,
 	difficulty = MIN_DIFFICULTY,
+	type = DEFAULT_MAZE_TYPE,
 }: GenerateMazeOptions): Maze {
 	validateDimensions(width, height);
 	validateDifficulty(difficulty);
+	validateType(type);
 
 	const random = createSeededRandom(seed);
 	const cells = createGrid(width, height);
@@ -154,7 +211,12 @@ export function generateMaze({
 		active.push({ x: chosen.x, y: chosen.y });
 	}
 
-	return { width, height, cells, type: MAZE_TYPE, seed, difficulty };
+	const crossings =
+		type === "rectangle-crossing"
+			? detectCrossings(cells, width, height)
+			: undefined;
+
+	return { width, height, cells, type, seed, difficulty, crossings };
 }
 
 export function generateMazeBatch({
@@ -163,6 +225,7 @@ export function generateMazeBatch({
 	seed,
 	count,
 	difficulty,
+	type,
 }: GenerateMazeBatchOptions): Maze[] {
 	if (!Number.isInteger(count) || count <= 0) {
 		throw new Error(
@@ -171,6 +234,6 @@ export function generateMazeBatch({
 	}
 
 	return Array.from({ length: count }, (_, index) =>
-		generateMaze({ width, height, seed: seed + index, difficulty }),
+		generateMaze({ width, height, seed: seed + index, difficulty, type }),
 	);
 }

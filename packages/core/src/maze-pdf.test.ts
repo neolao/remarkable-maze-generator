@@ -2,6 +2,10 @@ import { inflateSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import {
+	computeCrossingBridgeSegments,
+	computePathSegments,
+} from "./maze-layout.js";
+import {
 	REMARKABLE_2_PAGE_HEIGHT_PT,
 	REMARKABLE_2_PAGE_WIDTH_PT,
 	SOLUTION_MODES,
@@ -161,6 +165,36 @@ describe("renderMazeToPdf", () => {
 		const pdfBytes = await renderMazeToPdf(maze);
 
 		expect(countStrokedLines(pdfBytes)).toBe(2);
+	});
+
+	it("draws a rectangle-crossing maze as thick path segments plus crossing bridge segments, not walls", async () => {
+		const maze = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle-crossing",
+		});
+		expect(maze.crossings?.length ?? 0).toBeGreaterThan(0);
+
+		const pdfBytes = await renderMazeToPdf(maze);
+
+		const strokedLines = countStrokedLines(pdfBytes);
+		const expectedSegments =
+			computePathSegments(maze).length +
+			computeCrossingBridgeSegments(maze).length;
+		expect(strokedLines).toBe(expectedSegments);
+	});
+
+	it("does not error rendering a 1x1 rectangle-crossing maze, which has no room for a crossing", async () => {
+		const maze = generateMaze({
+			width: 1,
+			height: 1,
+			seed: 1,
+			type: "rectangle-crossing",
+		});
+
+		expect(maze.crossings).toEqual([]);
+		await expect(renderMazeToPdf(maze)).resolves.toBeInstanceOf(Uint8Array);
 	});
 });
 

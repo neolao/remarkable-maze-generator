@@ -50,7 +50,7 @@ h1 {
 
 .form-fields {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	grid-template-columns: repeat(4, 1fr);
 	gap: 1rem;
 	margin-bottom: 1.25rem;
 }
@@ -64,7 +64,8 @@ h1 {
 	color: var(--color-text-muted);
 }
 
-.field input {
+.field input,
+.field select {
 	font: inherit;
 	font-weight: 400;
 	color: var(--color-text);
@@ -74,7 +75,8 @@ h1 {
 	background: var(--color-surface);
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
 	outline: 2px solid var(--color-accent);
 	outline-offset: 1px;
 }

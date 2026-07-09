@@ -58,3 +58,110 @@ export function computeWallSegments(maze: Maze): LineSegment[] {
 
 	return segments;
 }
+
+/**
+ * Corridor centerline segments in unit cell coordinates, used for the
+ * "rectangle-crossing" maze type's thick, rounded-cap path rendering (see ADR
+ * 023): one segment per open connection between adjacent cells, plus a stub
+ * from the entrance/exit cell center out to the boundary opening.
+ */
+export function computePathSegments(maze: Maze): LineSegment[] {
+	validateMazeShape(maze);
+
+	const segments: LineSegment[] = [];
+	const cellCenter = (x: number, y: number) => ({ x: x + 0.5, y: y + 0.5 });
+
+	for (let y = 0; y < maze.height; y++) {
+		for (let x = 0; x < maze.width; x++) {
+			const cell = maze.cells[y][x];
+			const center = cellCenter(x, y);
+
+			if (!cell.walls.south && y < maze.height - 1) {
+				const neighbor = cellCenter(x, y + 1);
+				segments.push({
+					x1: center.x,
+					y1: center.y,
+					x2: neighbor.x,
+					y2: neighbor.y,
+				});
+			}
+			if (!cell.walls.east && x < maze.width - 1) {
+				const neighbor = cellCenter(x + 1, y);
+				segments.push({
+					x1: center.x,
+					y1: center.y,
+					x2: neighbor.x,
+					y2: neighbor.y,
+				});
+			}
+		}
+	}
+
+	const entranceCenter = cellCenter(0, 0);
+	segments.push({
+		x1: entranceCenter.x,
+		y1: entranceCenter.y,
+		x2: entranceCenter.x,
+		y2: 0,
+	});
+
+	const exitCenter = cellCenter(maze.width - 1, maze.height - 1);
+	segments.push({
+		x1: exitCenter.x,
+		y1: exitCenter.y,
+		x2: exitCenter.x,
+		y2: maze.height,
+	});
+
+	return segments;
+}
+
+const CROSSING_GAP_START = 0.3;
+const CROSSING_GAP_END = 0.7;
+
+/**
+ * Decorative "under" stub for each recorded bridge crossing (see ADR 022): two
+ * short segments with a gap in the middle, drawn perpendicular to the cell's
+ * real through-passage, so it reads as passing underneath it.
+ */
+export function computeCrossingBridgeSegments(maze: Maze): LineSegment[] {
+	const segments: LineSegment[] = [];
+
+	for (const crossing of maze.crossings ?? []) {
+		const { x, y } = crossing;
+		const cell = maze.cells[y][x];
+		const verticalPassage = !cell.walls.north && !cell.walls.south;
+
+		if (verticalPassage) {
+			const stubY = y + 0.5;
+			segments.push({
+				x1: x,
+				y1: stubY,
+				x2: x + CROSSING_GAP_START,
+				y2: stubY,
+			});
+			segments.push({
+				x1: x + CROSSING_GAP_END,
+				y1: stubY,
+				x2: x + 1,
+				y2: stubY,
+			});
+		} else {
+			const stubX = x + 0.5;
+			segments.push({
+				x1: stubX,
+				y1: y,
+				x2: stubX,
+				y2: y + CROSSING_GAP_START,
+			});
+			segments.push({
+				x1: stubX,
+				y1: y + CROSSING_GAP_END,
+				x2: stubX,
+				y2: y + 1,
+			});
+		}
+	}
+
+	return segments;
+}

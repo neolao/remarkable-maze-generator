@@ -1,4 +1,5 @@
 import {
+	LineCapStyle,
 	PDFDocument,
 	type PDFFont,
 	type PDFPage,
@@ -6,7 +7,11 @@ import {
 	rgb,
 } from "pdf-lib";
 import type { LineSegment } from "./maze-layout.js";
-import { computeWallSegments } from "./maze-layout.js";
+import {
+	computeCrossingBridgeSegments,
+	computePathSegments,
+	computeWallSegments,
+} from "./maze-layout.js";
 import type { MazePosition } from "./maze-solver.js";
 import { solveMaze } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -17,6 +22,7 @@ export const REMARKABLE_2_PAGE_HEIGHT_PT = (1872 / 226) * 72;
 const PAGE_MARGIN_PT = 24;
 const WALL_THICKNESS_PT = 1.5;
 const WALL_COLOR = rgb(0, 0, 0);
+const PATH_THICKNESS_RATIO = 0.4;
 const SOLUTION_THICKNESS_PT = 2;
 const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
 const PARAMETERS_LABEL_SIZE_PT = 8;
@@ -73,10 +79,12 @@ function toPdfY(layout: MazeLayout, mazeY: number): number {
 	return REMARKABLE_2_PAGE_HEIGHT_PT - layout.topOffset - mazeY;
 }
 
-function drawMazeWalls(
+function drawMazeSegments(
 	page: PDFPage,
 	segments: LineSegment[],
 	layout: MazeLayout,
+	thickness: number,
+	lineCap: LineCapStyle,
 ): void {
 	const { cellSize, leftOffset } = layout;
 
@@ -90,8 +98,9 @@ function drawMazeWalls(
 				x: leftOffset + segment.x2 * cellSize,
 				y: toPdfY(layout, segment.y2 * cellSize),
 			},
-			thickness: WALL_THICKNESS_PT,
+			thickness,
 			color: WALL_COLOR,
+			lineCap,
 		});
 	}
 }
@@ -149,16 +158,23 @@ function addMazePages(
 	maze: Maze,
 	options: RenderMazeToPdfOptions,
 ): void {
-	const wallSegments = computeWallSegments(maze);
+	const isCrossingType = maze.type === "rectangle-crossing";
+	const segments = isCrossingType
+		? [...computePathSegments(maze), ...computeCrossingBridgeSegments(maze)]
+		: computeWallSegments(maze);
 	const solutionMode = options.solution ?? "none";
 	const layout = computeLayout(maze);
 	const parametersLabel = formatParametersLabel(maze);
+	const thickness = isCrossingType
+		? layout.cellSize * PATH_THICKNESS_RATIO
+		: WALL_THICKNESS_PT;
+	const lineCap = isCrossingType ? LineCapStyle.Round : LineCapStyle.Butt;
 
 	const mazePage = document.addPage([
 		REMARKABLE_2_PAGE_WIDTH_PT,
 		REMARKABLE_2_PAGE_HEIGHT_PT,
 	]);
-	drawMazeWalls(mazePage, wallSegments, layout);
+	drawMazeSegments(mazePage, segments, layout, thickness, lineCap);
 	if (parametersLabel) drawParametersLabel(mazePage, font, parametersLabel);
 
 	if (solutionMode === "overlay") {
@@ -168,7 +184,7 @@ function addMazePages(
 			REMARKABLE_2_PAGE_WIDTH_PT,
 			REMARKABLE_2_PAGE_HEIGHT_PT,
 		]);
-		drawMazeWalls(solutionPage, wallSegments, layout);
+		drawMazeSegments(solutionPage, segments, layout, thickness, lineCap);
 		drawSolutionPath(solutionPage, solveMaze(maze), layout);
 		if (parametersLabel)
 			drawParametersLabel(solutionPage, font, parametersLabel);

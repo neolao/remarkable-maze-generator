@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+	computeCrossingBridgeSegments,
+	computePathSegments,
+} from "./maze-layout.js";
 import { renderMazeToSvg } from "./maze-svg.js";
 import { generateMaze } from "./maze.js";
 
@@ -48,5 +52,37 @@ describe("renderMazeToSvg", () => {
 		invalidMaze.width = 0;
 
 		expect(() => renderMazeToSvg(invalidMaze)).toThrow();
+	});
+
+	it("renders a rectangle-crossing maze as thick rounded-cap corridor paths, not walls", () => {
+		const maze = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "rectangle-crossing",
+		});
+		expect(maze.crossings?.length ?? 0).toBeGreaterThan(0);
+
+		const svg = renderMazeToSvg(maze);
+
+		const expectedCount =
+			computePathSegments(maze).length +
+			computeCrossingBridgeSegments(maze).length;
+		expect(countLineElements(svg)).toBe(expectedCount);
+		expect(svg).toContain('stroke-linecap="round"');
+	});
+
+	it("renders a rectangle-crossing maze too small for any crossing without error", () => {
+		const maze = generateMaze({
+			width: 1,
+			height: 1,
+			seed: 1,
+			type: "rectangle-crossing",
+		});
+
+		const svg = renderMazeToSvg(maze);
+
+		expect(maze.crossings).toEqual([]);
+		expect(countLineElements(svg)).toBe(computePathSegments(maze).length);
 	});
 });

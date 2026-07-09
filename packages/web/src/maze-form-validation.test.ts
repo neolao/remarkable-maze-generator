@@ -11,7 +11,51 @@ describe("validateMazeFormInput", () => {
 
 		expect(result).toEqual({
 			valid: true,
-			value: { width: 10, height: 8, difficulty: 3 },
+			value: { width: 10, height: 8, difficulty: 3, type: "rectangle" },
+		});
+	});
+
+	it("defaults the maze type to rectangle when not provided", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+		});
+
+		expect(result.valid).toBe(true);
+		expect(result.valid && result.value.type).toBe("rectangle");
+	});
+
+	it("accepts rectangle-crossing as a valid maze type", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			type: "rectangle-crossing",
+		});
+
+		expect(result).toEqual({
+			valid: true,
+			value: {
+				width: 10,
+				height: 8,
+				difficulty: 3,
+				type: "rectangle-crossing",
+			},
+		});
+	});
+
+	it("rejects an unknown maze type with a clear message", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			type: "hexagon",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/hexagon/),
 		});
 	});
 

@@ -1,10 +1,13 @@
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 
+const MAZE_TYPES = ["rectangle", "rectangle-crossing"];
+const DEFAULT_MAZE_TYPE = "rectangle";
+
 // Mirrors the rules tested in packages/web/src/maze-form-validation.ts;
 // duplicated here because this static page runs unmodified in the browser,
 // with no build step available to import the compiled/tested module.
-function validateMazeFormInput({ width, height, difficulty }) {
+function validateMazeFormInput({ width, height, difficulty, type }) {
 	const parsePositiveInteger = (raw, fieldLabel) => {
 		if (raw.trim() === "" || !/^-?\d+$/.test(raw.trim())) {
 			return { error: `${fieldLabel} must be a whole number` };
@@ -40,12 +43,21 @@ function validateMazeFormInput({ width, height, difficulty }) {
 		return { valid: false, error: difficultyResult.error };
 	}
 
+	const resolvedType = type?.trim() || DEFAULT_MAZE_TYPE;
+	if (!MAZE_TYPES.includes(resolvedType)) {
+		return {
+			valid: false,
+			error: `Maze type must be one of: ${MAZE_TYPES.join(", ")}`,
+		};
+	}
+
 	return {
 		valid: true,
 		value: {
 			width: widthResult.value,
 			height: heightResult.value,
 			difficulty: difficultyResult.value,
+			type: resolvedType,
 		},
 	};
 }
@@ -148,6 +160,7 @@ function initMazeForm() {
 			width: form.width.value,
 			height: form.height.value,
 			difficulty: form.difficulty.value,
+			type: form["maze-type"].value,
 		});
 
 		if (!result.valid) {

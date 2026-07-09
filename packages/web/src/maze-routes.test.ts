@@ -110,6 +110,39 @@ describe("POST /api/mazes/generate", () => {
 
 		expect(response.statusCode).toBe(400);
 	});
+
+	it("accepts the rectangle-crossing maze type", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 10,
+				height: 10,
+				seed: 3,
+				type: "rectangle-crossing",
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.headers["content-type"]).toBe("application/pdf");
+	});
+
+	it("returns 400 with a clear message when the maze type is invalid", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 5, height: 5, type: "hexagon" },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/hexagon/),
+		});
+	});
 });
 
 describe("POST /api/mazes/preview", () => {
@@ -204,5 +237,42 @@ describe("POST /api/mazes/preview", () => {
 		expect(previewResponse.statusCode).toBe(200);
 		const lineCount = (previewResponse.body.match(/<line /g) || []).length;
 		expect(lineCount).toBeGreaterThan(0);
+	});
+
+	it("accepts the rectangle-crossing maze type and shows the bridge decoration", async () => {
+		const app = buildServer();
+
+		const rectangleResponse = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 12, height: 12, seed: 3 },
+		});
+		const crossingResponse = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 12, height: 12, seed: 3, type: "rectangle-crossing" },
+		});
+
+		expect(crossingResponse.statusCode).toBe(200);
+		const rectangleLineCount = (rectangleResponse.body.match(/<line /g) || [])
+			.length;
+		const crossingLineCount = (crossingResponse.body.match(/<line /g) || [])
+			.length;
+		expect(crossingLineCount).toBeGreaterThan(rectangleLineCount);
+	});
+
+	it("returns 400 with a clear message when the maze type is invalid", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 5, height: 5, type: "hexagon" },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/hexagon/),
+		});
 	});
 });

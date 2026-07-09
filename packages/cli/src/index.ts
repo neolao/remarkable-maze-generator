@@ -25,6 +25,10 @@ program
 	)
 	.option("--output <path>", "output PDF file path (defaults to ./maze.pdf)")
 	.option(
+		"--type <type>",
+		"maze type: rectangle, or rectangle-crossing (defaults to rectangle)",
+	)
+	.option(
 		"--solution <mode>",
 		"solution display mode: none, extra-page, or overlay (defaults to none)",
 	)
@@ -34,6 +38,7 @@ program
 			height: string;
 			seed?: string;
 			difficulty?: string;
+			type?: string;
 			solution?: string;
 			output?: string;
 		}) => {
@@ -54,6 +59,7 @@ program
 					height,
 					seed,
 					difficulty,
+					type: opts.type,
 					solution: opts.solution,
 					output: opts.output,
 				});
@@ -117,6 +123,10 @@ program
 		"reMarkable Cloud folder to upload into (must already exist)",
 	)
 	.option(
+		"--type <type>",
+		"maze type: rectangle, or rectangle-crossing (defaults to rectangle)",
+	)
+	.option(
 		"--solution <mode>",
 		"solution display mode: none, extra-page, or overlay (defaults to none)",
 	)
@@ -129,6 +139,7 @@ program
 			output?: string;
 			visibleName?: string;
 			folder?: string;
+			type?: string;
 			solution?: string;
 		}) => {
 			try {
@@ -148,6 +159,7 @@ program
 					height,
 					seed,
 					difficulty,
+					type: opts.type,
 					solution: opts.solution,
 					output: opts.output,
 					visibleName: opts.visibleName,
