@@ -8,8 +8,9 @@ import {
 } from "pdf-lib";
 import type { LineSegment } from "./maze-layout.js";
 import {
-	PATH_THICKNESS_RATIO,
-	computeCrossingBridgeSegments,
+	TUBE_INNER_WIDTH_RATIO,
+	TUBE_OUTER_WIDTH_RATIO,
+	computeCrossingOverSegments,
 	computePathSegments,
 	computeWallSegments,
 } from "./maze-layout.js";
@@ -23,6 +24,8 @@ export const REMARKABLE_2_PAGE_HEIGHT_PT = (1872 / 226) * 72;
 const PAGE_MARGIN_PT = 24;
 const WALL_THICKNESS_PT = 1.5;
 const WALL_COLOR = rgb(0, 0, 0);
+const TUBE_COLOR = rgb(0, 0, 0);
+const TUBE_INNER_COLOR = rgb(1, 1, 1);
 const SOLUTION_THICKNESS_PT = 2;
 const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
 const PARAMETERS_LABEL_SIZE_PT = 8;
@@ -84,6 +87,7 @@ function drawMazeSegments(
 	segments: LineSegment[],
 	layout: MazeLayout,
 	thickness: number,
+	color: ReturnType<typeof rgb>,
 	lineCap: LineCapStyle,
 ): void {
 	const { cellSize, leftOffset } = layout;
@@ -99,10 +103,41 @@ function drawMazeSegments(
 				y: toPdfY(layout, segment.y2 * cellSize),
 			},
 			thickness,
-			color: WALL_COLOR,
+			color,
 			lineCap,
 		});
 	}
+}
+
+// A corridor is drawn as a hollow tube: a thick black stroke followed by a
+// thinner white stroke on the same path, leaving only a border visible. Each
+// group (bridge "under" segments, then the real "over" path segments) must be
+// drawn fully — black then white — before the next, so the "over" tube is
+// painted last and cleanly covers the "under" tube at a crossing (no manual
+// gap math needed — see ADR 023).
+function drawTubeGroup(
+	page: PDFPage,
+	segments: LineSegment[],
+	layout: MazeLayout,
+): void {
+	const outerThickness = layout.cellSize * TUBE_OUTER_WIDTH_RATIO;
+	const innerThickness = layout.cellSize * TUBE_INNER_WIDTH_RATIO;
+	drawMazeSegments(
+		page,
+		segments,
+		layout,
+		outerThickness,
+		TUBE_COLOR,
+		LineCapStyle.Round,
+	);
+	drawMazeSegments(
+		page,
+		segments,
+		layout,
+		innerThickness,
+		TUBE_INNER_COLOR,
+		LineCapStyle.Round,
+	);
 }
 
 function drawSolutionPath(
@@ -152,29 +187,37 @@ function drawParametersLabel(
 	});
 }
 
+function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
+	if (maze.type === "rectangle-crossing") {
+		drawTubeGroup(page, computePathSegments(maze), layout);
+		drawTubeGroup(page, computeCrossingOverSegments(maze), layout);
+	} else {
+		drawMazeSegments(
+			page,
+			computeWallSegments(maze),
+			layout,
+			WALL_THICKNESS_PT,
+			WALL_COLOR,
+			LineCapStyle.Butt,
+		);
+	}
+}
+
 function addMazePages(
 	document: PDFDocument,
 	font: PDFFont,
 	maze: Maze,
 	options: RenderMazeToPdfOptions,
 ): void {
-	const isCrossingType = maze.type === "rectangle-crossing";
-	const segments = isCrossingType
-		? [...computeCrossingBridgeSegments(maze), ...computePathSegments(maze)]
-		: computeWallSegments(maze);
 	const solutionMode = options.solution ?? "none";
 	const layout = computeLayout(maze);
 	const parametersLabel = formatParametersLabel(maze);
-	const thickness = isCrossingType
-		? layout.cellSize * PATH_THICKNESS_RATIO
-		: WALL_THICKNESS_PT;
-	const lineCap = isCrossingType ? LineCapStyle.Round : LineCapStyle.Butt;
 
 	const mazePage = document.addPage([
 		REMARKABLE_2_PAGE_WIDTH_PT,
 		REMARKABLE_2_PAGE_HEIGHT_PT,
 	]);
-	drawMazeSegments(mazePage, segments, layout, thickness, lineCap);
+	drawMaze(mazePage, maze, layout);
 	if (parametersLabel) drawParametersLabel(mazePage, font, parametersLabel);
 
 	if (solutionMode === "overlay") {
@@ -184,7 +227,7 @@ function addMazePages(
 			REMARKABLE_2_PAGE_WIDTH_PT,
 			REMARKABLE_2_PAGE_HEIGHT_PT,
 		]);
-		drawMazeSegments(solutionPage, segments, layout, thickness, lineCap);
+		drawMaze(solutionPage, maze, layout);
 		drawSolutionPath(solutionPage, solveMaze(maze), layout);
 		if (parametersLabel)
 			drawParametersLabel(solutionPage, font, parametersLabel);

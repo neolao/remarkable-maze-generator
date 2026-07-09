@@ -9,7 +9,7 @@
 | type | MazeType | optional; `"rectangle"` (default) or `"rectangle-crossing"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016 and ADR 022 |
 | seed | number | optional; the resolved seed used to generate this maze, see ADR 016 |
 | difficulty | number | optional; the resolved difficulty (1–5) used to generate this maze, see ADR 016 |
-| crossings | MazeCrossing[] | optional; cells decorated with a bridge-crossing effect, only populated for `type: "rectangle-crossing"`, see ADR 022 |
+| crossings | MazeCrossing[] | optional; cells where a corridor tunnels through another's straight passage, only populated for `type: "rectangle-crossing"` — both axes are real, walkable connections, see ADR 024 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeType
@@ -21,7 +21,8 @@ Defined in: `packages/core/src/maze.ts`
 |---|---|---|
 | x | number | column index of the crossing cell |
 | y | number | row index of the crossing cell |
-Defined in: `packages/core/src/maze.ts` — never the entrance or exit cell, see ADR 022
+| underAxis | `"vertical" \| "horizontal"` | which axis was the pre-existing passage that got tunneled under — a rendering hint only; both axes are equally real and walkable, see ADR 024 |
+Defined in: `packages/core/src/maze.ts` — never the entrance or exit cell, see ADR 024 (supersedes the decorative-only design of ADR 022)
 
 ## Cell
 | Field | Type | Notes |

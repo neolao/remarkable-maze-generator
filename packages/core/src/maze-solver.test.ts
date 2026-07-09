@@ -62,4 +62,83 @@ describe("solveMaze", () => {
 
 		expect(() => solveMaze(maze)).toThrow();
 	});
+
+	it("never turns between the two axes of a rectangle-crossing bridge cell", () => {
+		const maze = generateMaze({
+			width: 14,
+			height: 14,
+			seed: 3,
+			type: "rectangle-crossing",
+		});
+		expect(maze.crossings?.length ?? 0).toBeGreaterThan(0);
+		const crossingKeys = new Set(
+			(maze.crossings ?? []).map((c) => `${c.x},${c.y}`),
+		);
+
+		const path = solveMaze(maze);
+
+		for (let i = 1; i < path.length - 1; i++) {
+			if (!crossingKeys.has(`${path[i].x},${path[i].y}`)) continue;
+
+			const incomingAxis =
+				path[i - 1].x !== path[i].x ? "horizontal" : "vertical";
+			const outgoingAxis =
+				path[i + 1].x !== path[i].x ? "horizontal" : "vertical";
+			expect(outgoingAxis).toBe(incomingAxis);
+		}
+	});
+
+	it("finds a valid same-axis route through a crossing cell", () => {
+		// Cells addressed as maze.cells[y][x]. Builds a vertical route straight
+		// through the crossing cell (1,1): (0,0)-(1,0)-(1,1)-(1,2)-(2,2), plus two
+		// unused horizontal "arms" at (1,1) to represent the crossing's other axis.
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[0][0].walls.east = false; // (0,0) -> (1,0)
+		maze.cells[0][1].walls.west = false;
+		maze.cells[0][1].walls.south = false; // (1,0) -> (1,1)
+		maze.cells[1][1].walls.north = false;
+		maze.cells[1][1].walls.south = false; // (1,1) -> (1,2)
+		maze.cells[2][1].walls.north = false;
+		maze.cells[2][1].walls.east = false; // (1,2) -> (2,2)
+		maze.cells[2][2].walls.west = false;
+		maze.cells[1][1].walls.west = false; // (1,1) <-> (0,1), unused horizontal arm
+		maze.cells[1][0].walls.east = false;
+		maze.cells[1][1].walls.east = false; // (1,1) <-> (2,1), unused horizontal arm
+		maze.cells[1][2].walls.west = false;
+		maze.crossings = [{ x: 1, y: 1, underAxis: "horizontal" }];
+
+		const path = solveMaze(maze);
+
+		expect(path).toEqual([
+			{ x: 0, y: 0 },
+			{ x: 1, y: 0 },
+			{ x: 1, y: 1 },
+			{ x: 1, y: 2 },
+			{ x: 2, y: 2 },
+		]);
+	});
+
+	it("rejects a route that would require turning between axes at a crossing cell", () => {
+		// Cells addressed as maze.cells[y][x]. The only wall-connected route from
+		// entrance to exit passes through the crossing cell (1,1), entering from
+		// the west (horizontal axis) and leaving to the south (vertical axis) — a
+		// turn, which must be forbidden even though every individual wall along
+		// the way is open.
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[0][0].walls.south = false; // (0,0) -> (0,1)
+		maze.cells[1][0].walls.north = false;
+		maze.cells[1][0].walls.east = false; // (0,1) -> (1,1)
+		maze.cells[1][1].walls.west = false;
+		maze.cells[1][1].walls.south = false; // (1,1) -> (1,2)
+		maze.cells[2][1].walls.north = false;
+		maze.cells[2][1].walls.east = false; // (1,2) -> (2,2)
+		maze.cells[2][2].walls.west = false;
+		maze.cells[1][1].walls.north = false; // (1,1) <-> (1,0), unused vertical arm
+		maze.cells[0][1].walls.south = false;
+		maze.cells[1][1].walls.east = false; // (1,1) <-> (2,1), unused horizontal arm
+		maze.cells[1][2].walls.west = false;
+		maze.crossings = [{ x: 1, y: 1, underAxis: "vertical" }];
+
+		expect(() => solveMaze(maze)).toThrow();
+	});
 });

@@ -30,6 +30,65 @@ function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
 	return visited.size;
 }
 
+// Traces an actual step-by-step path from the entrance to every cell,
+// respecting both walls and — at a crossing cell — the rule that a path may
+// never turn from one axis onto the other (mirrors solveMaze's own traversal
+// rules, see ADR 024). Returns the set of cells a path was successfully
+// traced to.
+function findCellsReachableByATraceablePath(
+	maze: ReturnType<typeof generateMaze>,
+): Set<string> {
+	type Axis = "" | "vertical" | "horizontal";
+	interface Node {
+		x: number;
+		y: number;
+		axis: Axis;
+	}
+
+	const isCrossing = (x: number, y: number) =>
+		(maze.crossings ?? []).some(
+			(crossing) => crossing.x === x && crossing.y === y,
+		);
+
+	const reachableCells = new Set<string>(["0,0"]);
+	const visitedNodes = new Set<string>(["0,0,"]);
+	const queue: Node[] = [{ x: 0, y: 0, axis: "" }];
+
+	while (queue.length > 0) {
+		const node = queue.shift();
+		if (!node) break;
+		const cell = maze.cells[node.y][node.x];
+		const cellIsCrossing = isCrossing(node.x, node.y);
+
+		const tryMove = (
+			open: boolean,
+			dx: number,
+			dy: number,
+			axis: "vertical" | "horizontal",
+		) => {
+			if (!open) return;
+			if (cellIsCrossing && node.axis !== "" && axis !== node.axis) return;
+
+			const x = node.x + dx;
+			const y = node.y + dy;
+			const nextAxis: Axis = isCrossing(x, y) ? axis : "";
+			const key = `${x},${y},${nextAxis}`;
+			if (visitedNodes.has(key)) return;
+
+			visitedNodes.add(key);
+			reachableCells.add(`${x},${y}`);
+			queue.push({ x, y, axis: nextAxis });
+		};
+
+		tryMove(!cell.walls.north, 0, -1, "vertical");
+		tryMove(!cell.walls.south, 0, 1, "vertical");
+		tryMove(!cell.walls.east, 1, 0, "horizontal");
+		tryMove(!cell.walls.west, -1, 0, "horizontal");
+	}
+
+	return reachableCells;
+}
+
 function countBranchPoints(maze: ReturnType<typeof generateMaze>): number {
 	let branchPoints = 0;
 	for (const row of maze.cells) {
@@ -83,6 +142,12 @@ describe("generateMaze", () => {
 		const maze = generateMaze({ width: 10, height: 10, seed: 7 });
 
 		expect(countReachableCells(maze)).toBe(10 * 10);
+	});
+
+	it("can trace an actual path from the entrance to every single cell (rectangle type)", () => {
+		const maze = generateMaze({ width: 10, height: 10, seed: 7 });
+
+		expect(findCellsReachableByATraceablePath(maze).size).toBe(10 * 10);
 	});
 
 	it("produces a different layout for a different seed", () => {
@@ -236,28 +301,66 @@ describe("generateMaze - type option", () => {
 		}
 	});
 
-	it("marks each recorded crossing cell as a straight-through passage", () => {
+	it("opens all 4 walls at each recorded crossing cell — both passages are real, walkable connections", () => {
 		const maze = generateMaze({
 			width: 12,
 			height: 12,
 			seed: 3,
 			type: "rectangle-crossing",
 		});
+		expect(maze.crossings?.length ?? 0).toBeGreaterThan(0);
 
 		for (const crossing of maze.crossings ?? []) {
 			const cell = maze.cells[crossing.y][crossing.x];
-			const verticalPassage =
-				!cell.walls.north &&
-				!cell.walls.south &&
-				cell.walls.east &&
-				cell.walls.west;
-			const horizontalPassage =
-				!cell.walls.east &&
-				!cell.walls.west &&
-				cell.walls.north &&
-				cell.walls.south;
-			expect(verticalPassage || horizontalPassage).toBe(true);
+			expect(cell.walls).toEqual({
+				north: false,
+				south: false,
+				east: false,
+				west: false,
+			});
+			expect(["vertical", "horizontal"]).toContain(crossing.underAxis);
 		}
+	});
+
+	it("keeps every cell reachable from the entrance for a rectangle-crossing maze", () => {
+		const maze = generateMaze({
+			width: 14,
+			height: 14,
+			seed: 3,
+			type: "rectangle-crossing",
+		});
+
+		expect(countReachableCells(maze)).toBe(14 * 14);
+	});
+
+	it("never places two crossings next to each other, avoiding a repeating ladder pattern", () => {
+		const maze = generateMaze({
+			width: 20,
+			height: 20,
+			seed: 11,
+			type: "rectangle-crossing",
+		});
+		const crossings = maze.crossings ?? [];
+		expect(crossings.length).toBeGreaterThan(0);
+
+		for (const a of crossings) {
+			for (const b of crossings) {
+				if (a === b) continue;
+				expect(Math.abs(a.x - b.x) + Math.abs(a.y - b.y)).toBeGreaterThan(1);
+			}
+		}
+	});
+
+	it("can trace an actual path from the entrance to every single cell, never turning at a crossing (rectangle-crossing type)", () => {
+		const maze = generateMaze({
+			width: 14,
+			height: 14,
+			seed: 3,
+			type: "rectangle-crossing",
+		});
+		expect(maze.crossings?.length ?? 0).toBeGreaterThan(0);
+
+		expect(findCellsReachableByATraceablePath(maze).size).toBe(14 * 14);
 	});
 
 	it("generates the same crossings for the same seed", () => {

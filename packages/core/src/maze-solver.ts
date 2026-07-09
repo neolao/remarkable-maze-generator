@@ -5,34 +5,65 @@ export interface MazePosition {
 	y: number;
 }
 
-function positionKey(position: MazePosition): string {
-	return `${position.x},${position.y}`;
+// A crossing cell hosts two independent, non-intersecting passages (see ADR
+// 024): "axis" identifies which one a node sits on, so the solver never lets
+// a path turn from one into the other. "" means "not currently constrained"
+// (a regular cell, or the entrance/exit — which are never crossings).
+type Axis = "" | "vertical" | "horizontal";
+
+interface Node {
+	x: number;
+	y: number;
+	axis: Axis;
 }
 
-function getOpenNeighbors(maze: Maze, position: MazePosition): MazePosition[] {
-	const cell = maze.cells[position.y][position.x];
-	const neighbors: MazePosition[] = [];
+function nodeKey(node: Node): string {
+	return `${node.x},${node.y},${node.axis}`;
+}
 
-	if (!cell.walls.north) neighbors.push({ x: position.x, y: position.y - 1 });
-	if (!cell.walls.south) neighbors.push({ x: position.x, y: position.y + 1 });
-	if (!cell.walls.east) neighbors.push({ x: position.x + 1, y: position.y });
-	if (!cell.walls.west) neighbors.push({ x: position.x - 1, y: position.y });
+function isCrossingCell(maze: Maze, x: number, y: number): boolean {
+	return (maze.crossings ?? []).some(
+		(crossing) => crossing.x === x && crossing.y === y,
+	);
+}
 
-	return neighbors;
+function getOpenMoves(maze: Maze, node: Node): Node[] {
+	const cell = maze.cells[node.y][node.x];
+	const cellIsCrossing = isCrossingCell(maze, node.x, node.y);
+	const moves: Node[] = [];
+
+	const tryMove = (open: boolean, dx: number, dy: number, axis: Axis) => {
+		if (!open) return;
+		if (cellIsCrossing && node.axis !== "" && axis !== node.axis) return;
+		const x = node.x + dx;
+		const y = node.y + dy;
+		moves.push({
+			x,
+			y,
+			axis: isCrossingCell(maze, x, y) ? axis : "",
+		});
+	};
+
+	tryMove(!cell.walls.north, 0, -1, "vertical");
+	tryMove(!cell.walls.south, 0, 1, "vertical");
+	tryMove(!cell.walls.east, 1, 0, "horizontal");
+	tryMove(!cell.walls.west, -1, 0, "horizontal");
+
+	return moves;
 }
 
 function reconstructPath(
-	cameFrom: Map<string, MazePosition>,
-	entrance: MazePosition,
-	exit: MazePosition,
+	cameFrom: Map<string, Node>,
+	start: Node,
+	end: Node,
 ): MazePosition[] {
-	const path: MazePosition[] = [exit];
-	let current = exit;
+	const path: MazePosition[] = [{ x: end.x, y: end.y }];
+	let current = end;
 
-	while (positionKey(current) !== positionKey(entrance)) {
-		const previous = cameFrom.get(positionKey(current));
+	while (nodeKey(current) !== nodeKey(start)) {
+		const previous = cameFrom.get(nodeKey(current));
 		if (!previous) throw new Error("Failed to reconstruct the solution path");
-		path.push(previous);
+		path.push({ x: previous.x, y: previous.y });
 		current = previous;
 	}
 
@@ -40,23 +71,24 @@ function reconstructPath(
 }
 
 export function solveMaze(maze: Maze): MazePosition[] {
-	const entrance: MazePosition = { x: 0, y: 0 };
-	const exit: MazePosition = { x: maze.width - 1, y: maze.height - 1 };
+	const exitX = maze.width - 1;
+	const exitY = maze.height - 1;
 
-	const cameFrom = new Map<string, MazePosition>();
-	const visited = new Set<string>([positionKey(entrance)]);
-	const queue: MazePosition[] = [entrance];
+	const start: Node = { x: 0, y: 0, axis: "" };
+	const cameFrom = new Map<string, Node>();
+	const visited = new Set<string>([nodeKey(start)]);
+	const queue: Node[] = [start];
 
 	while (queue.length > 0) {
 		const current = queue.shift();
 		if (!current) break;
 
-		if (current.x === exit.x && current.y === exit.y) {
-			return reconstructPath(cameFrom, entrance, exit);
+		if (current.x === exitX && current.y === exitY) {
+			return reconstructPath(cameFrom, start, current);
 		}
 
-		for (const neighbor of getOpenNeighbors(maze, current)) {
-			const key = positionKey(neighbor);
+		for (const neighbor of getOpenMoves(maze, current)) {
+			const key = nodeKey(neighbor);
 			if (visited.has(key)) continue;
 			visited.add(key);
 			cameFrom.set(key, current);
@@ -65,6 +97,6 @@ export function solveMaze(maze: Maze): MazePosition[] {
 	}
 
 	throw new Error(
-		`No path exists between entrance (0,0) and exit (${exit.x},${exit.y})`,
+		`No path exists between entrance (0,0) and exit (${exitX},${exitY})`,
 	);
 }

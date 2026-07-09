@@ -20,7 +20,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Send the maze generated through the web page directly to your reMarkable Cloud account, with a guided one-time pairing step if the browser isn't paired yet (the same pairing already used by the CLI also works here)
 - Choose a target reMarkable Cloud folder for a maze sent from the web page, or leave it blank to upload to the account root
 - Enjoy a polished, responsive design on the web maze configuration page, readable on both desktop and mobile screens
-- Generate a "bridge crossing" maze type, drawn as thick, rounded curvy corridors where some paths visually pass over/under one another like a bridge, alongside the classic (thin-wall) maze type — selectable from the command line or the web page, with exactly one solution guaranteed either way
+- Generate a "bridge crossing" maze type, drawn as thick, rounded curvy corridors where some real, walkable corridors tunnel underneath one another like a bridge, alongside the classic (thin-wall) maze type — selectable from the command line or the web page, with exactly one solution guaranteed either way
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
@@ -88,7 +88,7 @@ Run the web server (development mode, auto-reload):
 npm run web
 ```
 
-Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty, and maze type — classic or bridge crossing) through the form, see an image preview, download the generated PDF, or send it straight to your reMarkable Cloud account with the "Send to reMarkable" button. Optionally fill in the "reMarkable folder" field first to upload into a specific, already-existing folder instead of the account root. The first time, a one-time pairing code is requested (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, the same way as the CLI's `send` command.
+Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty, and maze type — Rectangle or Rectangle crossing) through the form, see an image preview, download the generated PDF, or send it straight to your reMarkable Cloud account with the "Send to reMarkable" button. Optionally fill in the "reMarkable folder" field first to upload into a specific, already-existing folder instead of the account root. The first time, a one-time pairing code is requested (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, the same way as the CLI's `send` command.
 
 Run the tests:
 

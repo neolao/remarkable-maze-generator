@@ -12,6 +12,12 @@ export interface Cell {
 export interface MazeCrossing {
 	x: number;
 	y: number;
+	/**
+	 * Which axis was the pre-existing passage that got tunneled under. Purely a
+	 * rendering hint (see ADR 023/024) — both axes are real, walkable
+	 * connections either way.
+	 */
+	underAxis: "vertical" | "horizontal";
 }
 
 export type MazeType = "rectangle" | "rectangle-crossing";
@@ -57,18 +63,21 @@ const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 const DEFAULT_MAZE_TYPE: MazeType = "rectangle";
 
+type Axis = "vertical" | "horizontal";
+
 interface Direction {
 	dx: number;
 	dy: number;
 	wall: keyof CellWalls;
 	opposite: keyof CellWalls;
+	axis: Axis;
 }
 
 const DIRECTIONS: Direction[] = [
-	{ dx: 0, dy: -1, wall: "north", opposite: "south" },
-	{ dx: 0, dy: 1, wall: "south", opposite: "north" },
-	{ dx: 1, dy: 0, wall: "east", opposite: "west" },
-	{ dx: -1, dy: 0, wall: "west", opposite: "east" },
+	{ dx: 0, dy: -1, wall: "north", opposite: "south", axis: "vertical" },
+	{ dx: 0, dy: 1, wall: "south", opposite: "north", axis: "vertical" },
+	{ dx: 1, dy: 0, wall: "east", opposite: "west", axis: "horizontal" },
+	{ dx: -1, dy: 0, wall: "west", opposite: "east", axis: "horizontal" },
 ];
 
 function createSeededRandom(seed: number): () => number {
@@ -120,33 +129,15 @@ function validateType(type: MazeType): void {
 	}
 }
 
-// A crossing cell keeps its real, walkable through-passage (the "over" corridor,
-// already part of the spanning tree) and gets a purely decorative perpendicular
-// stub drawn at render time (see maze-layout.ts) to look like a bridge — no wall
-// is touched here, so the maze keeps its single-solution guarantee (ADR 022).
-function detectCrossings(
-	cells: Cell[][],
-	width: number,
-	height: number,
-): MazeCrossing[] {
-	const crossings: MazeCrossing[] = [];
-
-	for (let y = 0; y < height; y++) {
-		for (let x = 0; x < width; x++) {
-			const isEntrance = x === 0 && y === 0;
-			const isExit = x === width - 1 && y === height - 1;
-			if (isEntrance || isExit) continue;
-
-			const { north, south, east, west } = cells[y][x].walls;
-			const verticalPassage = !north && !south && east && west;
-			const horizontalPassage = !east && !west && north && south;
-			if (verticalPassage || horizontalPassage) {
-				crossings.push({ x, y });
-			}
-		}
-	}
-
-	return crossings;
+// A cell is a valid tunnel-through candidate when it currently carries exactly
+// one straight passage (both walls open on one axis, both closed on the
+// other) — the shape a real bridge crossing needs to duck under (see ADR 024).
+function straightPassageAxis(walls: CellWalls): Axis | undefined {
+	if (!walls.north && !walls.south && walls.east && walls.west)
+		return "vertical";
+	if (!walls.east && !walls.west && walls.north && walls.south)
+		return "horizontal";
+	return undefined;
 }
 
 export function generateMaze({
@@ -173,6 +164,21 @@ export function generateMaze({
 	const randomSelectionProbability =
 		(difficulty - MIN_DIFFICULTY) / (MAX_DIFFICULTY - MIN_DIFFICULTY);
 
+	const allowsCrossings = type === "rectangle-crossing";
+	const crossings: MazeCrossing[] = [];
+	const isUsedAsCrossing = (x: number, y: number) =>
+		(x === 0 && y === 0) ||
+		(x === width - 1 && y === height - 1) ||
+		crossings.some((crossing) => crossing.x === x && crossing.y === y);
+	// Keeping crossings apart from one another avoids a "ladder" of several
+	// crossings stacked back-to-back between the same two parallel corridors,
+	// which reads as a repeating structural pattern rather than an occasional,
+	// notable bridge (see ADR 024 follow-up).
+	const isAdjacentToCrossing = (x: number, y: number) =>
+		crossings.some(
+			(crossing) => Math.abs(crossing.x - x) + Math.abs(crossing.y - y) === 1,
+		);
+
 	const active: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
 	visited[0][0] = true;
 
@@ -196,27 +202,90 @@ export function generateMaze({
 				!visited[neighbor.y][neighbor.x],
 		);
 
-		if (unvisitedNeighbors.length === 0) {
+		// A tunnel candidate reaches a new, unvisited cell by ducking straight
+		// through an already-visited neighbor's existing perpendicular passage,
+		// creating a real bridge crossing (see ADR 024) instead of extending to
+		// an adjacent unvisited cell directly.
+		const tunnelCandidates = allowsCrossings
+			? DIRECTIONS.map((direction) => {
+					const tunnelX = current.x + direction.dx;
+					const tunnelY = current.y + direction.dy;
+					const targetX = tunnelX + direction.dx;
+					const targetY = tunnelY + direction.dy;
+					return { direction, tunnelX, tunnelY, targetX, targetY };
+				}).filter(({ direction, tunnelX, tunnelY, targetX, targetY }) => {
+					if (
+						tunnelX < 0 ||
+						tunnelX >= width ||
+						tunnelY < 0 ||
+						tunnelY >= height
+					)
+						return false;
+					if (!visited[tunnelY][tunnelX]) return false;
+					if (isUsedAsCrossing(tunnelX, tunnelY)) return false;
+					if (isAdjacentToCrossing(tunnelX, tunnelY)) return false;
+					if (
+						targetX < 0 ||
+						targetX >= width ||
+						targetY < 0 ||
+						targetY >= height
+					)
+						return false;
+					if (visited[targetY][targetX]) return false;
+
+					const existingAxis = straightPassageAxis(
+						cells[tunnelY][tunnelX].walls,
+					);
+					return existingAxis !== undefined && existingAxis !== direction.axis;
+				})
+			: [];
+
+		const totalCandidates = unvisitedNeighbors.length + tunnelCandidates.length;
+
+		if (totalCandidates === 0) {
 			active.splice(index, 1);
 			continue;
 		}
 
-		const chosen =
-			unvisitedNeighbors[Math.floor(random() * unvisitedNeighbors.length)];
+		const choice = Math.floor(random() * totalCandidates);
 
-		cells[current.y][current.x].walls[chosen.direction.wall] = false;
-		cells[chosen.y][chosen.x].walls[chosen.direction.opposite] = false;
+		if (choice < unvisitedNeighbors.length) {
+			const chosen = unvisitedNeighbors[choice];
 
-		visited[chosen.y][chosen.x] = true;
-		active.push({ x: chosen.x, y: chosen.y });
+			cells[current.y][current.x].walls[chosen.direction.wall] = false;
+			cells[chosen.y][chosen.x].walls[chosen.direction.opposite] = false;
+
+			visited[chosen.y][chosen.x] = true;
+			active.push({ x: chosen.x, y: chosen.y });
+		} else {
+			const { direction, tunnelX, tunnelY, targetX, targetY } =
+				tunnelCandidates[choice - unvisitedNeighbors.length];
+			const underAxis = straightPassageAxis(cells[tunnelY][tunnelX].walls);
+			if (!underAxis)
+				throw new Error(
+					"Unreachable: tunnel candidate lost its straight passage",
+				);
+
+			cells[current.y][current.x].walls[direction.wall] = false;
+			cells[tunnelY][tunnelX].walls[direction.opposite] = false;
+			cells[tunnelY][tunnelX].walls[direction.wall] = false;
+			cells[targetY][targetX].walls[direction.opposite] = false;
+
+			crossings.push({ x: tunnelX, y: tunnelY, underAxis });
+			visited[targetY][targetX] = true;
+			active.push({ x: targetX, y: targetY });
+		}
 	}
 
-	const crossings =
-		type === "rectangle-crossing"
-			? detectCrossings(cells, width, height)
-			: undefined;
-
-	return { width, height, cells, type, seed, difficulty, crossings };
+	return {
+		width,
+		height,
+		cells,
+		type,
+		seed,
+		difficulty,
+		crossings: allowsCrossings ? crossings : undefined,
+	};
 }
 
 export function generateMazeBatch({

@@ -1,6 +1,6 @@
 ---
 date: 2026-07-09
-status: accepted
+status: superseded by 024
 ---
 # Bridge crossing maze type: visual-only crossings, shared type validation
 
