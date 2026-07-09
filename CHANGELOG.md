@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Users can now choose whether the maze PDF generated from the web page includes its solution, and how (none, extra page, or overlay), with a new "Solution in PDF" option on the configuration form — applied consistently to both the downloaded PDF and the one sent to reMarkable Cloud; the same choice already available on the command line
 - Users can now show the maze's solution directly on the web page preview with a "Show solution on preview" option, tracing the path in red and marking every branch point (where the path had another possible direction) with a circle, along with the total number of branch points found; leaving the option unchecked keeps the current preview unchanged
 - When sending a maze from the web page without specifying a name, the file uploaded to reMarkable Cloud is now named after its type and dimensions (e.g. "rectangle 20x15") instead of including a seed number
 

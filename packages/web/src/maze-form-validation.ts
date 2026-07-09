@@ -1,7 +1,10 @@
 import {
 	type MazeType,
+	type SolutionDisplayMode,
 	invalidMazeTypeMessage,
+	invalidSolutionModeMessage,
 	isValidMazeType,
+	isValidSolutionMode,
 } from "@remarkable-maze-generator/core";
 
 export interface MazeFormInput {
@@ -9,6 +12,7 @@ export interface MazeFormInput {
 	height: string;
 	difficulty: string;
 	type?: string;
+	solution?: string;
 }
 
 export interface MazeFormValue {
@@ -16,6 +20,7 @@ export interface MazeFormValue {
 	height: number;
 	difficulty: number;
 	type: MazeType;
+	solution: SolutionDisplayMode;
 }
 
 export type MazeFormValidationResult =
@@ -25,6 +30,7 @@ export type MazeFormValidationResult =
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 const DEFAULT_MAZE_TYPE: MazeType = "rectangle";
+const DEFAULT_SOLUTION_MODE: SolutionDisplayMode = "none";
 
 function parsePositiveInteger(raw: string, fieldLabel: string): number {
 	if (raw.trim() === "" || !/^-?\d+$/.test(raw.trim())) {
@@ -62,6 +68,14 @@ function parseMazeType(raw: string | undefined): MazeType {
 	return type;
 }
 
+function parseSolutionMode(raw: string | undefined): SolutionDisplayMode {
+	const solution = raw?.trim() || DEFAULT_SOLUTION_MODE;
+	if (!isValidSolutionMode(solution)) {
+		throw new Error(invalidSolutionModeMessage(solution));
+	}
+	return solution;
+}
+
 export function validateMazeFormInput(
 	input: MazeFormInput,
 ): MazeFormValidationResult {
@@ -70,8 +84,12 @@ export function validateMazeFormInput(
 		const height = parsePositiveInteger(input.height, "Height");
 		const difficulty = parseDifficulty(input.difficulty);
 		const type = parseMazeType(input.type);
+		const solution = parseSolutionMode(input.solution);
 
-		return { valid: true, value: { width, height, difficulty, type } };
+		return {
+			valid: true,
+			value: { width, height, difficulty, type, solution },
+		};
 	} catch (error) {
 		return { valid: false, error: (error as Error).message };
 	}

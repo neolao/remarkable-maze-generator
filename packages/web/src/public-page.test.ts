@@ -13,6 +13,7 @@ const REQUIRED_ELEMENT_IDS = [
 	"height",
 	"difficulty",
 	"maze-type",
+	"solution-mode",
 	"show-solution",
 	"form-error",
 	"maze-preview",
@@ -64,5 +65,17 @@ describe("public maze configuration page", () => {
 		expect(html).toMatch(
 			/<input[^>]+id="show-solution"[^>]+type="checkbox"|<input[^>]+type="checkbox"[^>]+id="show-solution"/,
 		);
+	});
+
+	it("exposes the solution display mode as a select with all three modes", () => {
+		const match = html.match(
+			/<select[^>]+id="solution-mode"[^>]*>([\s\S]*?)<\/select>/,
+		);
+		expect(match).not.toBeNull();
+
+		const optionsMarkup = match?.[1] ?? "";
+		expect(optionsMarkup).toContain('value="none"');
+		expect(optionsMarkup).toContain('value="extra-page"');
+		expect(optionsMarkup).toContain('value="overlay"');
 	});
 });

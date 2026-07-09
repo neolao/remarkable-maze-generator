@@ -11,7 +11,13 @@ describe("validateMazeFormInput", () => {
 
 		expect(result).toEqual({
 			valid: true,
-			value: { width: 10, height: 8, difficulty: 3, type: "rectangle" },
+			value: {
+				width: 10,
+				height: 8,
+				difficulty: 3,
+				type: "rectangle",
+				solution: "none",
+			},
 		});
 	});
 
@@ -41,6 +47,7 @@ describe("validateMazeFormInput", () => {
 				height: 8,
 				difficulty: 3,
 				type: "rectangle-crossing",
+				solution: "none",
 			},
 		});
 	});
@@ -162,5 +169,62 @@ describe("validateMazeFormInput", () => {
 		});
 
 		expect(result.valid).toBe(false);
+	});
+
+	it("defaults the solution display mode to none when not provided", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+		});
+
+		expect(result.valid).toBe(true);
+		expect(result.valid && result.value.solution).toBe("none");
+	});
+
+	it("accepts overlay as a valid solution display mode", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			solution: "overlay",
+		});
+
+		expect(result).toEqual({
+			valid: true,
+			value: {
+				width: 10,
+				height: 8,
+				difficulty: 3,
+				type: "rectangle",
+				solution: "overlay",
+			},
+		});
+	});
+
+	it("accepts extra-page as a valid solution display mode", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			solution: "extra-page",
+		});
+
+		expect(result.valid).toBe(true);
+		expect(result.valid && result.value.solution).toBe("extra-page");
+	});
+
+	it("rejects an unknown solution display mode with a clear message", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			solution: "confetti",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/confetti/),
+		});
 	});
 });

@@ -151,6 +151,7 @@ Defined in: `packages/cli/src/send.ts`
 | height | string | raw form field value, parsed as a positive integer |
 | difficulty | string | raw form field value, parsed as an integer 1–5 |
 | type | string | optional raw form field value, defaults to `"rectangle"` when blank, validated via `core`'s `isValidMazeType` (see ADR 022) |
+| solution | string | optional raw form field value, defaults to `"none"` when blank, validated via `core`'s `isValidSolutionMode` (see ADR 021; backlog item 019) |
 Defined in: `packages/web/src/maze-form-validation.ts`
 
 ## MazeFormValidationResult (web)

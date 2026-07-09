@@ -4,10 +4,13 @@ const MAX_DIFFICULTY = 5;
 const MAZE_TYPES = ["rectangle", "rectangle-crossing"];
 const DEFAULT_MAZE_TYPE = "rectangle";
 
+const SOLUTION_MODES = ["none", "extra-page", "overlay"];
+const DEFAULT_SOLUTION_MODE = "none";
+
 // Mirrors the rules tested in packages/web/src/maze-form-validation.ts;
 // duplicated here because this static page runs unmodified in the browser,
 // with no build step available to import the compiled/tested module.
-function validateMazeFormInput({ width, height, difficulty, type }) {
+function validateMazeFormInput({ width, height, difficulty, type, solution }) {
 	const parsePositiveInteger = (raw, fieldLabel) => {
 		if (raw.trim() === "" || !/^-?\d+$/.test(raw.trim())) {
 			return { error: `${fieldLabel} must be a whole number` };
@@ -51,6 +54,14 @@ function validateMazeFormInput({ width, height, difficulty, type }) {
 		};
 	}
 
+	const resolvedSolution = solution?.trim() || DEFAULT_SOLUTION_MODE;
+	if (!SOLUTION_MODES.includes(resolvedSolution)) {
+		return {
+			valid: false,
+			error: `Invalid solution mode "${resolvedSolution}", expected one of: ${SOLUTION_MODES.join(", ")}`,
+		};
+	}
+
 	return {
 		valid: true,
 		value: {
@@ -58,6 +69,7 @@ function validateMazeFormInput({ width, height, difficulty, type }) {
 			height: heightResult.value,
 			difficulty: difficultyResult.value,
 			type: resolvedType,
+			solution: resolvedSolution,
 		},
 	};
 }
@@ -165,6 +177,7 @@ function initMazeForm() {
 			height: form.height.value,
 			difficulty: form.difficulty.value,
 			type: form["maze-type"].value,
+			solution: form["solution-mode"].value,
 		});
 
 		if (!result.valid) {
