@@ -248,4 +248,83 @@ describe("POST /api/mazes/send", () => {
 			error: "Failed to upload the PDF to reMarkable Cloud: network error",
 		});
 	});
+
+	it("forwards the target folder to the upload step", async () => {
+		await writeFile(
+			credentialsPath,
+			JSON.stringify({ deviceToken: "existing-token" }),
+		);
+		const fakeSession = {};
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+		const app = buildServer({ credentialsPath });
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: { width: 5, height: 5, seed: 42, folder: "Mazes" },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(uploadPdfMock).toHaveBeenCalledWith(
+			fakeSession,
+			expect.any(String),
+			"rectangle-5x5-42",
+			expect.objectContaining({ folder: "Mazes" }),
+		);
+	});
+
+	it("uploads to the account root when no folder is specified", async () => {
+		await writeFile(
+			credentialsPath,
+			JSON.stringify({ deviceToken: "existing-token" }),
+		);
+		const fakeSession = {};
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+		const app = buildServer({ credentialsPath });
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: { width: 5, height: 5, seed: 42 },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(uploadPdfMock).toHaveBeenCalledWith(
+			fakeSession,
+			expect.any(String),
+			"rectangle-5x5-42",
+			expect.objectContaining({ folder: undefined }),
+		);
+	});
+
+	it("returns 502 with a clear message when the target folder does not exist", async () => {
+		await writeFile(
+			credentialsPath,
+			JSON.stringify({ deviceToken: "existing-token" }),
+		);
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue({} as any);
+		uploadPdfMock.mockRejectedValue(
+			new Error(
+				'Failed to upload the PDF to reMarkable Cloud: Folder "Missing" was not found on reMarkable Cloud. Create it first, then try again.',
+			),
+		);
+		const app = buildServer({ credentialsPath });
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: { width: 5, height: 5, seed: 42, folder: "Missing" },
+		});
+
+		expect(response.statusCode).toBe(502);
+		expect(response.json()).toEqual({
+			error:
+				'Failed to upload the PDF to reMarkable Cloud: Folder "Missing" was not found on reMarkable Cloud. Create it first, then try again.',
+		});
+	});
 });

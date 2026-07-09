@@ -19,6 +19,7 @@ interface PairRequestBody {
 
 interface SendMazeRequestBody extends GenerateMazeRequestBody {
 	visibleName?: string;
+	folder?: string;
 }
 
 function defaultVisibleName(maze: Maze): string {
@@ -58,7 +59,7 @@ async function handleSendMaze(
 	reply: FastifyReply,
 ) {
 	const body = request.body ?? {};
-	const { solution, visibleName: requestedVisibleName } = body;
+	const { solution, visibleName: requestedVisibleName, folder } = body;
 
 	if (solution !== undefined && !isValidSolutionMode(solution)) {
 		reply.code(400);
@@ -94,6 +95,7 @@ async function handleSendMaze(
 	try {
 		await uploadPdf(session, `${visibleName}.pdf`, visibleName, {
 			readFile: async () => pdfBytes,
+			folder,
 		});
 	} catch (error) {
 		reply.code(502);

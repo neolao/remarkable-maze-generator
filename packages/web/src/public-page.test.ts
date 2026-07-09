@@ -17,6 +17,7 @@ const REQUIRED_ELEMENT_IDS = [
 	"download-link",
 	"send-button",
 	"send-status",
+	"remarkable-folder",
 	"pairing-section",
 	"pairing-code",
 	"pairing-submit",

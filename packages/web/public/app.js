@@ -55,6 +55,10 @@ function initMazeForm() {
 	const errorElement = document.getElementById("form-error");
 	const previewElement = document.getElementById("maze-preview");
 	const downloadLink = document.getElementById("download-link");
+	const remarkableFolderField = document.getElementById(
+		"remarkable-folder-field",
+	);
+	const remarkableFolderInput = document.getElementById("remarkable-folder");
 	const sendButton = document.getElementById("send-button");
 	const sendStatus = document.getElementById("send-status");
 	const pairingSection = document.getElementById("pairing-section");
@@ -67,6 +71,7 @@ function initMazeForm() {
 	const hidePreview = () => {
 		previewElement.style.display = "none";
 		downloadLink.style.display = "none";
+		remarkableFolderField.style.display = "none";
 		sendButton.style.display = "none";
 		sendStatus.textContent = "";
 		pairingSection.style.display = "none";
@@ -77,10 +82,16 @@ function initMazeForm() {
 		sendStatus.textContent = "Sending to reMarkable...";
 		pairingSection.style.display = "none";
 
+		const folder = remarkableFolderInput.value.trim();
+		const sendRequestBody = JSON.stringify({
+			...JSON.parse(lastMazeRequestBody),
+			folder: folder === "" ? undefined : folder,
+		});
+
 		const response = await fetch("/api/mazes/send", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
-			body: lastMazeRequestBody,
+			body: sendRequestBody,
 		});
 
 		if (response.ok) {
@@ -166,6 +177,7 @@ function initMazeForm() {
 		previewElement.style.display = "block";
 
 		lastMazeRequestBody = requestBody;
+		remarkableFolderField.style.display = "block";
 		sendButton.style.display = "inline";
 		sendStatus.textContent = "";
 		pairingSection.style.display = "none";
