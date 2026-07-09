@@ -1,4 +1,5 @@
 import {
+	PATH_THICKNESS_RATIO,
 	computeCrossingBridgeSegments,
 	computePathSegments,
 	computeWallSegments,
@@ -8,7 +9,6 @@ import type { Maze } from "./maze.js";
 
 const DEFAULT_CELL_SIZE_PX = 20;
 const WALL_STROKE_WIDTH_PX = 2;
-const PATH_THICKNESS_RATIO = 0.4;
 
 export interface RenderMazeToSvgOptions {
 	cellSizePx?: number;
@@ -40,8 +40,8 @@ export function renderMazeToSvg(
 		maze.type === "rectangle-crossing"
 			? renderLines(
 					[
-						...computePathSegments(maze),
 						...computeCrossingBridgeSegments(maze),
+						...computePathSegments(maze),
 					],
 					cellSizePx,
 					cellSizePx * PATH_THICKNESS_RATIO,

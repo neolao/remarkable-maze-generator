@@ -116,13 +116,25 @@ export function computePathSegments(maze: Maze): LineSegment[] {
 	return segments;
 }
 
-const CROSSING_GAP_START = 0.3;
-const CROSSING_GAP_END = 0.7;
+/**
+ * Stroke thickness for the "rectangle-crossing" path rendering, as a fraction
+ * of the cell size — the single source of truth shared by both the layout
+ * (bridge gap sizing) and the PDF/SVG renderers. Matches the proportions of
+ * David Bau's original maze generator (pypdfmaze: `wall=0.3` of the half-cell,
+ * i.e. 0.15 of the full cell — see ADR 023), which reads as a clean, legible
+ * tube instead of a thick blob.
+ */
+export const PATH_THICKNESS_RATIO = 0.15;
+
+const CROSSING_GAP_START = 0.32;
+const CROSSING_GAP_END = 0.68;
 
 /**
  * Decorative "under" stub for each recorded bridge crossing (see ADR 022): two
  * short segments with a gap in the middle, drawn perpendicular to the cell's
- * real through-passage, so it reads as passing underneath it.
+ * real through-passage, so it reads as passing underneath it. Confined to the
+ * crossing cell itself (not extending into neighbors), matching the reference
+ * implementation's own crossing cue (see ADR 023).
  */
 export function computeCrossingBridgeSegments(maze: Maze): LineSegment[] {
 	const segments: LineSegment[] = [];

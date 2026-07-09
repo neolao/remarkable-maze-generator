@@ -8,6 +8,7 @@ import {
 } from "pdf-lib";
 import type { LineSegment } from "./maze-layout.js";
 import {
+	PATH_THICKNESS_RATIO,
 	computeCrossingBridgeSegments,
 	computePathSegments,
 	computeWallSegments,
@@ -22,7 +23,6 @@ export const REMARKABLE_2_PAGE_HEIGHT_PT = (1872 / 226) * 72;
 const PAGE_MARGIN_PT = 24;
 const WALL_THICKNESS_PT = 1.5;
 const WALL_COLOR = rgb(0, 0, 0);
-const PATH_THICKNESS_RATIO = 0.4;
 const SOLUTION_THICKNESS_PT = 2;
 const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
 const PARAMETERS_LABEL_SIZE_PT = 8;
@@ -160,7 +160,7 @@ function addMazePages(
 ): void {
 	const isCrossingType = maze.type === "rectangle-crossing";
 	const segments = isCrossingType
-		? [...computePathSegments(maze), ...computeCrossingBridgeSegments(maze)]
+		? [...computeCrossingBridgeSegments(maze), ...computePathSegments(maze)]
 		: computeWallSegments(maze);
 	const solutionMode = options.solution ?? "none";
 	const layout = computeLayout(maze);
