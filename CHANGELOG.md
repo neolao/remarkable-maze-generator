@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-09
+
 ### Added
 
 - Users can now generate a maze PDF through the web API by sending its parameters (size, seed, difficulty, and solution display mode) to `POST /api/mazes/generate`, receiving the PDF directly in response
@@ -15,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Users can now include the maze's solution in the PDF produced by `remarkable-maze generate` and `remarkable-maze generate-and-send` with `--solution <none|extra-page|overlay>`; omitting it keeps the current behavior of no solution, and an unsupported value returns a clear error listing the valid choices
 - The web maze configuration page now has a polished visual design — a styled form, error message, maze preview, and download/send buttons that stay readable on both desktop and mobile screens
 - Users can now specify a target reMarkable Cloud folder before sending a maze from the web page; leaving it empty keeps the current behavior of uploading to the account root, and a folder that doesn't exist yet shows a clear error
-- Users can now generate a "bridge crossing" maze type, alongside the existing classic type, drawn as thick, rounded curvy corridors where some real, walkable corridors tunnel underneath one another like a bridge — selectable with `--type <rectangle|rectangle-crossing>` on the command line, or from a new maze type dropdown on the web page; the maze keeps exactly one solution as before, and every corridor shown remains genuinely reachable
+- Users can now generate a "bridge crossing" maze type, alongside the existing classic type, drawn as a real hollow tube where some real, walkable corridors visibly duck underneath one another like a bridge — selectable with `--type <rectangle|rectangle-crossing>` on the command line, or from a new maze type dropdown on the web page; the maze keeps exactly one solution as before, and every corridor shown remains genuinely reachable
 
 ## [0.3.0] - 2026-07-09
 
@@ -58,7 +60,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
 
-[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/neolao/remarkable-maze-generator/releases/tag/v0.1.0

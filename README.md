@@ -20,7 +20,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Send the maze generated through the web page directly to your reMarkable Cloud account, with a guided one-time pairing step if the browser isn't paired yet (the same pairing already used by the CLI also works here)
 - Choose a target reMarkable Cloud folder for a maze sent from the web page, or leave it blank to upload to the account root
 - Enjoy a polished, responsive design on the web maze configuration page, readable on both desktop and mobile screens
-- Generate a "bridge crossing" maze type, drawn as thick, rounded curvy corridors where some real, walkable corridors tunnel underneath one another like a bridge, alongside the classic (thin-wall) maze type — selectable from the command line or the web page, with exactly one solution guaranteed either way
+- Generate a "bridge crossing" maze type, drawn as a real hollow tube where some real, walkable corridors visibly duck underneath one another like a bridge, alongside the classic (thin-wall) maze type — selectable from the command line or the web page, with exactly one solution guaranteed either way
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
