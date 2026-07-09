@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- When sending a maze from the web page without specifying a name, the file uploaded to reMarkable Cloud is now named after its type and dimensions (e.g. "rectangle 20✕15") instead of including a seed number
+
 ## [0.4.0] - 2026-07-09
 
 ### Added

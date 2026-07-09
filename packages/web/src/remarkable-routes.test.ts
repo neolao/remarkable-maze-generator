@@ -147,13 +147,55 @@ describe("POST /api/mazes/send", () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toEqual({ visibleName: "rectangle-5x5-42" });
+		expect(response.json()).toEqual({ visibleName: "rectangle 5✕5" });
 		expect(uploadPdfMock).toHaveBeenCalledWith(
 			fakeSession,
 			expect.any(String),
-			"rectangle-5x5-42",
+			"rectangle 5✕5",
 			expect.objectContaining({ readFile: expect.any(Function) }),
 		);
+	});
+
+	it("omits the seed from the default visible name", async () => {
+		await writeFile(
+			credentialsPath,
+			JSON.stringify({ deviceToken: "existing-token" }),
+		);
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue({} as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+		const app = buildServer({ credentialsPath });
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: { width: 20, height: 15, seed: 12345 },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ visibleName: "rectangle 20✕15" });
+	});
+
+	it("uses the requested maze type in the default visible name", async () => {
+		await writeFile(
+			credentialsPath,
+			JSON.stringify({ deviceToken: "existing-token" }),
+		);
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue({} as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+		const app = buildServer({ credentialsPath });
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: { width: 5, height: 5, type: "rectangle-crossing" },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			visibleName: "rectangle-crossing 5✕5",
+		});
 	});
 
 	it("uses a custom visible name when provided", async () => {
@@ -200,6 +242,19 @@ describe("POST /api/mazes/send", () => {
 		});
 
 		expect(response.statusCode).toBe(400);
+	});
+
+	it("returns 400 when the maze type is unknown", async () => {
+		const app = buildServer({ credentialsPath });
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: { width: 5, height: 5, type: "unknown-type" },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(authenticateMock).not.toHaveBeenCalled();
 	});
 
 	it("returns 502 when reMarkable Cloud authentication fails despite stored credentials", async () => {
@@ -270,7 +325,7 @@ describe("POST /api/mazes/send", () => {
 		expect(uploadPdfMock).toHaveBeenCalledWith(
 			fakeSession,
 			expect.any(String),
-			"rectangle-5x5-42",
+			"rectangle 5✕5",
 			expect.objectContaining({ folder: "Mazes" }),
 		);
 	});
@@ -296,7 +351,7 @@ describe("POST /api/mazes/send", () => {
 		expect(uploadPdfMock).toHaveBeenCalledWith(
 			fakeSession,
 			expect.any(String),
-			"rectangle-5x5-42",
+			"rectangle 5✕5",
 			expect.objectContaining({ folder: undefined }),
 		);
 	});
