@@ -147,11 +147,11 @@ describe("POST /api/mazes/send", () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toEqual({ visibleName: "rectangle 5✕5" });
+		expect(response.json()).toEqual({ visibleName: "rectangle 5x5" });
 		expect(uploadPdfMock).toHaveBeenCalledWith(
 			fakeSession,
 			expect.any(String),
-			"rectangle 5✕5",
+			"rectangle 5x5",
 			expect.objectContaining({ readFile: expect.any(Function) }),
 		);
 	});
@@ -173,7 +173,7 @@ describe("POST /api/mazes/send", () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toEqual({ visibleName: "rectangle 20✕15" });
+		expect(response.json()).toEqual({ visibleName: "rectangle 20x15" });
 	});
 
 	it("uses the requested maze type in the default visible name", async () => {
@@ -194,7 +194,7 @@ describe("POST /api/mazes/send", () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual({
-			visibleName: "rectangle-crossing 5✕5",
+			visibleName: "rectangle-crossing 5x5",
 		});
 	});
 
@@ -325,7 +325,7 @@ describe("POST /api/mazes/send", () => {
 		expect(uploadPdfMock).toHaveBeenCalledWith(
 			fakeSession,
 			expect.any(String),
-			"rectangle 5✕5",
+			"rectangle 5x5",
 			expect.objectContaining({ folder: "Mazes" }),
 		);
 	});
@@ -351,7 +351,7 @@ describe("POST /api/mazes/send", () => {
 		expect(uploadPdfMock).toHaveBeenCalledWith(
 			fakeSession,
 			expect.any(String),
-			"rectangle 5✕5",
+			"rectangle 5x5",
 			expect.objectContaining({ folder: undefined }),
 		);
 	});

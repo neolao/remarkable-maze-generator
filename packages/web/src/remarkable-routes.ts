@@ -23,7 +23,7 @@ interface SendMazeRequestBody extends GenerateMazeRequestBody {
 }
 
 function defaultVisibleName(maze: Maze): string {
-	return `${maze.type ?? "maze"} ${maze.width}✕${maze.height}`;
+	return `${maze.type ?? "maze"} ${maze.width}x${maze.height}`;
 }
 
 async function handleGetStatus(store: CredentialStore) {

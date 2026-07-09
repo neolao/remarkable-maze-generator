@@ -10,6 +10,8 @@ Maze generator that exports to PDF, designed to be sent to a reMarkable tablet. 
 **Stack:** Node.js 25+ / TypeScript, npm workspaces (monorepo), Vitest, Biome
 **Type:** Full-stack (CLI + web API/server + shared core)
 
+Before running any Node-based command in this repo (`npm test`, `npm run lint`, starting the web dev server, etc.), run `nvm use` first — the pinned version in `.nvmrc` (25) can differ from the shell's default Node version.
+
 ## Architecture
 
 npm workspaces monorepo with a core (`core`) shared by the CLI and the web UI, to avoid duplicating maze generation logic, PDF layout, and reMarkable Cloud integration.
@@ -88,6 +90,7 @@ If tests or lint fail:
 - Never skip tests to meet a deadline — fix the code instead
 - Style is enforced by tooling, not by convention — always run `npm run lint` before presenting results
 - The `core` package remains the single place implementing maze generation, PDF rendering, and reMarkable Cloud integration — the CLI and the web UI stay plain consumers (no duplicated business logic)
+- When starting the web dev server (`packages/web`) to test a change in the browser, always stop it once testing is done — never leave it running in the background after presenting results
 
 ## Review agents
 
