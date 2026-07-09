@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Users can now choose the maze generation algorithm — growing tree (the previous default, unchanged), Kruskal, Wilson, or Aldous-Broder — via a new "Generation algorithm" option on the web configuration form and a new `--algorithm` option on the command line; the "bridge crossing" maze type still requires the growing tree algorithm and is rejected with a clear message for the other three
+
 ## [0.5.0] - 2026-07-09
 
 ### Added

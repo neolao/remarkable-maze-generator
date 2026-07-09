@@ -238,4 +238,77 @@ describe("runGenerate", () => {
 			}),
 		).rejects.toThrow(/hexagon/);
 	});
+
+	it("defaults to the growing-tree algorithm when the algorithm option is omitted", async () => {
+		const withoutAlgorithm = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			output: join(workDir, "without-algorithm.pdf"),
+			cwd: workDir,
+		});
+		const withExplicitAlgorithm = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			algorithm: "growing-tree",
+			output: join(workDir, "with-algorithm.pdf"),
+			cwd: workDir,
+		});
+
+		const [withoutBytes, withBytes] = await Promise.all([
+			readFile(withoutAlgorithm.outputPath),
+			readFile(withExplicitAlgorithm.outputPath),
+		]);
+		expect(withoutBytes).toEqual(withBytes);
+	});
+
+	it("forwards the algorithm option, producing a different maze than the default algorithm", async () => {
+		const growingTree = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			output: join(workDir, "growing-tree.pdf"),
+			cwd: workDir,
+		});
+		const kruskal = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			algorithm: "kruskal",
+			output: join(workDir, "kruskal.pdf"),
+			cwd: workDir,
+		});
+
+		const [growingTreeBytes, kruskalBytes] = await Promise.all([
+			readFile(growingTree.outputPath),
+			readFile(kruskal.outputPath),
+		]);
+		expect(kruskalBytes).not.toEqual(growingTreeBytes);
+	});
+
+	it("rejects an invalid maze algorithm with a clear error", async () => {
+		await expect(
+			runGenerate({
+				width: 5,
+				height: 5,
+				seed: 1,
+				algorithm: "prim",
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/prim/);
+	});
+
+	it("rejects the rectangle-crossing type combined with a non-growing-tree algorithm", async () => {
+		await expect(
+			runGenerate({
+				width: 10,
+				height: 10,
+				seed: 1,
+				type: "rectangle-crossing",
+				algorithm: "kruskal",
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/rectangle-crossing.*growing-tree/);
+	});
 });

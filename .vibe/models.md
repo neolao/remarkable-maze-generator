@@ -9,11 +9,16 @@
 | type | MazeType | optional; `"rectangle"` (default) or `"rectangle-crossing"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016 and ADR 022 |
 | seed | number | optional; the resolved seed used to generate this maze, see ADR 016 |
 | difficulty | number | optional; the resolved difficulty (1–5) used to generate this maze, see ADR 016 |
+| algorithm | MazeAlgorithm | optional; the resolved generation algorithm used for this maze, defaults to `"growing-tree"`, see ADR 033 |
 | crossings | MazeCrossing[] | optional; cells where a corridor tunnels through another's straight passage, only populated for `type: "rectangle-crossing"` — both axes are real, walkable connections, see ADR 024 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeType
 String literal union: `"rectangle" | "rectangle-crossing"`. See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022).
+Defined in: `packages/core/src/maze.ts`
+
+## MazeAlgorithm
+String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); the other three are only ever selectable with the plain `rectangle` type. See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeCrossing
@@ -47,6 +52,7 @@ Defined in: `packages/core/src/maze.ts`
 | seed | number | same seed reproduces the same maze |
 | difficulty | number | optional integer 1–5, defaults to 1 (easiest); controls branch-point density, see ADR 015 |
 | type | MazeType | optional, defaults to `"rectangle"`, see ADR 022 |
+| algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; rejected if combined with `type: "rectangle-crossing"` and anything other than `"growing-tree"`, see ADR 033 |
 Defined in: `packages/core/src/maze.ts`
 
 ## GenerateMazeBatchOptions
@@ -58,6 +64,7 @@ Defined in: `packages/core/src/maze.ts`
 | count | number | must be a positive integer, number of mazes to generate |
 | difficulty | number | optional integer 1–5, defaults to 1; applied to every maze in the batch, see ADR 015 |
 | type | MazeType | optional, defaults to `"rectangle"`; applied to every maze in the batch, see ADR 022 |
+| algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; applied to every maze in the batch, see ADR 033 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazePosition

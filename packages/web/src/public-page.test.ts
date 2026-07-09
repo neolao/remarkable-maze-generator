@@ -13,6 +13,7 @@ const REQUIRED_ELEMENT_IDS = [
 	"height",
 	"difficulty",
 	"maze-type",
+	"maze-algorithm",
 	"solution-mode",
 	"show-solution",
 	"form-error",
@@ -77,5 +78,18 @@ describe("public maze configuration page", () => {
 		expect(optionsMarkup).toContain('value="none"');
 		expect(optionsMarkup).toContain('value="extra-page"');
 		expect(optionsMarkup).toContain('value="overlay"');
+	});
+
+	it("exposes the generation algorithm as a select with all four algorithms", () => {
+		const match = html.match(
+			/<select[^>]+id="maze-algorithm"[^>]*>([\s\S]*?)<\/select>/,
+		);
+		expect(match).not.toBeNull();
+
+		const optionsMarkup = match?.[1] ?? "";
+		expect(optionsMarkup).toContain('value="growing-tree"');
+		expect(optionsMarkup).toContain('value="kruskal"');
+		expect(optionsMarkup).toContain('value="wilson"');
+		expect(optionsMarkup).toContain('value="aldous-broder"');
 	});
 });

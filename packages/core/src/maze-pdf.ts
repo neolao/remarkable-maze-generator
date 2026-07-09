@@ -167,7 +167,8 @@ function formatParametersLabel(maze: Maze): string | undefined {
 
 	const type = maze.type ?? "rectangle";
 	const difficulty = maze.difficulty ?? 1;
-	return `${type} ${maze.width}x${maze.height} seed=${maze.seed} difficulty=${difficulty}`;
+	const algorithm = maze.algorithm ?? "growing-tree";
+	return `${type} ${maze.width}x${maze.height} seed=${maze.seed} difficulty=${difficulty} algorithm=${algorithm}`;
 }
 
 function drawParametersLabel(

@@ -271,6 +271,60 @@ describe("runGenerateAndSend", () => {
 		expect(uploadPdfMock).not.toHaveBeenCalled();
 	});
 
+	it("forwards the algorithm option to maze generation", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		const growingTree = await runGenerateAndSend({
+			width: 12,
+			height: 12,
+			seed: 3,
+			output: join(workDir, "growing-tree.pdf"),
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+		const kruskal = await runGenerateAndSend({
+			width: 12,
+			height: 12,
+			seed: 3,
+			algorithm: "kruskal",
+			output: join(workDir, "kruskal.pdf"),
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+
+		const [growingTreeBytes, kruskalBytes] = await Promise.all([
+			readFile(growingTree.outputPath),
+			readFile(kruskal.outputPath),
+		]);
+		expect(kruskalBytes).not.toEqual(growingTreeBytes);
+	});
+
+	it("rejects an invalid maze algorithm before attempting to authenticate or upload", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		await expect(
+			runGenerateAndSend({
+				width: 5,
+				height: 5,
+				seed: 1,
+				algorithm: "prim",
+				cwd: workDir,
+				credentialsPath,
+				promptPairingCode: vi.fn(),
+			}),
+		).rejects.toThrow(/prim/);
+		expect(authenticateMock).not.toHaveBeenCalled();
+		expect(uploadPdfMock).not.toHaveBeenCalled();
+	});
+
 	it("prompts for a pairing code on first use, like the standalone send command", async () => {
 		const freshCredentialsPath = join(workDir, "fresh-credentials.json");
 		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type

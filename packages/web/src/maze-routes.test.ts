@@ -143,6 +143,59 @@ describe("POST /api/mazes/generate", () => {
 			error: expect.stringMatching(/hexagon/),
 		});
 	});
+
+	it("accepts the kruskal maze algorithm", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 10,
+				height: 10,
+				seed: 3,
+				algorithm: "kruskal",
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.headers["content-type"]).toBe("application/pdf");
+	});
+
+	it("returns 400 with a clear message when the maze algorithm is invalid", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 5, height: 5, algorithm: "prim" },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/prim/),
+		});
+	});
+
+	it("returns 400 when combining the rectangle-crossing type with a non-growing-tree algorithm", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 10,
+				height: 10,
+				type: "rectangle-crossing",
+				algorithm: "kruskal",
+			},
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/rectangle-crossing.*growing-tree/),
+		});
+	});
 });
 
 describe("POST /api/mazes/preview", () => {

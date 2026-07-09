@@ -8,14 +8,18 @@ export type {
 	GenerateMazeBatchOptions,
 	GenerateMazeOptions,
 	Maze,
+	MazeAlgorithm,
 	MazeCrossing,
 	MazeType,
 } from "./maze.js";
 export {
+	MAZE_ALGORITHMS,
 	MAZE_TYPES,
 	generateMaze,
 	generateMazeBatch,
+	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
+	isValidMazeAlgorithm,
 	isValidMazeType,
 } from "./maze.js";
 export type { MazePosition } from "./maze-solver.js";

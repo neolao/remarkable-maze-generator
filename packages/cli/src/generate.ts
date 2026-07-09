@@ -1,11 +1,14 @@
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
+	type MazeAlgorithm,
 	type MazeType,
 	type SolutionDisplayMode,
 	generateMaze,
+	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
 	invalidSolutionModeMessage,
+	isValidMazeAlgorithm,
 	isValidMazeType,
 	isValidSolutionMode,
 	renderMazeToPdf,
@@ -19,6 +22,7 @@ export interface GenerateOptions {
 	seed?: number;
 	difficulty?: number;
 	type?: string;
+	algorithm?: string;
 	solution?: string;
 	output?: string;
 	cwd?: string;
@@ -44,6 +48,12 @@ export async function runGenerate(
 	if (options.type !== undefined && !isValidMazeType(options.type)) {
 		throw new Error(invalidMazeTypeMessage(options.type));
 	}
+	if (
+		options.algorithm !== undefined &&
+		!isValidMazeAlgorithm(options.algorithm)
+	) {
+		throw new Error(invalidMazeAlgorithmMessage(options.algorithm));
+	}
 
 	const maze = generateMaze({
 		width: options.width,
@@ -51,6 +61,7 @@ export async function runGenerate(
 		seed,
 		difficulty: options.difficulty,
 		type: options.type as MazeType | undefined,
+		algorithm: options.algorithm as MazeAlgorithm | undefined,
 	});
 	const pdfBytes = await renderMazeToPdf(maze, {
 		solution: options.solution as SolutionDisplayMode | undefined,

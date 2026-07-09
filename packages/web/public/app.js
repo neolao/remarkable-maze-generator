@@ -4,13 +4,23 @@ const MAX_DIFFICULTY = 5;
 const MAZE_TYPES = ["rectangle", "rectangle-crossing"];
 const DEFAULT_MAZE_TYPE = "rectangle";
 
+const MAZE_ALGORITHMS = ["growing-tree", "kruskal", "wilson", "aldous-broder"];
+const DEFAULT_MAZE_ALGORITHM = "growing-tree";
+
 const SOLUTION_MODES = ["none", "extra-page", "overlay"];
 const DEFAULT_SOLUTION_MODE = "none";
 
 // Mirrors the rules tested in packages/web/src/maze-form-validation.ts;
 // duplicated here because this static page runs unmodified in the browser,
 // with no build step available to import the compiled/tested module.
-function validateMazeFormInput({ width, height, difficulty, type, solution }) {
+function validateMazeFormInput({
+	width,
+	height,
+	difficulty,
+	type,
+	algorithm,
+	solution,
+}) {
 	const parsePositiveInteger = (raw, fieldLabel) => {
 		if (raw.trim() === "" || !/^-?\d+$/.test(raw.trim())) {
 			return { error: `${fieldLabel} must be a whole number` };
@@ -54,6 +64,14 @@ function validateMazeFormInput({ width, height, difficulty, type, solution }) {
 		};
 	}
 
+	const resolvedAlgorithm = algorithm?.trim() || DEFAULT_MAZE_ALGORITHM;
+	if (!MAZE_ALGORITHMS.includes(resolvedAlgorithm)) {
+		return {
+			valid: false,
+			error: `Maze algorithm must be one of: ${MAZE_ALGORITHMS.join(", ")}`,
+		};
+	}
+
 	const resolvedSolution = solution?.trim() || DEFAULT_SOLUTION_MODE;
 	if (!SOLUTION_MODES.includes(resolvedSolution)) {
 		return {
@@ -69,6 +87,7 @@ function validateMazeFormInput({ width, height, difficulty, type, solution }) {
 			height: heightResult.value,
 			difficulty: difficultyResult.value,
 			type: resolvedType,
+			algorithm: resolvedAlgorithm,
 			solution: resolvedSolution,
 		},
 	};
@@ -177,6 +196,7 @@ function initMazeForm() {
 			height: form.height.value,
 			difficulty: form.difficulty.value,
 			type: form["maze-type"].value,
+			algorithm: form["maze-algorithm"].value,
 			solution: form["solution-mode"].value,
 		});
 

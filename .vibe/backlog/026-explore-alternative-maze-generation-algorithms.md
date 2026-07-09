@@ -1,5 +1,5 @@
 ---
-status: todo
+status: in_progress
 ---
 # Explore Alternative Maze Generation Algorithms
 

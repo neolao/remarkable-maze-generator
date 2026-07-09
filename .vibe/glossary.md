@@ -45,6 +45,11 @@
 **Code:** `MazeCrossing`, `crossings` field of `Maze`, `computeCrossingBridgeSegments()` / `computePathSegments()` in `packages/core/src/maze.ts` / `maze-layout.ts` (see ADR 022 and ADR 023)
 **Do not confuse with:** —
 
+## Generation algorithm
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `MazeAlgorithm`, `MAZE_ALGORITHMS`, `algorithm` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 033); each algorithm implemented in its own module under `packages/core/src/maze-algorithms/`
+**Do not confuse with:** Maze type, Difficulty
+
 ## Pairing code
 **Definition:** [what this concept means in the domain — fill in]
 **Code:** `pairingCode` parameter of `registerDevice()` / `authenticate()` in `packages/core/src/remarkable-auth.ts`

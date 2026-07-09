@@ -1,3 +1,8 @@
+import { generateAldousBroderMaze } from "./maze-algorithms/aldous-broder.js";
+import { generateGrowingTreeMaze } from "./maze-algorithms/growing-tree.js";
+import { generateKruskalMaze } from "./maze-algorithms/kruskal.js";
+import { generateWilsonMaze } from "./maze-algorithms/wilson.js";
+
 export interface CellWalls {
 	north: boolean;
 	south: boolean;
@@ -32,6 +37,27 @@ export function invalidMazeTypeMessage(value: string): string {
 	return `Invalid maze type "${value}", expected one of: ${MAZE_TYPES.join(", ")}`;
 }
 
+export type MazeAlgorithm =
+	| "growing-tree"
+	| "kruskal"
+	| "wilson"
+	| "aldous-broder";
+
+export const MAZE_ALGORITHMS: MazeAlgorithm[] = [
+	"growing-tree",
+	"kruskal",
+	"wilson",
+	"aldous-broder",
+];
+
+export function isValidMazeAlgorithm(value: string): value is MazeAlgorithm {
+	return (MAZE_ALGORITHMS as string[]).includes(value);
+}
+
+export function invalidMazeAlgorithmMessage(value: string): string {
+	return `Invalid maze algorithm "${value}", expected one of: ${MAZE_ALGORITHMS.join(", ")}`;
+}
+
 export interface Maze {
 	width: number;
 	height: number;
@@ -39,6 +65,7 @@ export interface Maze {
 	type?: MazeType;
 	seed?: number;
 	difficulty?: number;
+	algorithm?: MazeAlgorithm;
 	crossings?: MazeCrossing[];
 }
 
@@ -48,6 +75,7 @@ export interface GenerateMazeOptions {
 	seed: number;
 	difficulty?: number;
 	type?: MazeType;
+	algorithm?: MazeAlgorithm;
 }
 
 export interface GenerateMazeBatchOptions {
@@ -57,51 +85,13 @@ export interface GenerateMazeBatchOptions {
 	count: number;
 	difficulty?: number;
 	type?: MazeType;
+	algorithm?: MazeAlgorithm;
 }
 
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 const DEFAULT_MAZE_TYPE: MazeType = "rectangle";
-// Once the growing tree jumps to a dormant active cell (a wrong turn), keep
-// extending that same branch for at least this many cells before allowing
-// another jump — otherwise it tends to get boxed in by already-visited
-// neighbors after a single cell (see ADR 032).
-const MIN_BRANCH_COMMIT_LENGTH = 5;
-
-type Axis = "vertical" | "horizontal";
-
-interface Direction {
-	dx: number;
-	dy: number;
-	wall: keyof CellWalls;
-	opposite: keyof CellWalls;
-	axis: Axis;
-}
-
-const DIRECTIONS: Direction[] = [
-	{ dx: 0, dy: -1, wall: "north", opposite: "south", axis: "vertical" },
-	{ dx: 0, dy: 1, wall: "south", opposite: "north", axis: "vertical" },
-	{ dx: 1, dy: 0, wall: "east", opposite: "west", axis: "horizontal" },
-	{ dx: -1, dy: 0, wall: "west", opposite: "east", axis: "horizontal" },
-];
-
-function createSeededRandom(seed: number): () => number {
-	let state = seed >>> 0;
-	return () => {
-		state = (state + 0x6d2b79f5) | 0;
-		let t = Math.imul(state ^ (state >>> 15), 1 | state);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
-
-function createGrid(width: number, height: number): Cell[][] {
-	return Array.from({ length: height }, () =>
-		Array.from({ length: width }, () => ({
-			walls: { north: true, south: true, east: true, west: true },
-		})),
-	);
-}
+const DEFAULT_MAZE_ALGORITHM: MazeAlgorithm = "growing-tree";
 
 function validateDimensions(width: number, height: number): void {
 	if (
@@ -134,15 +124,52 @@ function validateType(type: MazeType): void {
 	}
 }
 
-// A cell is a valid tunnel-through candidate when it currently carries exactly
-// one straight passage (both walls open on one axis, both closed on the
-// other) — the shape a real bridge crossing needs to duck under (see ADR 024).
-function straightPassageAxis(walls: CellWalls): Axis | undefined {
-	if (!walls.north && !walls.south && walls.east && walls.west)
-		return "vertical";
-	if (!walls.east && !walls.west && walls.north && walls.south)
-		return "horizontal";
-	return undefined;
+function validateAlgorithm(algorithm: MazeAlgorithm): void {
+	if (!isValidMazeAlgorithm(algorithm)) {
+		throw new Error(invalidMazeAlgorithmMessage(algorithm));
+	}
+}
+
+// Bridge crossings are carved as part of the growing-tree traversal itself
+// (see ADR 024) — no other algorithm knows how to produce them (see ADR 033).
+function validateTypeAlgorithmCompatibility(
+	type: MazeType,
+	algorithm: MazeAlgorithm,
+): void {
+	if (type === "rectangle-crossing" && algorithm !== "growing-tree") {
+		throw new Error(
+			`Maze type "rectangle-crossing" is only supported by the "growing-tree" algorithm, got algorithm="${algorithm}"`,
+		);
+	}
+}
+
+interface GenerateCellsOptions {
+	width: number;
+	height: number;
+	seed: number;
+	difficulty: number;
+	allowsCrossings: boolean;
+}
+
+interface GeneratedCells {
+	cells: Cell[][];
+	crossings: MazeCrossing[];
+}
+
+function generateCells(
+	algorithm: MazeAlgorithm,
+	options: GenerateCellsOptions,
+): GeneratedCells {
+	switch (algorithm) {
+		case "growing-tree":
+			return generateGrowingTreeMaze(options);
+		case "kruskal":
+			return { cells: generateKruskalMaze(options).cells, crossings: [] };
+		case "wilson":
+			return { cells: generateWilsonMaze(options).cells, crossings: [] };
+		case "aldous-broder":
+			return { cells: generateAldousBroderMaze(options).cells, crossings: [] };
+	}
 }
 
 export function generateMaze({
@@ -151,152 +178,22 @@ export function generateMaze({
 	seed,
 	difficulty = MIN_DIFFICULTY,
 	type = DEFAULT_MAZE_TYPE,
+	algorithm = DEFAULT_MAZE_ALGORITHM,
 }: GenerateMazeOptions): Maze {
 	validateDimensions(width, height);
 	validateDifficulty(difficulty);
 	validateType(type);
-
-	const random = createSeededRandom(seed);
-	const cells = createGrid(width, height);
-	const visited = Array.from({ length: height }, () =>
-		new Array<boolean>(width).fill(false),
-	);
-
-	// Growing tree algorithm (see ADR 015): picking the most recently added
-	// active cell (probability 0) reduces to the recursive backtracker (long
-	// corridors, few branch points); picking a random active cell (probability
-	// 1) is structurally equivalent to Prim's algorithm (many branch points).
-	const randomSelectionProbability =
-		(difficulty - MIN_DIFFICULTY) / (MAX_DIFFICULTY - MIN_DIFFICULTY);
+	validateAlgorithm(algorithm);
+	validateTypeAlgorithmCompatibility(type, algorithm);
 
 	const allowsCrossings = type === "rectangle-crossing";
-	const crossings: MazeCrossing[] = [];
-	const isUsedAsCrossing = (x: number, y: number) =>
-		(x === 0 && y === 0) ||
-		(x === width - 1 && y === height - 1) ||
-		crossings.some((crossing) => crossing.x === x && crossing.y === y);
-	// Keeping crossings apart from one another avoids a "ladder" of several
-	// crossings stacked back-to-back between the same two parallel corridors,
-	// which reads as a repeating structural pattern rather than an occasional,
-	// notable bridge (see ADR 024 follow-up).
-	const isAdjacentToCrossing = (x: number, y: number) =>
-		crossings.some(
-			(crossing) => Math.abs(crossing.x - x) + Math.abs(crossing.y - y) === 1,
-		);
-
-	const active: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
-	visited[0][0] = true;
-	// Counts down while committed to extending the branch a random jump just
-	// landed on, instead of re-rolling the random-vs-recent choice every step
-	// (see ADR 032).
-	let forcedCommitRemaining = 0;
-
-	while (active.length > 0) {
-		let index: number;
-		if (forcedCommitRemaining > 0) {
-			index = active.length - 1;
-			forcedCommitRemaining--;
-		} else if (
-			randomSelectionProbability > 0 &&
-			random() < randomSelectionProbability
-		) {
-			index = Math.floor(random() * active.length);
-			if (index !== active.length - 1) {
-				forcedCommitRemaining = MIN_BRANCH_COMMIT_LENGTH - 1;
-			}
-		} else {
-			index = active.length - 1;
-		}
-		const current = active[index];
-
-		const unvisitedNeighbors = DIRECTIONS.map((direction) => ({
-			direction,
-			x: current.x + direction.dx,
-			y: current.y + direction.dy,
-		})).filter(
-			(neighbor) =>
-				neighbor.x >= 0 &&
-				neighbor.x < width &&
-				neighbor.y >= 0 &&
-				neighbor.y < height &&
-				!visited[neighbor.y][neighbor.x],
-		);
-
-		// A tunnel candidate reaches a new, unvisited cell by ducking straight
-		// through an already-visited neighbor's existing perpendicular passage,
-		// creating a real bridge crossing (see ADR 024) instead of extending to
-		// an adjacent unvisited cell directly.
-		const tunnelCandidates = allowsCrossings
-			? DIRECTIONS.map((direction) => {
-					const tunnelX = current.x + direction.dx;
-					const tunnelY = current.y + direction.dy;
-					const targetX = tunnelX + direction.dx;
-					const targetY = tunnelY + direction.dy;
-					return { direction, tunnelX, tunnelY, targetX, targetY };
-				}).filter(({ direction, tunnelX, tunnelY, targetX, targetY }) => {
-					if (
-						tunnelX < 0 ||
-						tunnelX >= width ||
-						tunnelY < 0 ||
-						tunnelY >= height
-					)
-						return false;
-					if (!visited[tunnelY][tunnelX]) return false;
-					if (isUsedAsCrossing(tunnelX, tunnelY)) return false;
-					if (isAdjacentToCrossing(tunnelX, tunnelY)) return false;
-					if (
-						targetX < 0 ||
-						targetX >= width ||
-						targetY < 0 ||
-						targetY >= height
-					)
-						return false;
-					if (visited[targetY][targetX]) return false;
-
-					const existingAxis = straightPassageAxis(
-						cells[tunnelY][tunnelX].walls,
-					);
-					return existingAxis !== undefined && existingAxis !== direction.axis;
-				})
-			: [];
-
-		const totalCandidates = unvisitedNeighbors.length + tunnelCandidates.length;
-
-		if (totalCandidates === 0) {
-			active.splice(index, 1);
-			forcedCommitRemaining = 0;
-			continue;
-		}
-
-		const choice = Math.floor(random() * totalCandidates);
-
-		if (choice < unvisitedNeighbors.length) {
-			const chosen = unvisitedNeighbors[choice];
-
-			cells[current.y][current.x].walls[chosen.direction.wall] = false;
-			cells[chosen.y][chosen.x].walls[chosen.direction.opposite] = false;
-
-			visited[chosen.y][chosen.x] = true;
-			active.push({ x: chosen.x, y: chosen.y });
-		} else {
-			const { direction, tunnelX, tunnelY, targetX, targetY } =
-				tunnelCandidates[choice - unvisitedNeighbors.length];
-			const underAxis = straightPassageAxis(cells[tunnelY][tunnelX].walls);
-			if (!underAxis)
-				throw new Error(
-					"Unreachable: tunnel candidate lost its straight passage",
-				);
-
-			cells[current.y][current.x].walls[direction.wall] = false;
-			cells[tunnelY][tunnelX].walls[direction.opposite] = false;
-			cells[tunnelY][tunnelX].walls[direction.wall] = false;
-			cells[targetY][targetX].walls[direction.opposite] = false;
-
-			crossings.push({ x: tunnelX, y: tunnelY, underAxis });
-			visited[targetY][targetX] = true;
-			active.push({ x: targetX, y: targetY });
-		}
-	}
+	const { cells, crossings } = generateCells(algorithm, {
+		width,
+		height,
+		seed,
+		difficulty,
+		allowsCrossings,
+	});
 
 	return {
 		width,
@@ -305,6 +202,7 @@ export function generateMaze({
 		type,
 		seed,
 		difficulty,
+		algorithm,
 		crossings: allowsCrossings ? crossings : undefined,
 	};
 }
@@ -316,6 +214,7 @@ export function generateMazeBatch({
 	count,
 	difficulty,
 	type,
+	algorithm,
 }: GenerateMazeBatchOptions): Maze[] {
 	if (!Number.isInteger(count) || count <= 0) {
 		throw new Error(
@@ -324,6 +223,13 @@ export function generateMazeBatch({
 	}
 
 	return Array.from({ length: count }, (_, index) =>
-		generateMaze({ width, height, seed: seed + index, difficulty, type }),
+		generateMaze({
+			width,
+			height,
+			seed: seed + index,
+			difficulty,
+			type,
+			algorithm,
+		}),
 	);
 }

@@ -29,6 +29,10 @@ program
 		"maze type: rectangle, or rectangle-crossing (defaults to rectangle)",
 	)
 	.option(
+		"--algorithm <algorithm>",
+		"generation algorithm: growing-tree, kruskal, wilson, or aldous-broder (defaults to growing-tree)",
+	)
+	.option(
 		"--solution <mode>",
 		"solution display mode: none, extra-page, or overlay (defaults to none)",
 	)
@@ -39,6 +43,7 @@ program
 			seed?: string;
 			difficulty?: string;
 			type?: string;
+			algorithm?: string;
 			solution?: string;
 			output?: string;
 		}) => {
@@ -60,6 +65,7 @@ program
 					seed,
 					difficulty,
 					type: opts.type,
+					algorithm: opts.algorithm,
 					solution: opts.solution,
 					output: opts.output,
 				});
@@ -127,6 +133,10 @@ program
 		"maze type: rectangle, or rectangle-crossing (defaults to rectangle)",
 	)
 	.option(
+		"--algorithm <algorithm>",
+		"generation algorithm: growing-tree, kruskal, wilson, or aldous-broder (defaults to growing-tree)",
+	)
+	.option(
 		"--solution <mode>",
 		"solution display mode: none, extra-page, or overlay (defaults to none)",
 	)
@@ -140,6 +150,7 @@ program
 			visibleName?: string;
 			folder?: string;
 			type?: string;
+			algorithm?: string;
 			solution?: string;
 		}) => {
 			try {
@@ -160,6 +171,7 @@ program
 					seed,
 					difficulty,
 					type: opts.type,
+					algorithm: opts.algorithm,
 					solution: opts.solution,
 					output: opts.output,
 					visibleName: opts.visibleName,

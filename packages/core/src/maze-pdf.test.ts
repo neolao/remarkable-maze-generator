@@ -449,6 +449,14 @@ describe("renderMazeToPdf parameters footer", () => {
 		expect(content).toContain("difficulty=3");
 	});
 
+	it("includes the maze algorithm when the maze carries it", async () => {
+		const maze = generateMaze({ width: 6, height: 6, seed: 42 });
+		const pdfBytes = await renderMazeToPdf(maze);
+
+		const content = decompressAllContentStreams(pdfBytes).join("\n");
+		expect(content).toContain("algorithm=growing-tree");
+	});
+
 	it("also shows the parameters on the separate solution page", async () => {
 		const maze = generateMaze({ width: 6, height: 6, seed: 7, difficulty: 2 });
 		const pdfBytes = await renderMazeToPdf(maze, { solution: "extra-page" });

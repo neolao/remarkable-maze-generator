@@ -1,8 +1,11 @@
 import {
+	type MazeAlgorithm,
 	type MazeType,
 	type SolutionDisplayMode,
+	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
 	invalidSolutionModeMessage,
+	isValidMazeAlgorithm,
 	isValidMazeType,
 	isValidSolutionMode,
 } from "@remarkable-maze-generator/core";
@@ -12,6 +15,7 @@ export interface MazeFormInput {
 	height: string;
 	difficulty: string;
 	type?: string;
+	algorithm?: string;
 	solution?: string;
 }
 
@@ -20,6 +24,7 @@ export interface MazeFormValue {
 	height: number;
 	difficulty: number;
 	type: MazeType;
+	algorithm: MazeAlgorithm;
 	solution: SolutionDisplayMode;
 }
 
@@ -30,6 +35,7 @@ export type MazeFormValidationResult =
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 const DEFAULT_MAZE_TYPE: MazeType = "rectangle";
+const DEFAULT_MAZE_ALGORITHM: MazeAlgorithm = "growing-tree";
 const DEFAULT_SOLUTION_MODE: SolutionDisplayMode = "none";
 
 function parsePositiveInteger(raw: string, fieldLabel: string): number {
@@ -68,6 +74,14 @@ function parseMazeType(raw: string | undefined): MazeType {
 	return type;
 }
 
+function parseMazeAlgorithm(raw: string | undefined): MazeAlgorithm {
+	const algorithm = raw?.trim() || DEFAULT_MAZE_ALGORITHM;
+	if (!isValidMazeAlgorithm(algorithm)) {
+		throw new Error(invalidMazeAlgorithmMessage(algorithm));
+	}
+	return algorithm;
+}
+
 function parseSolutionMode(raw: string | undefined): SolutionDisplayMode {
 	const solution = raw?.trim() || DEFAULT_SOLUTION_MODE;
 	if (!isValidSolutionMode(solution)) {
@@ -84,11 +98,12 @@ export function validateMazeFormInput(
 		const height = parsePositiveInteger(input.height, "Height");
 		const difficulty = parseDifficulty(input.difficulty);
 		const type = parseMazeType(input.type);
+		const algorithm = parseMazeAlgorithm(input.algorithm);
 		const solution = parseSolutionMode(input.solution);
 
 		return {
 			valid: true,
-			value: { width, height, difficulty, type, solution },
+			value: { width, height, difficulty, type, algorithm, solution },
 		};
 	} catch (error) {
 		return { valid: false, error: (error as Error).message };

@@ -23,6 +23,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Choose a target reMarkable Cloud folder for a maze sent from the web page, or leave it blank to upload to the account root
 - Enjoy a polished, responsive design on the web maze configuration page, readable on both desktop and mobile screens
 - Generate a "bridge crossing" maze type, drawn as a real hollow tube where some real, walkable corridors visibly duck underneath one another like a bridge, alongside the classic (thin-wall) maze type — selectable from the command line or the web page, with exactly one solution guaranteed either way
+- Choose the maze generation algorithm — growing tree (the original default), Kruskal, Wilson, or Aldous-Broder — from the command line or the web page; the "bridge crossing" maze type still requires the growing tree algorithm
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
@@ -48,7 +49,7 @@ Or, using the `generate.sh` shortcut at the repository root:
 ./generate.sh --width 20 --height 15
 ```
 
-Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--difficulty` (optional, 1 to 5, defaults to 1 — higher values produce more branch points and make the maze harder to solve), `--type` (optional, `rectangle` or `rectangle-crossing`; defaults to `rectangle`), `--solution` (optional, `none`, `extra-page`, or `overlay`; defaults to `none`), `--output` (optional, defaults to `./maze.pdf`).
+Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--difficulty` (optional, 1 to 5, defaults to 1 — higher values produce more branch points and make the maze harder to solve), `--type` (optional, `rectangle` or `rectangle-crossing`; defaults to `rectangle`), `--algorithm` (optional, `growing-tree`, `kruskal`, `wilson`, or `aldous-broder`; defaults to `growing-tree`; `rectangle-crossing` requires `growing-tree`), `--solution` (optional, `none`, `extra-page`, or `overlay`; defaults to `none`), `--output` (optional, defaults to `./maze.pdf`).
 
 Upload a local PDF file to your reMarkable Cloud account:
 
@@ -76,7 +77,7 @@ Or, using the `generate-and-send.sh` shortcut at the repository root:
 ./generate-and-send.sh --width 20 --height 15
 ```
 
-Accepts the same `--width`, `--height`, `--seed`, `--difficulty`, `--type`, `--solution` and `--output` options as `generate`, plus the same `--visible-name` and `--folder` options as `send` (the visible name defaults to `rectangle-<width>x<height>-<seed>` if not given). If generation succeeds but the upload fails, the local PDF is kept and the error is reported clearly.
+Accepts the same `--width`, `--height`, `--seed`, `--difficulty`, `--type`, `--algorithm`, `--solution` and `--output` options as `generate`, plus the same `--visible-name` and `--folder` options as `send` (the visible name defaults to `rectangle-<width>x<height>-<seed>` if not given). If generation succeeds but the upload fails, the local PDF is kept and the error is reported clearly.
 
 See the CLI's built-in help:
 
@@ -90,7 +91,7 @@ Run the web server (development mode, auto-reload):
 npm run web
 ```
 
-Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty, and maze type — Rectangle or Rectangle crossing) through the form, see an image preview, download the generated PDF, or send it straight to your reMarkable Cloud account with the "Send to reMarkable" button. Choose a "Solution in PDF" mode (none, extra page, or overlay) to control whether the downloaded/sent PDF includes the solution, the same choice available on the command line. Check "Show solution on preview" to trace the solution path on the preview image itself, with a circle on every branch point and the total branch point count shown below it — a separate option from the PDF solution mode. Optionally fill in the "reMarkable folder" field first to upload into a specific, already-existing folder instead of the account root. The first time, a one-time pairing code is requested (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, the same way as the CLI's `send` command.
+Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty, maze type — Rectangle or Rectangle crossing — and generation algorithm — Growing tree, Kruskal, Wilson, or Aldous-Broder) through the form, see an image preview, download the generated PDF, or send it straight to your reMarkable Cloud account with the "Send to reMarkable" button. Choose a "Solution in PDF" mode (none, extra page, or overlay) to control whether the downloaded/sent PDF includes the solution, the same choice available on the command line. Check "Show solution on preview" to trace the solution path on the preview image itself, with a circle on every branch point and the total branch point count shown below it — a separate option from the PDF solution mode. Optionally fill in the "reMarkable folder" field first to upload into a specific, already-existing folder instead of the account root. The first time, a one-time pairing code is requested (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, the same way as the CLI's `send` command.
 
 Run the tests:
 

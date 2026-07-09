@@ -16,6 +16,7 @@ describe("validateMazeFormInput", () => {
 				height: 8,
 				difficulty: 3,
 				type: "rectangle",
+				algorithm: "growing-tree",
 				solution: "none",
 			},
 		});
@@ -47,6 +48,7 @@ describe("validateMazeFormInput", () => {
 				height: 8,
 				difficulty: 3,
 				type: "rectangle-crossing",
+				algorithm: "growing-tree",
 				solution: "none",
 			},
 		});
@@ -197,6 +199,7 @@ describe("validateMazeFormInput", () => {
 				height: 8,
 				difficulty: 3,
 				type: "rectangle",
+				algorithm: "growing-tree",
 				solution: "overlay",
 			},
 		});
@@ -225,6 +228,46 @@ describe("validateMazeFormInput", () => {
 		expect(result).toEqual({
 			valid: false,
 			error: expect.stringMatching(/confetti/),
+		});
+	});
+
+	it("defaults the maze algorithm to growing-tree when not provided", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+		});
+
+		expect(result.valid).toBe(true);
+		expect(result.valid && result.value.algorithm).toBe("growing-tree");
+	});
+
+	it.each(["kruskal", "wilson", "aldous-broder"])(
+		"accepts %s as a valid maze algorithm",
+		(algorithm) => {
+			const result = validateMazeFormInput({
+				width: "10",
+				height: "8",
+				difficulty: "3",
+				algorithm,
+			});
+
+			expect(result.valid).toBe(true);
+			expect(result.valid && result.value.algorithm).toBe(algorithm);
+		},
+	);
+
+	it("rejects an unknown maze algorithm with a clear message", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			algorithm: "prim",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/prim/),
 		});
 	});
 });

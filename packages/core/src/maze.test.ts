@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+	MAZE_ALGORITHMS,
 	MAZE_TYPES,
 	generateMaze,
 	generateMazeBatch,
+	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
+	isValidMazeAlgorithm,
 	isValidMazeType,
 } from "./maze.js";
 
@@ -530,6 +533,248 @@ describe("generateMaze - type option", () => {
 	});
 });
 
+describe("MAZE_ALGORITHMS / isValidMazeAlgorithm / invalidMazeAlgorithmMessage", () => {
+	it("lists growing-tree, kruskal, wilson and aldous-broder as the valid maze algorithms", () => {
+		expect(MAZE_ALGORITHMS).toEqual([
+			"growing-tree",
+			"kruskal",
+			"wilson",
+			"aldous-broder",
+		]);
+	});
+
+	it.each(MAZE_ALGORITHMS)(
+		"accepts %s as a valid maze algorithm",
+		(algorithm) => {
+			expect(isValidMazeAlgorithm(algorithm)).toBe(true);
+		},
+	);
+
+	it("rejects an unknown maze algorithm", () => {
+		expect(isValidMazeAlgorithm("prim")).toBe(false);
+	});
+
+	it("describes the allowed values in the invalid maze algorithm message", () => {
+		expect(invalidMazeAlgorithmMessage("prim")).toBe(
+			'Invalid maze algorithm "prim", expected one of: growing-tree, kruskal, wilson, aldous-broder',
+		);
+	});
+});
+
+describe("generateMaze - algorithm option", () => {
+	it("defaults to the growing-tree algorithm when not specified", () => {
+		const maze = generateMaze({ width: 5, height: 5, seed: 1 });
+
+		expect(maze.algorithm).toBe("growing-tree");
+	});
+
+	it("produces the exact same maze whether the growing-tree algorithm is implicit or explicit", () => {
+		const implicit = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 42,
+			difficulty: 3,
+		});
+		const explicit = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 42,
+			difficulty: 3,
+			algorithm: "growing-tree",
+		});
+
+		expect(explicit).toEqual(implicit);
+	});
+
+	it("rejects an invalid maze algorithm", () => {
+		expect(() =>
+			generateMaze({
+				width: 5,
+				height: 5,
+				seed: 1,
+				// biome-ignore lint/suspicious/noExplicitAny: deliberately passing an invalid algorithm to test validation
+				algorithm: "prim" as any,
+			}),
+		).toThrow();
+	});
+});
+
+describe("generateMaze - kruskal algorithm", () => {
+	it("records the kruskal algorithm on the returned maze", () => {
+		const maze = generateMaze({
+			width: 6,
+			height: 6,
+			seed: 1,
+			algorithm: "kruskal",
+		});
+
+		expect(maze.algorithm).toBe("kruskal");
+	});
+
+	it("produces a maze where every cell is reachable from any other cell", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 7,
+			algorithm: "kruskal",
+		});
+
+		expect(countReachableCells(maze)).toBe(10 * 10);
+	});
+
+	it("rejects the rectangle-crossing type combined with a non-growing-tree algorithm", () => {
+		expect(() =>
+			generateMaze({
+				width: 10,
+				height: 10,
+				seed: 1,
+				type: "rectangle-crossing",
+				algorithm: "kruskal",
+			}),
+		).toThrow(/rectangle-crossing.*growing-tree/);
+	});
+
+	it("still rejects invalid dimensions regardless of the chosen algorithm", () => {
+		expect(() =>
+			generateMaze({
+				width: 0,
+				height: 5,
+				seed: 1,
+				algorithm: "kruskal",
+			}),
+		).toThrow();
+	});
+
+	it("ignores the difficulty option (not yet tunable for kruskal)", () => {
+		const easy = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			algorithm: "kruskal",
+			difficulty: 1,
+		});
+		const hard = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			algorithm: "kruskal",
+			difficulty: 5,
+		});
+
+		expect(hard.cells).toEqual(easy.cells);
+	});
+});
+
+describe("generateMaze - wilson algorithm", () => {
+	it("records the wilson algorithm on the returned maze", () => {
+		const maze = generateMaze({
+			width: 6,
+			height: 6,
+			seed: 1,
+			algorithm: "wilson",
+		});
+
+		expect(maze.algorithm).toBe("wilson");
+	});
+
+	it("produces a maze where every cell is reachable from any other cell", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 7,
+			algorithm: "wilson",
+		});
+
+		expect(countReachableCells(maze)).toBe(10 * 10);
+	});
+
+	it("rejects the rectangle-crossing type combined with the wilson algorithm", () => {
+		expect(() =>
+			generateMaze({
+				width: 10,
+				height: 10,
+				seed: 1,
+				type: "rectangle-crossing",
+				algorithm: "wilson",
+			}),
+		).toThrow(/rectangle-crossing.*growing-tree/);
+	});
+
+	it("ignores the difficulty option (not yet tunable for wilson)", () => {
+		const easy = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			algorithm: "wilson",
+			difficulty: 1,
+		});
+		const hard = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			algorithm: "wilson",
+			difficulty: 5,
+		});
+
+		expect(hard.cells).toEqual(easy.cells);
+	});
+});
+
+describe("generateMaze - aldous-broder algorithm", () => {
+	it("records the aldous-broder algorithm on the returned maze", () => {
+		const maze = generateMaze({
+			width: 6,
+			height: 6,
+			seed: 1,
+			algorithm: "aldous-broder",
+		});
+
+		expect(maze.algorithm).toBe("aldous-broder");
+	});
+
+	it("produces a maze where every cell is reachable from any other cell", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 7,
+			algorithm: "aldous-broder",
+		});
+
+		expect(countReachableCells(maze)).toBe(10 * 10);
+	});
+
+	it("rejects the rectangle-crossing type combined with the aldous-broder algorithm", () => {
+		expect(() =>
+			generateMaze({
+				width: 10,
+				height: 10,
+				seed: 1,
+				type: "rectangle-crossing",
+				algorithm: "aldous-broder",
+			}),
+		).toThrow(/rectangle-crossing.*growing-tree/);
+	});
+
+	it("ignores the difficulty option (not yet tunable for aldous-broder)", () => {
+		const easy = generateMaze({
+			width: 8,
+			height: 8,
+			seed: 5,
+			algorithm: "aldous-broder",
+			difficulty: 1,
+		});
+		const hard = generateMaze({
+			width: 8,
+			height: 8,
+			seed: 5,
+			algorithm: "aldous-broder",
+			difficulty: 5,
+		});
+
+		expect(hard.cells).toEqual(easy.cells);
+	});
+});
+
 describe("generateMazeBatch", () => {
 	it("generates the requested number of distinct mazes", () => {
 		const mazes = generateMazeBatch({
@@ -619,6 +864,20 @@ describe("generateMazeBatch", () => {
 
 		for (const maze of mazes) {
 			expect(maze.type).toBe("rectangle-crossing");
+		}
+	});
+
+	it("forwards the maze algorithm to every maze in the batch", () => {
+		const mazes = generateMazeBatch({
+			width: 6,
+			height: 6,
+			seed: 1,
+			count: 2,
+			algorithm: "growing-tree",
+		});
+
+		for (const maze of mazes) {
+			expect(maze.algorithm).toBe("growing-tree");
 		}
 	});
 });
