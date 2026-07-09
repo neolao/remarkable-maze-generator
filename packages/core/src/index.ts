@@ -1,4 +1,6 @@
-export const CORE_VERSION = "0.5.0";
+import pkg from "../package.json" with { type: "json" };
+
+export const CORE_VERSION = pkg.version;
 
 export type {
 	Cell,
