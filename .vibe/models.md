@@ -58,6 +58,21 @@ Defined in: `packages/core/src/maze-solver.ts`
 | solution | SolutionDisplayMode | optional, defaults to `"none"` |
 Defined in: `packages/core/src/maze-pdf.ts`
 
+## LineSegment
+| Field | Type | Notes |
+|---|---|---|
+| x1 | number | unit cell coordinates (cellSize=1), top-left origin, Y-down |
+| y1 | number | |
+| x2 | number | |
+| y2 | number | |
+Defined in: `packages/core/src/maze-layout.ts` — shared wall geometry consumed by both the PDF and SVG renderers, see ADR 019
+
+## RenderMazeToSvgOptions
+| Field | Type | Notes |
+|---|---|---|
+| cellSizePx | number | optional, defaults to 20 |
+Defined in: `packages/core/src/maze-svg.ts`
+
 ## RemarkableCredentials
 | Field | Type | Notes |
 |---|---|---|

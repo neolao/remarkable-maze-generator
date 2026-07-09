@@ -5,6 +5,8 @@ import {
 	StandardFonts,
 	rgb,
 } from "pdf-lib";
+import type { LineSegment } from "./maze-layout.js";
+import { computeWallSegments } from "./maze-layout.js";
 import type { MazePosition } from "./maze-solver.js";
 import { solveMaze } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -33,25 +35,6 @@ interface MazeLayout {
 	topOffset: number;
 }
 
-function validateMaze(maze: Maze): void {
-	if (
-		!Number.isInteger(maze.width) ||
-		!Number.isInteger(maze.height) ||
-		maze.width <= 0 ||
-		maze.height <= 0
-	) {
-		throw new Error(
-			`Cannot render a maze with invalid dimensions, got width=${maze.width}, height=${maze.height}`,
-		);
-	}
-	if (
-		maze.cells.length !== maze.height ||
-		maze.cells.some((row) => row.length !== maze.width)
-	) {
-		throw new Error("Maze cells do not match the declared width and height");
-	}
-}
-
 function computeLayout(maze: Maze): MazeLayout {
 	const drawableWidth = REMARKABLE_2_PAGE_WIDTH_PT - 2 * PAGE_MARGIN_PT;
 	const drawableHeight = REMARKABLE_2_PAGE_HEIGHT_PT - 2 * PAGE_MARGIN_PT;
@@ -74,33 +57,26 @@ function toPdfY(layout: MazeLayout, mazeY: number): number {
 	return REMARKABLE_2_PAGE_HEIGHT_PT - layout.topOffset - mazeY;
 }
 
-function drawMazeWalls(page: PDFPage, maze: Maze, layout: MazeLayout): void {
+function drawMazeWalls(
+	page: PDFPage,
+	segments: LineSegment[],
+	layout: MazeLayout,
+): void {
 	const { cellSize, leftOffset } = layout;
 
-	const drawWall = (x1: number, y1: number, x2: number, y2: number) => {
+	for (const segment of segments) {
 		page.drawLine({
-			start: { x: leftOffset + x1, y: toPdfY(layout, y1) },
-			end: { x: leftOffset + x2, y: toPdfY(layout, y2) },
+			start: {
+				x: leftOffset + segment.x1 * cellSize,
+				y: toPdfY(layout, segment.y1 * cellSize),
+			},
+			end: {
+				x: leftOffset + segment.x2 * cellSize,
+				y: toPdfY(layout, segment.y2 * cellSize),
+			},
 			thickness: WALL_THICKNESS_PT,
 			color: WALL_COLOR,
 		});
-	};
-
-	for (let y = 0; y < maze.height; y++) {
-		for (let x = 0; x < maze.width; x++) {
-			const cell = maze.cells[y][x];
-			const px = x * cellSize;
-			const py = y * cellSize;
-			const isEntrance = x === 0 && y === 0;
-			const isExit = x === maze.width - 1 && y === maze.height - 1;
-
-			if (cell.walls.north && !isEntrance) drawWall(px, py, px + cellSize, py);
-			if (cell.walls.west) drawWall(px, py, px, py + cellSize);
-			if (x === maze.width - 1 && cell.walls.east)
-				drawWall(px + cellSize, py, px + cellSize, py + cellSize);
-			if (y === maze.height - 1 && cell.walls.south && !isExit)
-				drawWall(px, py + cellSize, px + cellSize, py + cellSize);
-		}
 	}
 }
 
@@ -157,7 +133,7 @@ function addMazePages(
 	maze: Maze,
 	options: RenderMazeToPdfOptions,
 ): void {
-	validateMaze(maze);
+	const wallSegments = computeWallSegments(maze);
 	const solutionMode = options.solution ?? "none";
 	const layout = computeLayout(maze);
 	const parametersLabel = formatParametersLabel(maze);
@@ -166,7 +142,7 @@ function addMazePages(
 		REMARKABLE_2_PAGE_WIDTH_PT,
 		REMARKABLE_2_PAGE_HEIGHT_PT,
 	]);
-	drawMazeWalls(mazePage, maze, layout);
+	drawMazeWalls(mazePage, wallSegments, layout);
 	if (parametersLabel) drawParametersLabel(mazePage, font, parametersLabel);
 
 	if (solutionMode === "overlay") {
@@ -176,7 +152,7 @@ function addMazePages(
 			REMARKABLE_2_PAGE_WIDTH_PT,
 			REMARKABLE_2_PAGE_HEIGHT_PT,
 		]);
-		drawMazeWalls(solutionPage, maze, layout);
+		drawMazeWalls(solutionPage, wallSegments, layout);
 		drawSolutionPath(solutionPage, solveMaze(maze), layout);
 		if (parametersLabel)
 			drawParametersLabel(solutionPage, font, parametersLabel);

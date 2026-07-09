@@ -1,7 +1,9 @@
 import {
+	type Maze,
 	type SolutionDisplayMode,
 	generateMaze,
 	renderMazeToPdf,
+	renderMazeToSvg,
 } from "@remarkable-maze-generator/core";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -19,11 +21,22 @@ function isValidSolutionMode(value: string): value is SolutionDisplayMode {
 	return (SOLUTION_MODES as string[]).includes(value);
 }
 
+function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {
+	const { width, height, seed, difficulty } = body;
+	return generateMaze({
+		width: width as number,
+		height: height as number,
+		seed: seed ?? Math.floor(Math.random() * 2 ** 31),
+		difficulty,
+	});
+}
+
 async function handleGenerateMaze(
 	request: FastifyRequest<{ Body: GenerateMazeRequestBody }>,
 	reply: FastifyReply,
 ) {
-	const { width, height, seed, difficulty, solution } = request.body ?? {};
+	const body = request.body ?? {};
+	const { solution } = body;
 
 	if (solution !== undefined && !isValidSolutionMode(solution)) {
 		reply.code(400);
@@ -34,12 +47,7 @@ async function handleGenerateMaze(
 
 	let pdfBytes: Uint8Array;
 	try {
-		const maze = generateMaze({
-			width: width as number,
-			height: height as number,
-			seed: seed ?? Math.floor(Math.random() * 2 ** 31),
-			difficulty,
-		});
+		const maze = buildMazeFromRequest(body);
 		pdfBytes = await renderMazeToPdf(maze, { solution });
 	} catch (error) {
 		reply.code(400);
@@ -50,6 +58,24 @@ async function handleGenerateMaze(
 	return Buffer.from(pdfBytes);
 }
 
+function handleGenerateMazePreview(
+	request: FastifyRequest<{ Body: GenerateMazeRequestBody }>,
+	reply: FastifyReply,
+) {
+	let svg: string;
+	try {
+		const maze = buildMazeFromRequest(request.body ?? {});
+		svg = renderMazeToSvg(maze);
+	} catch (error) {
+		reply.code(400);
+		return { error: (error as Error).message };
+	}
+
+	reply.header("content-type", "image/svg+xml");
+	return svg;
+}
+
 export function registerMazeRoutes(app: FastifyInstance): void {
 	app.post("/api/mazes/generate", handleGenerateMaze);
+	app.post("/api/mazes/preview", handleGenerateMazePreview);
 }

@@ -21,6 +21,8 @@ export {
 	renderMazeBatchToPdfs,
 	renderMazeToPdf,
 } from "./maze-pdf.js";
+export type { RenderMazeToSvgOptions } from "./maze-svg.js";
+export { renderMazeToSvg } from "./maze-svg.js";
 export type {
 	CredentialStore,
 	RemarkableCredentials,

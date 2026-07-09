@@ -1,6 +1,6 @@
 ---
 date: 2026-07-09
-status: accepted
+status: superseded by 019 (point 1 only — native PDF viewer preview; point 2, the client-validation split, still stands)
 ---
 # Web form: native PDF preview and split client validation
 

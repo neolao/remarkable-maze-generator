@@ -25,7 +25,11 @@
 
     <p id="form-error" role="alert"></p>
 
-    <iframe id="maze-preview" title="Maze preview" style="display: none; width: 100%; height: 600px; border: 1px solid #ccc;"></iframe>
+    <img id="maze-preview" alt="Generated maze preview" style="display: none; max-width: 100%; border: 1px solid #ccc;" />
+
+    <p>
+      <a id="download-link" href="#" download="maze.pdf" style="display: none;">Download PDF</a>
+    </p>
 
     <script type="module" src="./app.js"></script>
   </body>

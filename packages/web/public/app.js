@@ -54,6 +54,12 @@ function initMazeForm() {
 	const form = document.getElementById("maze-form");
 	const errorElement = document.getElementById("form-error");
 	const previewElement = document.getElementById("maze-preview");
+	const downloadLink = document.getElementById("download-link");
+
+	const hidePreview = () => {
+		previewElement.style.display = "none";
+		downloadLink.style.display = "none";
+	};
 
 	form.addEventListener("submit", async (event) => {
 		event.preventDefault();
@@ -67,26 +73,40 @@ function initMazeForm() {
 
 		if (!result.valid) {
 			errorElement.textContent = result.error;
-			previewElement.style.display = "none";
+			hidePreview();
 			return;
 		}
 
-		const response = await fetch("/api/mazes/generate", {
+		const requestBody = JSON.stringify(result.value);
+		const requestInit = {
 			method: "POST",
 			headers: { "content-type": "application/json" },
-			body: JSON.stringify(result.value),
-		});
+			body: requestBody,
+		};
 
-		if (!response.ok) {
-			const body = await response.json();
+		const previewResponse = await fetch("/api/mazes/preview", requestInit);
+
+		if (!previewResponse.ok) {
+			const body = await previewResponse.json();
 			errorElement.textContent = body.error ?? "Maze generation failed";
-			previewElement.style.display = "none";
+			hidePreview();
 			return;
 		}
 
-		const pdfBlob = await response.blob();
-		previewElement.src = URL.createObjectURL(pdfBlob);
+		const svgMarkup = await previewResponse.text();
+		previewElement.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
 		previewElement.style.display = "block";
+
+		const pdfResponse = await fetch("/api/mazes/generate", requestInit);
+
+		if (!pdfResponse.ok) {
+			downloadLink.style.display = "none";
+			return;
+		}
+
+		const pdfBlob = await pdfResponse.blob();
+		downloadLink.href = URL.createObjectURL(pdfBlob);
+		downloadLink.style.display = "inline";
 	});
 }
 
