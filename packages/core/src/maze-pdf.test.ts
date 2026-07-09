@@ -2,7 +2,7 @@ import { inflateSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import {
-	computeCrossingOverSegments,
+	computeCrossingUnderSegments,
 	computePathSegments,
 } from "./maze-layout.js";
 import {
@@ -167,7 +167,7 @@ describe("renderMazeToPdf", () => {
 		expect(countStrokedLines(pdfBytes)).toBe(2);
 	});
 
-	it("draws a rectangle-crossing maze as hollow tubes (black outer + white inner stroke), not walls", async () => {
+	it("draws a rectangle-crossing maze as independent solid strokes, not walls", async () => {
 		const maze = generateMaze({
 			width: 8,
 			height: 6,
@@ -179,14 +179,12 @@ describe("renderMazeToPdf", () => {
 		const pdfBytes = await renderMazeToPdf(maze);
 
 		const strokedLines = countStrokedLines(pdfBytes);
-		// Each segment (path — which already includes a crossing's under-axis —
-		// plus a crossing's over-axis) is drawn twice: a thick black outer
-		// stroke, then a thinner white inner stroke on top, to produce a hollow
-		// tube outline instead of a solid fill (see ADR 023/024).
+		// One stroke per path segment, plus one per crossing under-axis
+		// segment (see ADR 025) — every segment is an independent solid
+		// stroke, no fill/border layering.
 		const expectedSegments =
-			2 *
-			(computePathSegments(maze).length +
-				computeCrossingOverSegments(maze).length);
+			computePathSegments(maze).length +
+			computeCrossingUnderSegments(maze).length;
 		expect(strokedLines).toBe(expectedSegments);
 	});
 

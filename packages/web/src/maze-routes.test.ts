@@ -239,7 +239,7 @@ describe("POST /api/mazes/preview", () => {
 		expect(lineCount).toBeGreaterThan(0);
 	});
 
-	it("accepts the rectangle-crossing maze type and shows the bridge decoration", async () => {
+	it("accepts the rectangle-crossing maze type and renders it distinctly from the classic type", async () => {
 		const app = buildServer();
 
 		const rectangleResponse = await app.inject({
@@ -254,11 +254,8 @@ describe("POST /api/mazes/preview", () => {
 		});
 
 		expect(crossingResponse.statusCode).toBe(200);
-		const rectangleLineCount = (rectangleResponse.body.match(/<line /g) || [])
-			.length;
-		const crossingLineCount = (crossingResponse.body.match(/<line /g) || [])
-			.length;
-		expect(crossingLineCount).toBeGreaterThan(rectangleLineCount);
+		expect(crossingResponse.body.startsWith("<svg")).toBe(true);
+		expect(crossingResponse.body).not.toBe(rectangleResponse.body);
 	});
 
 	it("returns 400 with a clear message when the maze type is invalid", async () => {

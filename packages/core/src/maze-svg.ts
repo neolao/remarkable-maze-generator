@@ -1,7 +1,6 @@
 import {
-	TUBE_INNER_WIDTH_RATIO,
-	TUBE_OUTER_WIDTH_RATIO,
-	computeCrossingOverSegments,
+	PATH_THICKNESS_RATIO,
+	computeCrossingUnderSegments,
 	computePathSegments,
 	computeWallSegments,
 } from "./maze-layout.js";
@@ -19,41 +18,14 @@ function renderLines(
 	segments: LineSegment[],
 	cellSizePx: number,
 	strokeWidthPx: number,
-	stroke: "black" | "white",
 	lineCap: "square" | "round",
 ): string {
 	return segments
 		.map(
 			(segment) =>
-				`<line x1="${segment.x1 * cellSizePx}" y1="${segment.y1 * cellSizePx}" x2="${segment.x2 * cellSizePx}" y2="${segment.y2 * cellSizePx}" stroke="${stroke}" stroke-width="${strokeWidthPx}" stroke-linecap="${lineCap}" />`,
+				`<line x1="${segment.x1 * cellSizePx}" y1="${segment.y1 * cellSizePx}" x2="${segment.x2 * cellSizePx}" y2="${segment.y2 * cellSizePx}" stroke="black" stroke-width="${strokeWidthPx}" stroke-linecap="${lineCap}" />`,
 		)
 		.join("");
-}
-
-// A corridor is drawn as a hollow tube: a thick black stroke followed by a
-// thinner white stroke on the same path, leaving only a border visible. Each
-// group (all normal path segments — which already include a crossing's
-// "under" axis, see ADR 024 — then a crossing's "over" axis segments) is
-// drawn fully — black then white — before moving to the next, so the "over"
-// tube is painted last and cleanly covers the "under" tube at each crossing,
-// without disturbing any unrelated corridor elsewhere (see ADR 023/024).
-function renderTubeGroup(segments: LineSegment[], cellSizePx: number): string {
-	return (
-		renderLines(
-			segments,
-			cellSizePx,
-			cellSizePx * TUBE_OUTER_WIDTH_RATIO,
-			"black",
-			"round",
-		) +
-		renderLines(
-			segments,
-			cellSizePx,
-			cellSizePx * TUBE_INNER_WIDTH_RATIO,
-			"white",
-			"round",
-		)
-	);
 }
 
 export function renderMazeToSvg(
@@ -64,15 +36,22 @@ export function renderMazeToSvg(
 	const width = maze.width * cellSizePx;
 	const height = maze.height * cellSizePx;
 
+	// Every segment is drawn independently as a single solid stroke — no
+	// fill/border trick. A crossing's over-axis is a normal, uninterrupted
+	// segment; its under-axis has a real, drawn gap at the crossing point
+	// (see ADR 025), so no paint-order tricks are needed anywhere.
 	const lines =
 		maze.type === "rectangle-crossing"
-			? renderTubeGroup(computePathSegments(maze), cellSizePx) +
-				renderTubeGroup(computeCrossingOverSegments(maze), cellSizePx)
+			? renderLines(
+					[...computePathSegments(maze), ...computeCrossingUnderSegments(maze)],
+					cellSizePx,
+					cellSizePx * PATH_THICKNESS_RATIO,
+					"round",
+				)
 			: renderLines(
 					computeWallSegments(maze),
 					cellSizePx,
 					WALL_STROKE_WIDTH_PX,
-					"black",
 					"square",
 				);
 

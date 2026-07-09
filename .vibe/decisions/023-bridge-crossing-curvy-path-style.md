@@ -1,6 +1,6 @@
 ---
 date: 2026-07-09
-status: accepted
+status: superseded by 025
 ---
 # Bridge crossing maze type: hollow rounded-cap tube rendering, not thin walls
 

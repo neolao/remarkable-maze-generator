@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	computeCrossingOverSegments,
+	computeCrossingUnderSegments,
 	computePathSegments,
 } from "./maze-layout.js";
 import { renderMazeToSvg } from "./maze-svg.js";
@@ -54,7 +54,7 @@ describe("renderMazeToSvg", () => {
 		expect(() => renderMazeToSvg(invalidMaze)).toThrow();
 	});
 
-	it("renders a rectangle-crossing maze as hollow rounded-cap tubes (black outer + white inner stroke), not walls", () => {
+	it("renders a rectangle-crossing maze as independent rounded-cap solid lines, not walls", () => {
 		const maze = generateMaze({
 			width: 12,
 			height: 12,
@@ -65,17 +65,14 @@ describe("renderMazeToSvg", () => {
 
 		const svg = renderMazeToSvg(maze);
 
-		// Each segment (path — which already includes a crossing's under-axis —
-		// plus a crossing's over-axis) is drawn twice: a thick black outer
-		// stroke, then a thinner white inner stroke on top, to produce a hollow
-		// tube outline instead of a solid fill (see ADR 023/024).
+		// One <line> per path segment, plus one per crossing under-axis
+		// segment (see ADR 025) — every segment is an independent solid
+		// stroke, no fill/border layering.
 		const expectedCount =
-			2 *
-			(computePathSegments(maze).length +
-				computeCrossingOverSegments(maze).length);
+			computePathSegments(maze).length +
+			computeCrossingUnderSegments(maze).length;
 		expect(countLineElements(svg)).toBe(expectedCount);
 		expect(svg).toContain('stroke-linecap="round"');
-		expect(svg).toContain('stroke="white"');
 	});
 
 	it("renders a rectangle-crossing maze too small for any crossing without error", () => {
@@ -89,6 +86,6 @@ describe("renderMazeToSvg", () => {
 		const svg = renderMazeToSvg(maze);
 
 		expect(maze.crossings).toEqual([]);
-		expect(countLineElements(svg)).toBe(2 * computePathSegments(maze).length);
+		expect(countLineElements(svg)).toBe(computePathSegments(maze).length);
 	});
 });

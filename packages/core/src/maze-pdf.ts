@@ -8,9 +8,8 @@ import {
 } from "pdf-lib";
 import type { LineSegment } from "./maze-layout.js";
 import {
-	TUBE_INNER_WIDTH_RATIO,
-	TUBE_OUTER_WIDTH_RATIO,
-	computeCrossingOverSegments,
+	PATH_THICKNESS_RATIO,
+	computeCrossingUnderSegments,
 	computePathSegments,
 	computeWallSegments,
 } from "./maze-layout.js";
@@ -24,8 +23,7 @@ export const REMARKABLE_2_PAGE_HEIGHT_PT = (1872 / 226) * 72;
 const PAGE_MARGIN_PT = 24;
 const WALL_THICKNESS_PT = 1.5;
 const WALL_COLOR = rgb(0, 0, 0);
-const TUBE_COLOR = rgb(0, 0, 0);
-const TUBE_INNER_COLOR = rgb(1, 1, 1);
+const PATH_COLOR = rgb(0, 0, 0);
 const SOLUTION_THICKNESS_PT = 2;
 const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
 const PARAMETERS_LABEL_SIZE_PT = 8;
@@ -109,37 +107,6 @@ function drawMazeSegments(
 	}
 }
 
-// A corridor is drawn as a hollow tube: a thick black stroke followed by a
-// thinner white stroke on the same path, leaving only a border visible. Each
-// group (bridge "under" segments, then the real "over" path segments) must be
-// drawn fully — black then white — before the next, so the "over" tube is
-// painted last and cleanly covers the "under" tube at a crossing (no manual
-// gap math needed — see ADR 023).
-function drawTubeGroup(
-	page: PDFPage,
-	segments: LineSegment[],
-	layout: MazeLayout,
-): void {
-	const outerThickness = layout.cellSize * TUBE_OUTER_WIDTH_RATIO;
-	const innerThickness = layout.cellSize * TUBE_INNER_WIDTH_RATIO;
-	drawMazeSegments(
-		page,
-		segments,
-		layout,
-		outerThickness,
-		TUBE_COLOR,
-		LineCapStyle.Round,
-	);
-	drawMazeSegments(
-		page,
-		segments,
-		layout,
-		innerThickness,
-		TUBE_INNER_COLOR,
-		LineCapStyle.Round,
-	);
-}
-
 function drawSolutionPath(
 	page: PDFPage,
 	path: MazePosition[],
@@ -189,8 +156,18 @@ function drawParametersLabel(
 
 function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
 	if (maze.type === "rectangle-crossing") {
-		drawTubeGroup(page, computePathSegments(maze), layout);
-		drawTubeGroup(page, computeCrossingOverSegments(maze), layout);
+		// Every segment is drawn independently as a single solid stroke — no
+		// fill/border trick. A crossing's over-axis is a normal, uninterrupted
+		// segment; its under-axis has a real, drawn gap at the crossing point
+		// (see ADR 025), so no paint-order tricks are needed anywhere.
+		drawMazeSegments(
+			page,
+			[...computePathSegments(maze), ...computeCrossingUnderSegments(maze)],
+			layout,
+			layout.cellSize * PATH_THICKNESS_RATIO,
+			PATH_COLOR,
+			LineCapStyle.Round,
+		);
 	} else {
 		drawMazeSegments(
 			page,

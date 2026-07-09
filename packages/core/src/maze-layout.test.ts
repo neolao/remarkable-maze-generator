@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	computeCrossingOverSegments,
+	computeCrossingUnderSegments,
 	computePathSegments,
 	computeWallSegments,
 } from "./maze-layout.js";
@@ -161,7 +161,7 @@ describe("computePathSegments", () => {
 		expect(() => computePathSegments(invalidMaze)).toThrow();
 	});
 
-	it("includes the under-axis connection but excludes the over-axis connection at a crossing cell", () => {
+	it("draws only the over-axis connections at a crossing cell — the under axis is drawn separately, with a gap", () => {
 		const maze = generateMaze({
 			width: 12,
 			height: 12,
@@ -179,9 +179,9 @@ describe("computePathSegments", () => {
 					(segment.x1 === center.x && segment.y1 === center.y) ||
 					(segment.x2 === center.x && segment.y2 === center.y),
 			);
-			// Exactly the 2 under-axis connections (its own neighbors on that
-			// axis) — the 2 over-axis connections are excluded here, drawn
-			// separately on top by computeCrossingOverSegments (see ADR 024).
+			// Only the 2 over-axis connections reach all the way to the
+			// crossing's own center here (see ADR 025); the under axis is
+			// provided by computeCrossingUnderSegments instead.
 			expect(touchingSegments).toHaveLength(2);
 			for (const segment of touchingSegments) {
 				const other =
@@ -189,14 +189,15 @@ describe("computePathSegments", () => {
 						? { x: segment.x2, y: segment.y2 }
 						: { x: segment.x1, y: segment.y1 };
 				const isVertical = other.x === center.x;
-				expect(isVertical ? "vertical" : "horizontal").toBe(crossing.underAxis);
+				const overAxis = isVertical ? "vertical" : "horizontal";
+				expect(overAxis).not.toBe(crossing.underAxis);
 			}
 		}
 	});
 });
 
-describe("computeCrossingOverSegments", () => {
-	it("returns 2 segments per recorded crossing, reaching the over-axis neighbor centers", () => {
+describe("computeCrossingUnderSegments", () => {
+	it("returns 2 segments per recorded crossing, each reaching its real neighbor's center", () => {
 		const maze = generateMaze({
 			width: 12,
 			height: 12,
@@ -205,7 +206,7 @@ describe("computeCrossingOverSegments", () => {
 		});
 		expect(maze.crossings?.length ?? 0).toBeGreaterThan(0);
 
-		const segments = computeCrossingOverSegments(maze);
+		const segments = computeCrossingUnderSegments(maze);
 
 		expect(segments).toHaveLength((maze.crossings?.length ?? 0) * 2);
 	});
@@ -213,28 +214,10 @@ describe("computeCrossingOverSegments", () => {
 	it("returns no segments when the maze has no recorded crossings", () => {
 		const maze = generateMaze({ width: 5, height: 5, seed: 1 });
 
-		expect(computeCrossingOverSegments(maze)).toEqual([]);
+		expect(computeCrossingUnderSegments(maze)).toEqual([]);
 	});
 
-	it("reaches the vertical neighbors when underAxis is horizontal", () => {
-		const maze = generateMaze({ width: 5, height: 5, seed: 1 });
-		maze.cells[2][2].walls = {
-			north: false,
-			south: false,
-			east: false,
-			west: false,
-		};
-		maze.crossings = [{ x: 2, y: 2, underAxis: "horizontal" }];
-
-		const segments = computeCrossingOverSegments(maze);
-
-		expect(segments).toHaveLength(2);
-		for (const segment of segments) {
-			expect(segment.x2).toBeCloseTo(2.5);
-		}
-	});
-
-	it("reaches the horizontal neighbors when underAxis is vertical", () => {
+	it("leaves a real geometric gap around the crossing center, on the under axis", () => {
 		const maze = generateMaze({ width: 5, height: 5, seed: 1 });
 		maze.cells[2][2].walls = {
 			north: false,
@@ -244,10 +227,44 @@ describe("computeCrossingOverSegments", () => {
 		};
 		maze.crossings = [{ x: 2, y: 2, underAxis: "vertical" }];
 
-		const segments = computeCrossingOverSegments(maze);
+		const segments = computeCrossingUnderSegments(maze);
 
 		expect(segments).toHaveLength(2);
 		for (const segment of segments) {
+			expect(segment.x1).toBeCloseTo(2.5);
+			expect(segment.x2).toBeCloseTo(2.5);
+			// Neither endpoint may land exactly on the crossing's own center —
+			// that's the real, drawn gap (not a later paint-order trick).
+			const distanceFromCenterY = Math.min(
+				Math.abs(segment.y1 - 2.5),
+				Math.abs(segment.y2 - 2.5),
+			);
+			expect(distanceFromCenterY).toBeGreaterThan(0);
+		}
+		// One segment reaches north, the other south, both a full cell away.
+		const farEndsY = segments.map((segment) =>
+			Math.abs(segment.y1 - 2.5) > Math.abs(segment.y2 - 2.5)
+				? segment.y1
+				: segment.y2,
+		);
+		expect(Math.min(...farEndsY)).toBeCloseTo(1.5);
+		expect(Math.max(...farEndsY)).toBeCloseTo(3.5);
+	});
+
+	it("orients the under segments horizontally when underAxis is horizontal", () => {
+		const maze = generateMaze({ width: 5, height: 5, seed: 1 });
+		maze.cells[2][2].walls = {
+			north: false,
+			south: false,
+			east: false,
+			west: false,
+		};
+		maze.crossings = [{ x: 2, y: 2, underAxis: "horizontal" }];
+
+		const segments = computeCrossingUnderSegments(maze);
+
+		for (const segment of segments) {
+			expect(segment.y1).toBeCloseTo(2.5);
 			expect(segment.y2).toBeCloseTo(2.5);
 		}
 	});
