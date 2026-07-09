@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 ---
 # Default Visible Name Format
 
