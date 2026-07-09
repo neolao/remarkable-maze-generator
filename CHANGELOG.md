@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-09
+
 ### Added
 
 - Users can now choose whether the maze PDF generated from the web page includes its solution, and how (none, extra page, or overlay), with a new "Solution in PDF" option on the configuration form — applied consistently to both the downloaded PDF and the one sent to reMarkable Cloud; the same choice already available on the command line
@@ -72,7 +74,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
 
-[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.1.0...v0.2.0

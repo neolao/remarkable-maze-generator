@@ -19,7 +19,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Choose whether the maze PDF generated through the web page includes its solution (none, extra page, or overlay), applied consistently to both the downloaded PDF and the one sent to reMarkable Cloud
 - Show the maze's solution directly on the web page preview, with a circle marking every branch point along the path and the total branch point count displayed
 - Download the maze PDF generated through the web page with a dedicated download link
-- Send the maze generated through the web page directly to your reMarkable Cloud account, with a guided one-time pairing step if the browser isn't paired yet (the same pairing already used by the CLI also works here)
+- Send the maze generated through the web page directly to your reMarkable Cloud account, with a guided one-time pairing step if the browser isn't paired yet (the same pairing already used by the CLI also works here); when no name is given, the uploaded file is named after its type and dimensions (e.g. "rectangle 20x15") instead of a seed number
 - Choose a target reMarkable Cloud folder for a maze sent from the web page, or leave it blank to upload to the account root
 - Enjoy a polished, responsive design on the web maze configuration page, readable on both desktop and mobile screens
 - Generate a "bridge crossing" maze type, drawn as a real hollow tube where some real, walkable corridors visibly duck underneath one another like a bridge, alongside the classic (thin-wall) maze type — selectable from the command line or the web page, with exactly one solution guaranteed either way
