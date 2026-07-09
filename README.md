@@ -13,6 +13,8 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Authenticate with reMarkable Cloud using a one-time pairing code, remembered for later uploads
 - Upload a local PDF file to your reMarkable Cloud account from the command line, optionally into a specific folder
 - Generate a maze PDF and upload it to your reMarkable Cloud account in a single command
+- Generate a maze PDF through a web API by sending its parameters (size, seed, difficulty, solution display mode)
+- Configure a maze (width, height, difficulty) through a web page form and preview the generated PDF right after submitting, with invalid input caught before any request is sent
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
@@ -79,6 +81,8 @@ Run the web server (development mode, auto-reload):
 ```bash
 npm run web
 ```
+
+Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty) through the form and preview the generated PDF.
 
 Run the tests:
 

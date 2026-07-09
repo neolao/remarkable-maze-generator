@@ -112,6 +112,18 @@ Defined in: `packages/cli/src/generate.ts`
 | promptPairingCode | () => Promise\<string\> | optional, injectable for testing; defaults to an interactive terminal prompt |
 Defined in: `packages/cli/src/send.ts`
 
+## MazeFormInput (web)
+| Field | Type | Notes |
+|---|---|---|
+| width | string | raw form field value, parsed as a positive integer |
+| height | string | raw form field value, parsed as a positive integer |
+| difficulty | string | raw form field value, parsed as an integer 1–5 |
+Defined in: `packages/web/src/maze-form-validation.ts`
+
+## MazeFormValidationResult (web)
+Discriminated union: `{ valid: true; value: MazeFormValue }` or `{ valid: false; error: string }` (a human-readable message naming the invalid field).
+Defined in: `packages/web/src/maze-form-validation.ts`
+
 ## GenerateAndSendOptions (CLI)
 | Field | Type | Notes |
 |---|---|---|

@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+import { validateMazeFormInput } from "./maze-form-validation.js";
+
+describe("validateMazeFormInput", () => {
+	it("accepts valid width, height and difficulty", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+		});
+
+		expect(result).toEqual({
+			valid: true,
+			value: { width: 10, height: 8, difficulty: 3 },
+		});
+	});
+
+	it("accepts the minimal width and height of 1", () => {
+		const result = validateMazeFormInput({
+			width: "1",
+			height: "1",
+			difficulty: "1",
+		});
+
+		expect(result.valid).toBe(true);
+	});
+
+	it.each([1, 5])(
+		"accepts difficulty at the boundary value %i",
+		(difficulty) => {
+			const result = validateMazeFormInput({
+				width: "5",
+				height: "5",
+				difficulty: String(difficulty),
+			});
+
+			expect(result.valid).toBe(true);
+		},
+	);
+
+	it("rejects a missing width with a clear message", () => {
+		const result = validateMazeFormInput({
+			width: "",
+			height: "5",
+			difficulty: "1",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/width/i),
+		});
+	});
+
+	it("rejects a non-integer height", () => {
+		const result = validateMazeFormInput({
+			width: "5",
+			height: "3.5",
+			difficulty: "1",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/height/i),
+		});
+	});
+
+	it("rejects a width of zero", () => {
+		const result = validateMazeFormInput({
+			width: "0",
+			height: "5",
+			difficulty: "1",
+		});
+
+		expect(result.valid).toBe(false);
+	});
+
+	it("rejects a negative height", () => {
+		const result = validateMazeFormInput({
+			width: "5",
+			height: "-2",
+			difficulty: "1",
+		});
+
+		expect(result.valid).toBe(false);
+	});
+
+	it("rejects a difficulty below the minimum bound", () => {
+		const result = validateMazeFormInput({
+			width: "5",
+			height: "5",
+			difficulty: "0",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/difficulty/i),
+		});
+	});
+
+	it("rejects a difficulty above the maximum bound", () => {
+		const result = validateMazeFormInput({
+			width: "5",
+			height: "5",
+			difficulty: "6",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/difficulty/i),
+		});
+	});
+
+	it("rejects a non-numeric difficulty", () => {
+		const result = validateMazeFormInput({
+			width: "5",
+			height: "5",
+			difficulty: "abc",
+		});
+
+		expect(result.valid).toBe(false);
+	});
+});
