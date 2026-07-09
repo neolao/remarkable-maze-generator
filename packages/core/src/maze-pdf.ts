@@ -25,6 +25,22 @@ const PARAMETERS_LABEL_Y_PT = PAGE_MARGIN_PT / 2;
 
 export type SolutionDisplayMode = "none" | "extra-page" | "overlay";
 
+export const SOLUTION_MODES: SolutionDisplayMode[] = [
+	"none",
+	"extra-page",
+	"overlay",
+];
+
+export function isValidSolutionMode(
+	value: string,
+): value is SolutionDisplayMode {
+	return (SOLUTION_MODES as string[]).includes(value);
+}
+
+export function invalidSolutionModeMessage(value: string): string {
+	return `Invalid solution mode "${value}", expected one of: ${SOLUTION_MODES.join(", ")}`;
+}
+
 export interface RenderMazeToPdfOptions {
 	solution?: SolutionDisplayMode;
 }

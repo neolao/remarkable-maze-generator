@@ -24,12 +24,17 @@ program
 		"difficulty from 1 (easiest, fewest branch points) to 5 (hardest, most branch points); defaults to 1",
 	)
 	.option("--output <path>", "output PDF file path (defaults to ./maze.pdf)")
+	.option(
+		"--solution <mode>",
+		"solution display mode: none, extra-page, or overlay (defaults to none)",
+	)
 	.action(
 		async (opts: {
 			width: string;
 			height: string;
 			seed?: string;
 			difficulty?: string;
+			solution?: string;
 			output?: string;
 		}) => {
 			try {
@@ -49,6 +54,7 @@ program
 					height,
 					seed,
 					difficulty,
+					solution: opts.solution,
 					output: opts.output,
 				});
 				console.log(`Maze written to ${outputPath}`);
@@ -110,6 +116,10 @@ program
 		"--folder <name>",
 		"reMarkable Cloud folder to upload into (must already exist)",
 	)
+	.option(
+		"--solution <mode>",
+		"solution display mode: none, extra-page, or overlay (defaults to none)",
+	)
 	.action(
 		async (opts: {
 			width: string;
@@ -119,6 +129,7 @@ program
 			output?: string;
 			visibleName?: string;
 			folder?: string;
+			solution?: string;
 		}) => {
 			try {
 				const width = parseIntegerOption(opts.width, "--width");
@@ -137,6 +148,7 @@ program
 					height,
 					seed,
 					difficulty,
+					solution: opts.solution,
 					output: opts.output,
 					visibleName: opts.visibleName,
 					folder: opts.folder,

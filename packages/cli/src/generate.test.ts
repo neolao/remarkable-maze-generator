@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PDFDocument } from "pdf-lib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runGenerate } from "./generate.js";
 
@@ -113,5 +114,68 @@ describe("runGenerate", () => {
 				cwd: workDir,
 			}),
 		).rejects.toThrow();
+	});
+
+	it("includes the solution as an extra page when solution mode is extra-page", async () => {
+		const result = await runGenerate({
+			width: 6,
+			height: 6,
+			seed: 3,
+			solution: "extra-page",
+			cwd: workDir,
+		});
+
+		const doc = await PDFDocument.load(await readFile(result.outputPath));
+		expect(doc.getPageCount()).toBe(2);
+	});
+
+	it("overlays the solution on the single maze page when solution mode is overlay", async () => {
+		const withoutSolution = await runGenerate({
+			width: 6,
+			height: 6,
+			seed: 3,
+			output: join(workDir, "without.pdf"),
+			cwd: workDir,
+		});
+		const withOverlay = await runGenerate({
+			width: 6,
+			height: 6,
+			seed: 3,
+			solution: "overlay",
+			output: join(workDir, "with-overlay.pdf"),
+			cwd: workDir,
+		});
+
+		const doc = await PDFDocument.load(await readFile(withOverlay.outputPath));
+		expect(doc.getPageCount()).toBe(1);
+		const [withoutBytes, withOverlayBytes] = await Promise.all([
+			readFile(withoutSolution.outputPath),
+			readFile(withOverlay.outputPath),
+		]);
+		expect(withOverlayBytes).not.toEqual(withoutBytes);
+	});
+
+	it("keeps producing a single page with no solution when solution mode is omitted", async () => {
+		const result = await runGenerate({
+			width: 6,
+			height: 6,
+			seed: 3,
+			cwd: workDir,
+		});
+
+		const doc = await PDFDocument.load(await readFile(result.outputPath));
+		expect(doc.getPageCount()).toBe(1);
+	});
+
+	it("rejects an invalid solution value with a clear error", async () => {
+		await expect(
+			runGenerate({
+				width: 5,
+				height: 5,
+				seed: 1,
+				solution: "side-panel",
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/side-panel/);
 	});
 });

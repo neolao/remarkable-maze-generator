@@ -6,6 +6,7 @@ export interface GenerateAndSendOptions {
 	height: number;
 	seed?: number;
 	difficulty?: number;
+	solution?: string;
 	output?: string;
 	cwd?: string;
 	visibleName?: string;
@@ -51,6 +52,7 @@ export async function runGenerateAndSend(
 		height: options.height,
 		seed,
 		difficulty: options.difficulty,
+		solution: options.solution,
 		output: options.output,
 		cwd: options.cwd,
 	});

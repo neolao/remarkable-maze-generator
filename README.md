@@ -10,6 +10,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - See the parameters used to generate a maze (type, dimensions, seed, difficulty) printed on the PDF itself, so it can be regenerated exactly later
 - Generate a batch of several mazes at once, as one combined PDF or as separate files
 - Generate a maze PDF directly from the command line
+- Choose whether the maze PDF includes its solution (on a separate page or overlaid on the maze) directly from the command line
 - Authenticate with reMarkable Cloud using a one-time pairing code, remembered for later uploads
 - Upload a local PDF file to your reMarkable Cloud account from the command line, optionally into a specific folder
 - Generate a maze PDF and upload it to your reMarkable Cloud account in a single command
@@ -42,7 +43,7 @@ Or, using the `generate.sh` shortcut at the repository root:
 ./generate.sh --width 20 --height 15
 ```
 
-Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--difficulty` (optional, 1 to 5, defaults to 1 — higher values produce more branch points and make the maze harder to solve), `--output` (optional, defaults to `./maze.pdf`).
+Options: `--width` and `--height` (required, number of cells), `--seed` (optional, reused to reproduce the same maze), `--difficulty` (optional, 1 to 5, defaults to 1 — higher values produce more branch points and make the maze harder to solve), `--solution` (optional, `none`, `extra-page`, or `overlay`; defaults to `none`), `--output` (optional, defaults to `./maze.pdf`).
 
 Upload a local PDF file to your reMarkable Cloud account:
 
@@ -70,7 +71,7 @@ Or, using the `generate-and-send.sh` shortcut at the repository root:
 ./generate-and-send.sh --width 20 --height 15
 ```
 
-Accepts the same `--width`, `--height`, `--seed`, `--difficulty` and `--output` options as `generate`, plus the same `--visible-name` and `--folder` options as `send` (the visible name defaults to `rectangle-<width>x<height>-<seed>` if not given). If generation succeeds but the upload fails, the local PDF is kept and the error is reported clearly.
+Accepts the same `--width`, `--height`, `--seed`, `--difficulty`, `--solution` and `--output` options as `generate`, plus the same `--visible-name` and `--folder` options as `send` (the visible name defaults to `rectangle-<width>x<height>-<seed>` if not given). If generation succeeds but the upload fails, the local PDF is kept and the error is reported clearly.
 
 See the CLI's built-in help:
 

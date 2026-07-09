@@ -2,6 +2,7 @@ import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { authenticate, uploadPdf } from "@remarkable-maze-generator/core";
+import { PDFDocument } from "pdf-lib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runGenerateAndSend } from "./generate-and-send.js";
 
@@ -184,6 +185,47 @@ describe("runGenerateAndSend", () => {
 				promptPairingCode: vi.fn(),
 			}),
 		).rejects.toThrow();
+		expect(authenticateMock).not.toHaveBeenCalled();
+		expect(uploadPdfMock).not.toHaveBeenCalled();
+	});
+
+	it("forwards the solution option to PDF generation", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		const result = await runGenerateAndSend({
+			width: 6,
+			height: 6,
+			seed: 3,
+			solution: "extra-page",
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+
+		const doc = await PDFDocument.load(await readFile(result.outputPath));
+		expect(doc.getPageCount()).toBe(2);
+	});
+
+	it("rejects an invalid solution value before attempting to authenticate or upload", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		await expect(
+			runGenerateAndSend({
+				width: 5,
+				height: 5,
+				seed: 1,
+				solution: "side-panel",
+				cwd: workDir,
+				credentialsPath,
+				promptPairingCode: vi.fn(),
+			}),
+		).rejects.toThrow(/side-panel/);
 		expect(authenticateMock).not.toHaveBeenCalled();
 		expect(uploadPdfMock).not.toHaveBeenCalled();
 	});

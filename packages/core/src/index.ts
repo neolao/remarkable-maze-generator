@@ -17,6 +17,9 @@ export type {
 export {
 	REMARKABLE_2_PAGE_HEIGHT_PT,
 	REMARKABLE_2_PAGE_WIDTH_PT,
+	SOLUTION_MODES,
+	invalidSolutionModeMessage,
+	isValidSolutionMode,
 	renderMazeBatchToPdf,
 	renderMazeBatchToPdfs,
 	renderMazeToPdf,

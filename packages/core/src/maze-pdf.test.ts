@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
 	REMARKABLE_2_PAGE_HEIGHT_PT,
 	REMARKABLE_2_PAGE_WIDTH_PT,
+	SOLUTION_MODES,
+	invalidSolutionModeMessage,
+	isValidSolutionMode,
 	renderMazeBatchToPdf,
 	renderMazeBatchToPdfs,
 	renderMazeToPdf,
@@ -221,6 +224,31 @@ describe("renderMazeBatchToPdf", () => {
 
 	it("rejects an empty batch instead of producing an empty PDF", async () => {
 		await expect(renderMazeBatchToPdf([])).rejects.toThrow();
+	});
+});
+
+describe("isValidSolutionMode", () => {
+	it.each(SOLUTION_MODES)("accepts %j as a valid solution mode", (mode) => {
+		expect(isValidSolutionMode(mode)).toBe(true);
+	});
+
+	it("rejects a value that is not one of the known solution modes", () => {
+		expect(isValidSolutionMode("side-panel")).toBe(false);
+	});
+
+	it("rejects an empty string", () => {
+		expect(isValidSolutionMode("")).toBe(false);
+	});
+});
+
+describe("invalidSolutionModeMessage", () => {
+	it("mentions the offending value and lists the valid modes", () => {
+		const message = invalidSolutionModeMessage("side-panel");
+
+		expect(message).toContain("side-panel");
+		for (const mode of SOLUTION_MODES) {
+			expect(message).toContain(mode);
+		}
 	});
 });
 

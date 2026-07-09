@@ -1,14 +1,11 @@
 import {
 	type Maze,
-	type SolutionDisplayMode,
 	generateMaze,
+	invalidSolutionModeMessage,
+	isValidSolutionMode,
 } from "@remarkable-maze-generator/core";
 
-export const SOLUTION_MODES: SolutionDisplayMode[] = [
-	"none",
-	"extra-page",
-	"overlay",
-];
+export { invalidSolutionModeMessage, isValidSolutionMode };
 
 export interface GenerateMazeRequestBody {
 	width?: number;
@@ -16,16 +13,6 @@ export interface GenerateMazeRequestBody {
 	seed?: number;
 	difficulty?: number;
 	solution?: string;
-}
-
-export function isValidSolutionMode(
-	value: string,
-): value is SolutionDisplayMode {
-	return (SOLUTION_MODES as string[]).includes(value);
-}
-
-export function invalidSolutionModeMessage(value: string): string {
-	return `Invalid solution mode "${value}", expected one of: ${SOLUTION_MODES.join(", ")}`;
 }
 
 export function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {
