@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - The "bridge crossing" maze type's tube corridors are now noticeably wider, taking up more visual space than the walls between them, in both the PDF and the web preview
-- The "bridge crossing" maze type's tube now has smoothly rounded corners at every turn, instead of sharp right angles, in both the PDF and the web preview; straight passages, dead ends, and bridge crossings are unchanged
+- The "bridge crossing" maze type's tube now has smoothly rounded corners everywhere a corridor turns, dead-ends, or branches, instead of sharp right angles, in both the PDF and the web preview; straight passages and bridge crossings are unchanged
 
 ## [0.4.0] - 2026-07-09
 

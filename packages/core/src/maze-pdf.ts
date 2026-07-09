@@ -87,29 +87,50 @@ function drawMazeSegments(
 	lineCap: LineCapStyle,
 ): void {
 	const { cellSize, leftOffset } = layout;
+	// pdf-lib's drawSvgPath() applies its own translate-then-flip-Y transform
+	// ("SVG path Y axis is opposite pdf-lib's" — see its own source), so an
+	// arc's path coordinates must stay in plain, unflipped, Y-down page
+	// points (matching how the classic SVG renderer reads the very same
+	// segments) with this anchor absorbing the offset/flip — pre-flipping
+	// them here as well, the way drawLine's own points are computed, would
+	// double-flip and silently draw the arc off in the wrong place (this
+	// broke the very first PDF render of a rounded corner: the shortened
+	// straight edges appeared correctly but the arc connecting them never
+	// showed up at all).
+	const svgPathAnchor = {
+		x: leftOffset,
+		y: REMARKABLE_2_PAGE_HEIGHT_PT - layout.topOffset,
+	};
 
 	for (const segment of segments) {
-		const x1 = leftOffset + segment.x1 * cellSize;
-		const y1 = toPdfY(layout, segment.y1 * cellSize);
-		const x2 = leftOffset + segment.x2 * cellSize;
-		const y2 = toPdfY(layout, segment.y2 * cellSize);
-
 		if (isArcSegment(segment)) {
+			const x1 = segment.x1 * cellSize;
+			const y1 = segment.y1 * cellSize;
+			const x2 = segment.x2 * cellSize;
+			const y2 = segment.y2 * cellSize;
 			const radius = segment.radius * cellSize;
-			// toPdfY() flips the Y axis (unit-cell space is Y-down, PDF page
-			// space is Y-up) — that mirror reverses the arc's rotational
-			// direction, so the sweep flag must flip too to keep the same curve.
-			const sweep = segment.sweep === 1 ? 0 : 1;
 			page.drawSvgPath(
-				`M ${x1} ${y1} A ${radius} ${radius} 0 0 ${sweep} ${x2} ${y2}`,
-				{ borderColor: color, borderWidth: thickness, borderLineCap: lineCap },
+				`M ${x1} ${y1} A ${radius} ${radius} 0 0 ${segment.sweep} ${x2} ${y2}`,
+				{
+					x: svgPathAnchor.x,
+					y: svgPathAnchor.y,
+					borderColor: color,
+					borderWidth: thickness,
+					borderLineCap: lineCap,
+				},
 			);
 			continue;
 		}
 
 		page.drawLine({
-			start: { x: x1, y: y1 },
-			end: { x: x2, y: y2 },
+			start: {
+				x: leftOffset + segment.x1 * cellSize,
+				y: toPdfY(layout, segment.y1 * cellSize),
+			},
+			end: {
+				x: leftOffset + segment.x2 * cellSize,
+				y: toPdfY(layout, segment.y2 * cellSize),
+			},
 			thickness,
 			color,
 			lineCap,

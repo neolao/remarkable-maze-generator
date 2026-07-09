@@ -1,7 +1,11 @@
 import { inflateSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { computeTubeSegments } from "./maze-layout.js";
+import {
+	TUBE_CORNER_RADIUS_RATIO,
+	TUBE_HALF_WIDTH_RATIO,
+	computeTubeSegments,
+} from "./maze-layout.js";
 import {
 	REMARKABLE_2_PAGE_HEIGHT_PT,
 	REMARKABLE_2_PAGE_WIDTH_PT,
@@ -24,6 +28,59 @@ function countStrokedLines(pdfBytes: Uint8Array): number {
 	const content = inflateSync(compressed).toString("latin1");
 
 	return (content.match(/^S$/gm) || []).length;
+}
+
+// A rounded tube corner is drawn via pdf-lib's drawSvgPath(), which wraps
+// each call in its own "q ... Q" graphics-state block: a "cm" matrix
+// encoding the anchor translate + the library's own Y-flip (its own source
+// comment: "SVG path Y axis is opposite pdf-lib's"), followed by a "m"
+// (moveto, the path's true start point) and one or more cubic Bézier "c"
+// curves — all in coordinates *local* to that block's "cm" (i.e. exactly
+// `segment.x * cellSize`/`segment.y * cellSize`, unflipped, un-offset).
+// Reading a block's raw local start/end position back out and comparing it
+// to that same simple formula catches a wrong coordinate transform: an
+// earlier version pre-flipped Y itself *and* let pdf-lib's own "cm" flip it
+// again, which left the arc's straight neighbors correctly shortened but
+// silently drew the connecting curve at the wrong position — invisible in
+// the real render, not just misshapen — while still emitting a normal
+// moveto/curve/stroke sequence, so a test only counting strokes, or only
+// checking the curve's coordinates stayed within the page bounds, couldn't
+// tell the difference (both weaker checks were tried and missed this bug).
+// Blocks are scoped by "q"/"Q" so a plain drawLine()'s own unrelated "m" line
+// is never mistaken for the start of a neighboring arc's path.
+function extractArcPaths(
+	pdfBytes: Uint8Array,
+): { start: { x: number; y: number }; end: { x: number; y: number } }[] {
+	const text = Buffer.from(pdfBytes).toString("latin1");
+	const streamMatch = text.match(/stream\r?\n([\s\S]*?)endstream/);
+	if (!streamMatch) throw new Error("No content stream found in PDF");
+
+	const compressed = Buffer.from(streamMatch[1], "latin1");
+	const content = inflateSync(compressed).toString("latin1");
+
+	const pathOpRegex =
+		/^(-?[\d.]+) (-?[\d.]+) m$|^(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) c$/gm;
+	const paths: {
+		start: { x: number; y: number };
+		end: { x: number; y: number };
+	}[] = [];
+
+	for (const block of content.split(/^Q$/m)) {
+		if (!/ c$/m.test(block)) continue; // no arc in this graphics-state block
+
+		let current: { x: number; y: number } | undefined;
+		for (const match of block.matchAll(pathOpRegex)) {
+			if (match[1] !== undefined) {
+				current = { x: Number(match[1]), y: Number(match[2]) };
+				paths.push({ start: current, end: current });
+			} else if (current) {
+				current = { x: Number(match[7]), y: Number(match[8]) };
+				paths[paths.length - 1].end = current;
+			}
+		}
+	}
+
+	return paths;
 }
 
 function decodeHexStrings(content: string): string {
@@ -180,6 +237,54 @@ describe("renderMazeToPdf", () => {
 		// see ADR 026) — every segment is an independent solid stroke, no
 		// fill/border layering.
 		expect(strokedLines).toBe(computeTubeSegments(maze).length);
+	});
+
+	it("draws a rounded tube corner's curve at its actual expected local position", async () => {
+		// A hand-built 3x3 maze with a single dead end at (1,1) — same shape
+		// as maze-layout.test.ts's dead-end tests — so the exact unit-cell
+		// position of its one rounded corner (NW) is known precisely. Each
+		// arc's path coordinates are local to its own "cm"-transformed
+		// graphics-state block — i.e. exactly `unitCoordinate * cellSize`,
+		// with no further offset or flip to reproduce (see extractArcPaths).
+		const maze: Maze = {
+			width: 3,
+			height: 3,
+			type: "rectangle-crossing",
+			cells: Array.from({ length: 3 }, () =>
+				Array.from({ length: 3 }, () => ({
+					walls: { north: true, south: true, east: true, west: true },
+				})),
+			),
+		};
+		maze.cells[1][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+
+		const pageMarginPt = 24; // PAGE_MARGIN_PT in maze-pdf.ts
+		const cellSizePt = (REMARKABLE_2_PAGE_WIDTH_PT - 2 * pageMarginPt) / 3;
+
+		const h = TUBE_HALF_WIDTH_RATIO;
+		const r = TUBE_CORNER_RADIUS_RATIO;
+		const NW = { x: 1.5 - h, y: 1.5 - h };
+		// The two tangent points shortening NW's cap segments, in unit-cell
+		// coordinates — matches the geometry asserted directly in
+		// maze-layout.test.ts's "closes a dead-end cell" test.
+		const expectedTangents = [
+			{ x: NW.x + r, y: NW.y },
+			{ x: NW.x, y: NW.y + r },
+		].map((p) => ({ x: p.x * cellSizePt, y: p.y * cellSizePt }));
+
+		const pdfBytes = await renderMazeToPdf(maze);
+		const arcs = extractArcPaths(pdfBytes);
+		expect(arcs.length).toBeGreaterThan(0);
+
+		const closeTo = (a: number, b: number) => Math.abs(a - b) < 0.01;
+		const arcPoints = arcs.flatMap((arc) => [arc.start, arc.end]);
+		for (const expected of expectedTangents) {
+			const match = arcPoints.some(
+				(p) => closeTo(p.x, expected.x) && closeTo(p.y, expected.y),
+			);
+			expect(match).toBe(true);
+		}
 	});
 
 	it("does not error rendering a 1x1 rectangle-crossing maze, which has no room for a crossing", async () => {

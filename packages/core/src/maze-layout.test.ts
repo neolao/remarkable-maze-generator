@@ -138,17 +138,21 @@ describe("computeTubeSegments", () => {
 
 		// Each edge is unbroken across the whole passage (possibly split across
 		// cell boundaries into colinear pieces, but with no gap in between) —
-		// spanning from row 1's north cap corner (closed, y=1+0.5-h) to row 3's
-		// south cap corner (closed, y=3+0.5+h).
+		// spanning from row 1's north cap corner to row 3's south cap corner.
+		// Row 1 and row 3 are themselves dead ends here (only the middle row 2
+		// is a true straight-through), so those two corners are now rounded
+		// (see ADR 031) — the straight pieces stop `TUBE_CORNER_RADIUS_RATIO`
+		// short of the original sharp corner on each end, an arc picking up
+		// from there instead.
 		for (const edgeSegments of [leftEdgeSegments, rightEdgeSegments]) {
 			const sortedPieces = [...edgeSegments].sort(
 				(a, b) => Math.min(a.y1, a.y2) - Math.min(b.y1, b.y2),
 			);
 			expect(Math.min(...sortedPieces.map((s) => Math.min(s.y1, s.y2)))).toBe(
-				1.5 - h,
+				1.5 - h + TUBE_CORNER_RADIUS_RATIO,
 			);
 			expect(Math.max(...sortedPieces.map((s) => Math.max(s.y1, s.y2)))).toBe(
-				3.5 + h,
+				3.5 + h - TUBE_CORNER_RADIUS_RATIO,
 			);
 			for (let i = 0; i < sortedPieces.length - 1; i++) {
 				const end = Math.max(sortedPieces[i].y1, sortedPieces[i].y2);
@@ -161,8 +165,11 @@ describe("computeTubeSegments", () => {
 		}
 	});
 
-	it("closes a dead-end cell with 3 caps and one open arm, no gaps", () => {
+	it("closes a dead-end cell with a rounded cap and one open arm, no gaps", () => {
 		// Cell (1,1) open only to the south, in an otherwise fully walled maze.
+		// The cap's two corners (NW, NE — both closed/closed) are now rounded
+		// (see ADR 031); the other two (SE, SW — south open, east/west closed)
+		// stay sharp and collinear, unaffected.
 		const maze = buildFullyWalledMaze(3, 3);
 		maze.cells[1][1].walls.south = false;
 		maze.cells[2][1].walls.north = false;
@@ -184,11 +191,48 @@ describe("computeTubeSegments", () => {
 					(s.x1 === a.x && s.y1 === a.y && s.x2 === b.x && s.y2 === b.y) ||
 					(s.x1 === b.x && s.y1 === b.y && s.x2 === a.x && s.y2 === a.y),
 			);
+		const reachesPoint = (p: { x: number; y: number }) =>
+			segments.some(
+				(s) => (s.x1 === p.x && s.y1 === p.y) || (s.x2 === p.x && s.y2 === p.y),
+			);
 
-		// North, east and west caps (closed sides).
-		expect(hasSegment(NW, NE)).toBe(true);
-		expect(hasSegment(NE, SE)).toBe(true);
-		expect(hasSegment(NW, SW)).toBe(true);
+		// The two closed corners (NW, NE) no longer reach their sharp point —
+		// they were replaced by a rounding arc (see ADR 031).
+		expect(reachesPoint(NW)).toBe(false);
+		expect(reachesPoint(NE)).toBe(false);
+		const closeTo = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+		const arcNearNW = segments
+			.filter(isArcSegment)
+			.find(
+				(arc) =>
+					closeTo(
+						Math.hypot(arc.x1 - NW.x, arc.y1 - NW.y),
+						TUBE_CORNER_RADIUS_RATIO,
+					) &&
+					closeTo(
+						Math.hypot(arc.x2 - NW.x, arc.y2 - NW.y),
+						TUBE_CORNER_RADIUS_RATIO,
+					),
+			);
+		const arcNearNE = segments
+			.filter(isArcSegment)
+			.find(
+				(arc) =>
+					closeTo(
+						Math.hypot(arc.x1 - NE.x, arc.y1 - NE.y),
+						TUBE_CORNER_RADIUS_RATIO,
+					) &&
+					closeTo(
+						Math.hypot(arc.x2 - NE.x, arc.y2 - NE.y),
+						TUBE_CORNER_RADIUS_RATIO,
+					),
+			);
+		expect(arcNearNW).toBeDefined();
+		expect(arcNearNE).toBeDefined();
+		// The two open-side corners (SE, SW) still reach their sharp point,
+		// unaffected — south is open, east/west are closed, so they differ.
+		expect(reachesPoint(SE)).toBe(true);
+		expect(reachesPoint(SW)).toBe(true);
 		// South arm (open side): 2 edges reaching the cell boundary.
 		expect(hasSegment(SW, { x: cx - h, y: 2 })).toBe(true);
 		expect(hasSegment(SE, { x: cx + h, y: 2 })).toBe(true);
@@ -314,7 +358,26 @@ describe("computeTubeSegments", () => {
 		maze.cells[1][1].walls.east = false;
 		maze.cells[1][2].walls.west = false;
 
-		const segments = computeTubeSegments(maze);
+		// Scoped to cell (1,1)'s own hub corners — the two neighboring cells
+		// opened only enough to connect to it (and the maze's entrance at
+		// (0,0)) each end up as their own incidental dead end, which also
+		// gets rounded (see ADR 031) but is irrelevant to what this test
+		// checks.
+		const inTargetCell = (s: {
+			x1: number;
+			x2: number;
+			y1: number;
+			y2: number;
+		}) =>
+			s.x1 >= 0.95 &&
+			s.x1 <= 2.05 &&
+			s.x2 >= 0.95 &&
+			s.x2 <= 2.05 &&
+			s.y1 >= 0.95 &&
+			s.y1 <= 2.05 &&
+			s.y2 >= 0.95 &&
+			s.y2 <= 2.05;
+		const segments = computeTubeSegments(maze).filter(inTargetCell);
 		const r = TUBE_CORNER_RADIUS_RATIO;
 		const cx = 1.5;
 		const cy = 1.5;
@@ -360,28 +423,33 @@ describe("computeTubeSegments", () => {
 	});
 
 	it("keeps a straight passage as plain unrounded lines, with no arcs", () => {
+		// Row 2 is the only genuinely straight-through cell here (open both
+		// north and south) — rows 1 and 3 are themselves dead ends (each open
+		// on only one side, purely to connect row 2 to something), and dead
+		// ends now get their own corners rounded (see the dedicated dead-end
+		// test and ADR 031), which is not what this test is about. Scope the
+		// check to row 2's own hub corners only.
 		const maze = buildFullyWalledMaze(3, 5);
 		maze.cells[1][1].walls.south = false;
 		maze.cells[2][1].walls.north = false;
 		maze.cells[2][1].walls.south = false;
 		maze.cells[3][1].walls.north = false;
 
-		const segments = computeTubeSegments(maze);
+		const inRow2 = (s: { x1: number; x2: number; y1: number; y2: number }) =>
+			s.x1 >= 0.95 &&
+			s.x1 <= 2.05 &&
+			s.x2 >= 0.95 &&
+			s.x2 <= 2.05 &&
+			s.y1 >= 1.95 &&
+			s.y1 <= 3.05 &&
+			s.y2 >= 1.95 &&
+			s.y2 <= 3.05;
+		const segments = computeTubeSegments(maze).filter(inRow2);
 
 		expect(segments.filter(isArcSegment)).toHaveLength(0);
 	});
 
-	it("keeps a dead end as plain unrounded lines, with no arcs", () => {
-		const maze = buildFullyWalledMaze(3, 3);
-		maze.cells[1][1].walls.south = false;
-		maze.cells[2][1].walls.north = false;
-
-		const segments = computeTubeSegments(maze);
-
-		expect(segments.filter(isArcSegment)).toHaveLength(0);
-	});
-
-	it("keeps a bridge crossing as plain unrounded lines, preserving the real gap", () => {
+	it("keeps a bridge crossing cell itself unrounded, preserving the real gap", () => {
 		const maze = buildFullyWalledMaze(3, 3);
 		maze.cells[1][1].walls = {
 			north: false,
@@ -391,10 +459,81 @@ describe("computeTubeSegments", () => {
 		};
 		maze.crossings = [{ x: 1, y: 1, underAxis: "vertical" }];
 
-		const segments = computeTubeSegments(maze);
+		// Scoped to the crossing cell itself — the maze's entrance (0,0) and
+		// exit (2,2) sit outside this region and legitimately get their own
+		// corners rounded (see ADR 031), which is irrelevant to what this
+		// test checks (the crossing cell's own gap-preserving behavior).
+		const inCrossingCell = (s: { x1: number; x2: number }) =>
+			s.x1 >= 0.9 && s.x1 <= 2.1 && s.x2 >= 0.9 && s.x2 <= 2.1;
+		const segments = computeTubeSegments(maze).filter(inCrossingCell);
 
 		expect(segments.filter(isArcSegment)).toHaveLength(0);
 		expect(segments.length).toBeGreaterThan(0);
+	});
+
+	// Cell (1,1)'s own hub corners, tangent points included — tight enough to
+	// exclude the maze's entrance (0,0) and exit corners, and any incidental
+	// dead end created on a neighboring cell purely to open a connection.
+	const inTargetCell = (s: {
+		x1: number;
+		x2: number;
+		y1: number;
+		y2: number;
+	}) =>
+		s.x1 >= 0.95 &&
+		s.x1 <= 2.05 &&
+		s.x2 >= 0.95 &&
+		s.x2 <= 2.05 &&
+		s.y1 >= 0.95 &&
+		s.y1 <= 2.05 &&
+		s.y2 >= 0.95 &&
+		s.y2 <= 2.05;
+
+	it("rounds both corners of a dead end's cap (see ADR 031)", () => {
+		// Cell (1,1) open only to the south, in an otherwise fully walled maze
+		// — same setup as the "closes a dead-end cell" test above.
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[1][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+
+		const segments = computeTubeSegments(maze).filter(inTargetCell);
+
+		expect(segments.filter(isArcSegment)).toHaveLength(2);
+	});
+
+	it("rounds both corners of a T-junction, leaving the two collinear corners untouched", () => {
+		// Cell (1,1) open north, east, and south (closed west only).
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[0][1].walls.south = false;
+		maze.cells[1][1].walls.north = false;
+		maze.cells[1][1].walls.east = false;
+		maze.cells[1][2].walls.west = false;
+		maze.cells[1][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+
+		const segments = computeTubeSegments(maze).filter(inTargetCell);
+
+		expect(segments.filter(isArcSegment)).toHaveLength(2);
+	});
+
+	it("rounds all four corners of a full (non-crossing) 4-way junction", () => {
+		// Cell (1,1) open on all four sides, but not registered as a bridge
+		// crossing — a plain 4-way branch point.
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[1][1].walls = {
+			north: false,
+			south: false,
+			east: false,
+			west: false,
+		};
+		maze.cells[0][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+		maze.cells[1][0].walls.east = false;
+		maze.cells[1][2].walls.west = false;
+
+		const segments = computeTubeSegments(maze).filter(inTargetCell);
+
+		expect(segments.filter(isArcSegment)).toHaveLength(4);
 	});
 
 	it("makes the tube wider than the non-tube area within a cell", () => {
