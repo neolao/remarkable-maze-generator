@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The "bridge crossing" maze type's tube corridors are now noticeably wider, taking up more visual space than the walls between them, in both the PDF and the web preview
 - The "bridge crossing" maze type's tube now has smoothly rounded corners everywhere a corridor turns, dead-ends, or branches, instead of sharp right angles, in both the PDF and the web preview; straight passages and bridge crossings are unchanged
+- Generated mazes now have noticeably longer dead-end branches on average, at every difficulty level, instead of many short 1-2 cell dead ends — the maze stays just as connected and just as hard to solve at each difficulty setting
 
 ## [0.4.0] - 2026-07-09
 

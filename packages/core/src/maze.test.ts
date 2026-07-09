@@ -89,6 +89,88 @@ function findCellsReachableByATraceablePath(
 	return reachableCells;
 }
 
+const DEGREE_DIRECTIONS = [
+	{ dx: 0, dy: -1, wall: "north" as const },
+	{ dx: 0, dy: 1, wall: "south" as const },
+	{ dx: 1, dy: 0, wall: "east" as const },
+	{ dx: -1, dy: 0, wall: "west" as const },
+];
+
+function cellDegree(cell: { walls: Record<string, boolean> }): number {
+	return [
+		cell.walls.north,
+		cell.walls.south,
+		cell.walls.east,
+		cell.walls.west,
+	].filter((wall) => !wall).length;
+}
+
+// Measures, for every dead-end branch (a corridor dangling off a branch point
+// or trailing from the entrance/exit), how many cells it spans before
+// reaching a branch point (3+ open walls). Only meaningful for the plain
+// `rectangle` type, where "degree" directly reflects corridor topology.
+function computeDeadEndBranchLengths(
+	maze: ReturnType<typeof generateMaze>,
+): number[] {
+	const lengths: number[] = [];
+	const entranceKey = "0,0";
+	const exitKey = `${maze.width - 1},${maze.height - 1}`;
+
+	for (let y = 0; y < maze.height; y++) {
+		for (let x = 0; x < maze.width; x++) {
+			const key = `${x},${y}`;
+			if (key === entranceKey || key === exitKey) continue;
+			const cell = maze.cells[y][x];
+			if (cellDegree(cell) !== 1) continue;
+
+			const openDirection = DEGREE_DIRECTIONS.find(
+				(direction) => !cell.walls[direction.wall],
+			);
+			if (!openDirection) continue;
+
+			let length = 1;
+			let previous = { x, y };
+			let current = { x: x + openDirection.dx, y: y + openDirection.dy };
+
+			while (true) {
+				const currentKey = `${current.x},${current.y}`;
+				const currentCell = maze.cells[current.y][current.x];
+				const degree = cellDegree(currentCell);
+				if (degree >= 3) break;
+
+				length++;
+				if (currentKey === entranceKey || currentKey === exitKey) break;
+				if (degree === 1) break;
+
+				const next = DEGREE_DIRECTIONS.filter(
+					(direction) => !currentCell.walls[direction.wall],
+				)
+					.map((direction) => ({
+						x: current.x + direction.dx,
+						y: current.y + direction.dy,
+					}))
+					.find((cell) => !(cell.x === previous.x && cell.y === previous.y));
+				if (!next) break;
+
+				previous = current;
+				current = next;
+			}
+			lengths.push(length);
+		}
+	}
+	return lengths;
+}
+
+function averageDeadEndBranchLength(mazes: ReturnType<typeof generateMaze>[]) {
+	const lengths = mazes.flatMap(computeDeadEndBranchLengths);
+	return lengths.reduce((sum, length) => sum + length, 0) / lengths.length;
+}
+
+function shortDeadEndBranchRatio(mazes: ReturnType<typeof generateMaze>[]) {
+	const lengths = mazes.flatMap(computeDeadEndBranchLengths);
+	return lengths.filter((length) => length <= 2).length / lengths.length;
+}
+
 function countBranchPoints(maze: ReturnType<typeof generateMaze>): number {
 	let branchPoints = 0;
 	for (const row of maze.cells) {
@@ -226,6 +308,73 @@ describe("generateMaze", () => {
 			).toThrow();
 		},
 	);
+});
+
+describe("generateMaze - dead-end branch length", () => {
+	const seeds = Array.from({ length: 20 }, (_, index) => index);
+
+	it("produces noticeably longer dead-end branches on average at difficulty 3, for a representative sample of seeds", () => {
+		const mazes = seeds.map((seed) =>
+			generateMaze({ width: 16, height: 16, seed, difficulty: 3 }),
+		);
+
+		// Baseline measured before this change (same seeds/size): avg ~2.20,
+		// ~72.8% of dead ends were 1-2 cells long.
+		expect(averageDeadEndBranchLength(mazes)).toBeGreaterThan(2.4);
+		expect(shortDeadEndBranchRatio(mazes)).toBeLessThan(0.7);
+	});
+
+	it("keeps many branch points while still lengthening dead ends at the hardest difficulty", () => {
+		const mazes = seeds.map((seed) =>
+			generateMaze({ width: 16, height: 16, seed, difficulty: 5 }),
+		);
+
+		// Baseline measured before this change (same seeds/size): avg ~1.97,
+		// ~75.8% of dead ends were 1-2 cells long.
+		expect(averageDeadEndBranchLength(mazes)).toBeGreaterThan(2.3);
+		expect(shortDeadEndBranchRatio(mazes)).toBeLessThan(0.7);
+		const totalBranchPoints = mazes.reduce(
+			(sum, maze) => sum + countBranchPoints(maze),
+			0,
+		);
+		expect(totalBranchPoints / mazes.length).toBeGreaterThan(40);
+	});
+
+	it("does not change dead-end branch length at the easiest difficulty (no branching decision is ever made)", () => {
+		const mazes = seeds.map((seed) =>
+			generateMaze({ width: 16, height: 16, seed, difficulty: 1 }),
+		);
+
+		// Baseline measured before this change (same seeds/size): avg ~2.11.
+		// Difficulty 1 never rolls the random-vs-recent choice, so the new
+		// minimum branch-commit rule never triggers (see ADR 032).
+		const avg = averageDeadEndBranchLength(mazes);
+		expect(avg).toBeGreaterThan(1.9);
+		expect(avg).toBeLessThan(2.3);
+	});
+
+	it("still fully connects a maze too small to contain a long dead-end branch", () => {
+		const maze = generateMaze({ width: 2, height: 2, seed: 1, difficulty: 5 });
+
+		expect(countReachableCells(maze)).toBe(4);
+	});
+
+	it("still generates the same maze twice at difficulty 5 (deterministic under the new selection rule)", () => {
+		const first = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 42,
+			difficulty: 5,
+		});
+		const second = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 42,
+			difficulty: 5,
+		});
+
+		expect(second.cells).toEqual(first.cells);
+	});
 });
 
 describe("MAZE_TYPES / isValidMazeType / invalidMazeTypeMessage", () => {

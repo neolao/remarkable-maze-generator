@@ -62,6 +62,11 @@ export interface GenerateMazeBatchOptions {
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 const DEFAULT_MAZE_TYPE: MazeType = "rectangle";
+// Once the growing tree jumps to a dormant active cell (a wrong turn), keep
+// extending that same branch for at least this many cells before allowing
+// another jump — otherwise it tends to get boxed in by already-visited
+// neighbors after a single cell (see ADR 032).
+const MIN_BRANCH_COMMIT_LENGTH = 5;
 
 type Axis = "vertical" | "horizontal";
 
@@ -181,12 +186,27 @@ export function generateMaze({
 
 	const active: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
 	visited[0][0] = true;
+	// Counts down while committed to extending the branch a random jump just
+	// landed on, instead of re-rolling the random-vs-recent choice every step
+	// (see ADR 032).
+	let forcedCommitRemaining = 0;
 
 	while (active.length > 0) {
-		const index =
-			randomSelectionProbability > 0 && random() < randomSelectionProbability
-				? Math.floor(random() * active.length)
-				: active.length - 1;
+		let index: number;
+		if (forcedCommitRemaining > 0) {
+			index = active.length - 1;
+			forcedCommitRemaining--;
+		} else if (
+			randomSelectionProbability > 0 &&
+			random() < randomSelectionProbability
+		) {
+			index = Math.floor(random() * active.length);
+			if (index !== active.length - 1) {
+				forcedCommitRemaining = MIN_BRANCH_COMMIT_LENGTH - 1;
+			}
+		} else {
+			index = active.length - 1;
+		}
 		const current = active[index];
 
 		const unvisitedNeighbors = DIRECTIONS.map((direction) => ({
@@ -244,6 +264,7 @@ export function generateMaze({
 
 		if (totalCandidates === 0) {
 			active.splice(index, 1);
+			forcedCommitRemaining = 0;
 			continue;
 		}
 
