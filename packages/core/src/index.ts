@@ -17,7 +17,7 @@ export {
 	isValidMazeType,
 } from "./maze.js";
 export type { MazePosition } from "./maze-solver.js";
-export { solveMaze } from "./maze-solver.js";
+export { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
 export type {
 	RenderMazeToPdfOptions,
 	SolutionDisplayMode,

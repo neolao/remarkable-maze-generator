@@ -1,4 +1,5 @@
 import {
+	findSolutionBranchPoints,
 	renderMazeToPdf,
 	renderMazeToSvg,
 } from "@remarkable-maze-generator/core";
@@ -39,16 +40,23 @@ function handleGenerateMazePreview(
 	request: FastifyRequest<{ Body: GenerateMazeRequestBody }>,
 	reply: FastifyReply,
 ) {
+	const showSolution = request.body?.showSolution === true;
+
 	let svg: string;
+	let branchPointCount: number | undefined;
 	try {
 		const maze = buildMazeFromRequest(request.body ?? {});
-		svg = renderMazeToSvg(maze);
+		svg = renderMazeToSvg(maze, { showSolution });
+		if (showSolution) branchPointCount = findSolutionBranchPoints(maze).length;
 	} catch (error) {
 		reply.code(400);
 		return { error: (error as Error).message };
 	}
 
 	reply.header("content-type", "image/svg+xml");
+	if (branchPointCount !== undefined) {
+		reply.header("x-solution-branch-point-count", branchPointCount);
+	}
 	return svg;
 }
 

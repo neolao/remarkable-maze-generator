@@ -13,8 +13,10 @@ const REQUIRED_ELEMENT_IDS = [
 	"height",
 	"difficulty",
 	"maze-type",
+	"show-solution",
 	"form-error",
 	"maze-preview",
+	"solution-branch-count",
 	"download-link",
 	"send-button",
 	"send-status",
@@ -55,6 +57,12 @@ describe("public maze configuration page", () => {
 		);
 		expect(html).toMatch(
 			/id="send-status"[^>]*role="status"|role="status"[^>]*id="send-status"/,
+		);
+	});
+
+	it("exposes the show-solution option as a checkbox input", () => {
+		expect(html).toMatch(
+			/<input[^>]+id="show-solution"[^>]+type="checkbox"|<input[^>]+type="checkbox"[^>]+id="show-solution"/,
 		);
 	});
 });

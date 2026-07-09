@@ -22,6 +22,7 @@ export interface GenerateMazeRequestBody {
 	difficulty?: number;
 	type?: string;
 	solution?: string;
+	showSolution?: boolean;
 }
 
 export function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {

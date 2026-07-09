@@ -81,6 +81,20 @@ h1 {
 	outline-offset: 1px;
 }
 
+.field-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--color-text-muted);
+	margin-bottom: 1.25rem;
+}
+
+.field-checkbox input {
+	margin: 0;
+}
+
 button,
 .button {
 	font: inherit;
@@ -126,6 +140,12 @@ button:disabled {
 	max-width: 100%;
 	border: 1px solid var(--color-border);
 	border-radius: 6px;
+}
+
+#solution-branch-count {
+	margin: 0.5rem 0 0;
+	color: var(--color-text-muted);
+	min-height: 1.25rem;
 }
 
 .actions {

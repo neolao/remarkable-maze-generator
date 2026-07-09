@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { computeTubeSegments } from "./maze-layout.js";
+import { findSolutionBranchPoints } from "./maze-solver.js";
 import { renderMazeToSvg } from "./maze-svg.js";
 import { generateMaze } from "./maze.js";
 
 function countLineElements(svg: string): number {
 	return (svg.match(/<line /g) || []).length;
+}
+
+function countCircleElements(svg: string): number {
+	return (svg.match(/<circle /g) || []).length;
 }
 
 describe("renderMazeToSvg", () => {
@@ -81,5 +86,43 @@ describe("renderMazeToSvg", () => {
 
 		expect(maze.crossings).toEqual([]);
 		expect(countLineElements(svg)).toBe(computeTubeSegments(maze).length);
+	});
+
+	it("does not draw a solution trace or branch markers when showSolution is left disabled", () => {
+		const maze = generateMaze({ width: 8, height: 8, seed: 4, difficulty: 5 });
+
+		const svg = renderMazeToSvg(maze);
+
+		expect(svg).not.toContain('stroke="#d91a1a"');
+		expect(countCircleElements(svg)).toBe(0);
+	});
+
+	it("draws the solution trace and one circle per branch point when showSolution is enabled", () => {
+		const maze = generateMaze({ width: 8, height: 8, seed: 4, difficulty: 5 });
+		const branchPoints = findSolutionBranchPoints(maze);
+		expect(branchPoints.length).toBeGreaterThan(0);
+
+		const svg = renderMazeToSvg(maze, { showSolution: true });
+
+		expect(svg).toContain('stroke="#d91a1a"');
+		expect(countCircleElements(svg)).toBe(branchPoints.length);
+	});
+
+	it("draws the solution trace without any branch marker on a straight 1x2 maze", () => {
+		const maze = generateMaze({ width: 1, height: 2, seed: 1 });
+
+		const svg = renderMazeToSvg(maze, { showSolution: true });
+
+		expect(svg).toContain('stroke="#d91a1a"');
+		expect(countCircleElements(svg)).toBe(0);
+	});
+
+	it("renders the minimal 1x1 maze with showSolution enabled without error", () => {
+		const maze = generateMaze({ width: 1, height: 1, seed: 1 });
+
+		const svg = renderMazeToSvg(maze, { showSolution: true });
+
+		expect(svg.startsWith("<svg")).toBe(true);
+		expect(countCircleElements(svg)).toBe(0);
 	});
 });

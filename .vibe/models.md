@@ -86,6 +86,7 @@ Defined in: `packages/core/src/maze-layout.ts` — shared wall geometry consumed
 | Field | Type | Notes |
 |---|---|---|
 | cellSizePx | number | optional, defaults to 20 |
+| showSolution | boolean | optional, defaults to false; traces the solution path in red with a red circle per branch point (from `findSolutionBranchPoints`), kept separate from `RenderMazeToPdfOptions.solution`, see ADR 028 |
 Defined in: `packages/core/src/maze-svg.ts`
 
 ## RemarkableCredentials

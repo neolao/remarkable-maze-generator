@@ -35,6 +35,11 @@
 **Code:** `MazeType`, `MAZE_TYPES`, `type` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 022)
 **Do not confuse with:** Difficulty
 
+## Branch point
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `findSolutionBranchPoints()` in `packages/core/src/maze-solver.ts`
+**Do not confuse with:** Bridge crossing (a bridge-crossing cell is never itself a branch point, since the solver's axis lock removes the alternative direction — see ADR 024 and ADR 028)
+
 ## Bridge crossing
 **Definition:** [what this concept means in the domain — fill in]
 **Code:** `MazeCrossing`, `crossings` field of `Maze`, `computeCrossingBridgeSegments()` / `computePathSegments()` in `packages/core/src/maze.ts` / `maze-layout.ts` (see ADR 022 and ADR 023)

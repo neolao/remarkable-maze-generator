@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- When sending a maze from the web page without specifying a name, the file uploaded to reMarkable Cloud is now named after its type and dimensions (e.g. "rectangle 20✕15") instead of including a seed number
+- Users can now show the maze's solution directly on the web page preview with a "Show solution on preview" option, tracing the path in red and marking every branch point (where the path had another possible direction) with a circle, along with the total number of branch points found; leaving the option unchecked keeps the current preview unchanged
+- When sending a maze from the web page without specifying a name, the file uploaded to reMarkable Cloud is now named after its type and dimensions (e.g. "rectangle 20x15") instead of including a seed number
 
 ## [0.4.0] - 2026-07-09
 

@@ -66,6 +66,9 @@ function initMazeForm() {
 	const form = document.getElementById("maze-form");
 	const errorElement = document.getElementById("form-error");
 	const previewElement = document.getElementById("maze-preview");
+	const solutionBranchCountElement = document.getElementById(
+		"solution-branch-count",
+	);
 	const downloadLink = document.getElementById("download-link");
 	const remarkableFolderField = document.getElementById(
 		"remarkable-folder-field",
@@ -82,6 +85,7 @@ function initMazeForm() {
 
 	const hidePreview = () => {
 		previewElement.style.display = "none";
+		solutionBranchCountElement.textContent = "";
 		downloadLink.style.display = "none";
 		remarkableFolderField.style.display = "none";
 		sendButton.style.display = "none";
@@ -169,7 +173,10 @@ function initMazeForm() {
 			return;
 		}
 
-		const requestBody = JSON.stringify(result.value);
+		const requestBody = JSON.stringify({
+			...result.value,
+			showSolution: form["show-solution"].checked,
+		});
 		const requestInit = {
 			method: "POST",
 			headers: { "content-type": "application/json" },
@@ -188,6 +195,14 @@ function initMazeForm() {
 		const svgMarkup = await previewResponse.text();
 		previewElement.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
 		previewElement.style.display = "block";
+
+		const branchPointCount = previewResponse.headers.get(
+			"x-solution-branch-point-count",
+		);
+		solutionBranchCountElement.textContent =
+			branchPointCount === null
+				? ""
+				: `Branch points on solution path: ${branchPointCount}`;
 
 		lastMazeRequestBody = requestBody;
 		remarkableFolderField.style.display = "block";

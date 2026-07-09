@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { solveMaze } from "./maze-solver.js";
+import { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
 import { generateMaze } from "./maze.js";
 import type { Cell, Maze } from "./maze.js";
 
@@ -140,5 +140,66 @@ describe("solveMaze", () => {
 		maze.crossings = [{ x: 1, y: 1, underAxis: "vertical" }];
 
 		expect(() => solveMaze(maze)).toThrow();
+	});
+});
+
+describe("findSolutionBranchPoints", () => {
+	it("flags a path cell that had an extra open direction beyond arrival and departure", () => {
+		// Cells addressed as maze.cells[y][x]. Straight route (0,0)-(1,0)-(2,0)-
+		// (2,1)-(2,2), plus one unused dead-end branch off (1,0) going south to
+		// (1,1) — (1,0) has 3 open directions (west, east, south) so it must be
+		// flagged; every other path cell has exactly 2.
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[0][0].walls.east = false; // (0,0) -> (1,0)
+		maze.cells[0][1].walls.west = false;
+		maze.cells[0][1].walls.east = false; // (1,0) -> (2,0)
+		maze.cells[0][2].walls.west = false;
+		maze.cells[0][1].walls.south = false; // (1,0) -> (1,1), unused dead end
+		maze.cells[1][1].walls.north = false;
+		maze.cells[0][2].walls.south = false; // (2,0) -> (2,1)
+		maze.cells[1][2].walls.north = false;
+		maze.cells[1][2].walls.south = false; // (2,1) -> (2,2)
+		maze.cells[2][2].walls.north = false;
+
+		const branchPoints = findSolutionBranchPoints(maze);
+
+		expect(branchPoints).toEqual([{ x: 1, y: 0 }]);
+	});
+
+	it("returns an empty list when the maze is 1x1", () => {
+		const maze = generateMaze({ width: 1, height: 1, seed: 1 });
+
+		expect(findSolutionBranchPoints(maze)).toEqual([]);
+	});
+
+	it("never flags a bridge-crossing cell even though all four of its walls are open", () => {
+		// Same crossing maze as the "finds a valid same-axis route" solveMaze
+		// test above: the crossing cell (1,1) has all four walls open, but the
+		// solver's axis lock (see ADR 024) only allows continuing along the
+		// entered axis, so it is never a real branch choice for the path.
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[0][0].walls.east = false; // (0,0) -> (1,0)
+		maze.cells[0][1].walls.west = false;
+		maze.cells[0][1].walls.south = false; // (1,0) -> (1,1)
+		maze.cells[1][1].walls.north = false;
+		maze.cells[1][1].walls.south = false; // (1,1) -> (1,2)
+		maze.cells[2][1].walls.north = false;
+		maze.cells[2][1].walls.east = false; // (1,2) -> (2,2)
+		maze.cells[2][2].walls.west = false;
+		maze.cells[1][1].walls.west = false; // (1,1) <-> (0,1), unused horizontal arm
+		maze.cells[1][0].walls.east = false;
+		maze.cells[1][1].walls.east = false; // (1,1) <-> (2,1), unused horizontal arm
+		maze.cells[1][2].walls.west = false;
+		maze.crossings = [{ x: 1, y: 1, underAxis: "horizontal" }];
+
+		const branchPoints = findSolutionBranchPoints(maze);
+
+		expect(branchPoints).not.toContainEqual({ x: 1, y: 1 });
+	});
+
+	it("throws a clear error when no path exists between entrance and exit", () => {
+		const maze = buildFullyWalledMaze(5, 5);
+
+		expect(() => findSolutionBranchPoints(maze)).toThrow();
 	});
 });

@@ -56,21 +56,21 @@ function reconstructPath(
 	cameFrom: Map<string, Node>,
 	start: Node,
 	end: Node,
-): MazePosition[] {
-	const path: MazePosition[] = [{ x: end.x, y: end.y }];
+): Node[] {
+	const path: Node[] = [end];
 	let current = end;
 
 	while (nodeKey(current) !== nodeKey(start)) {
 		const previous = cameFrom.get(nodeKey(current));
 		if (!previous) throw new Error("Failed to reconstruct the solution path");
-		path.push({ x: previous.x, y: previous.y });
+		path.push(previous);
 		current = previous;
 	}
 
 	return path.reverse();
 }
 
-export function solveMaze(maze: Maze): MazePosition[] {
+function solvePathNodes(maze: Maze): Node[] {
 	const exitX = maze.width - 1;
 	const exitY = maze.height - 1;
 
@@ -99,4 +99,29 @@ export function solveMaze(maze: Maze): MazePosition[] {
 	throw new Error(
 		`No path exists between entrance (0,0) and exit (${exitX},${exitY})`,
 	);
+}
+
+export function solveMaze(maze: Maze): MazePosition[] {
+	return solvePathNodes(maze).map(({ x, y }) => ({ x, y }));
+}
+
+/**
+ * Path cells where the solver had more than the two directions used to
+ * arrive and leave — i.e. a real alternative was available. Entrance and
+ * exit are excluded (they are endpoints, not something the path "passes
+ * through"). A bridge-crossing cell is never flagged even though all four of
+ * its walls are open: the solver's own axis lock (see ADR 024) already
+ * limits it to the entered axis, so the other axis is never a real choice.
+ */
+export function findSolutionBranchPoints(maze: Maze): MazePosition[] {
+	const nodes = solvePathNodes(maze);
+	const branchPoints: MazePosition[] = [];
+
+	for (let i = 1; i < nodes.length - 1; i++) {
+		if (getOpenMoves(maze, nodes[i]).length > 2) {
+			branchPoints.push({ x: nodes[i].x, y: nodes[i].y });
+		}
+	}
+
+	return branchPoints;
 }

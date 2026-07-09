@@ -16,6 +16,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Generate a maze PDF and upload it to your reMarkable Cloud account in a single command
 - Generate a maze PDF through a web API by sending its parameters (size, seed, difficulty, solution display mode)
 - Configure a maze (width, height, difficulty) through a web page form and see an image preview right after submitting, with invalid input caught before any request is sent
+- Show the maze's solution directly on the web page preview, with a circle marking every branch point along the path and the total branch point count displayed
 - Download the maze PDF generated through the web page with a dedicated download link
 - Send the maze generated through the web page directly to your reMarkable Cloud account, with a guided one-time pairing step if the browser isn't paired yet (the same pairing already used by the CLI also works here)
 - Choose a target reMarkable Cloud folder for a maze sent from the web page, or leave it blank to upload to the account root
@@ -88,7 +89,7 @@ Run the web server (development mode, auto-reload):
 npm run web
 ```
 
-Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty, and maze type — Rectangle or Rectangle crossing) through the form, see an image preview, download the generated PDF, or send it straight to your reMarkable Cloud account with the "Send to reMarkable" button. Optionally fill in the "reMarkable folder" field first to upload into a specific, already-existing folder instead of the account root. The first time, a one-time pairing code is requested (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, the same way as the CLI's `send` command.
+Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty, and maze type — Rectangle or Rectangle crossing) through the form, see an image preview, download the generated PDF, or send it straight to your reMarkable Cloud account with the "Send to reMarkable" button. Check "Show solution on preview" to trace the solution path on the preview image, with a circle on every branch point and the total branch point count shown below it. Optionally fill in the "reMarkable folder" field first to upload into a specific, already-existing folder instead of the account root. The first time, a one-time pairing code is requested (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, the same way as the CLI's `send` command.
 
 Run the tests:
 

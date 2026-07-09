@@ -272,4 +272,68 @@ describe("POST /api/mazes/preview", () => {
 			error: expect.stringMatching(/hexagon/),
 		});
 	});
+
+	it("draws the solution trace and reports the branch point count when showSolution is enabled", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: {
+				width: 8,
+				height: 8,
+				seed: 4,
+				difficulty: 5,
+				showSolution: true,
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toContain('stroke="#d91a1a"');
+		const branchPointCount = Number(
+			response.headers["x-solution-branch-point-count"],
+		);
+		expect(branchPointCount).toBeGreaterThan(0);
+	});
+
+	it("does not draw a solution trace or report a branch point count when showSolution is left disabled", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 8, height: 8, seed: 4, difficulty: 5 },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).not.toContain('stroke="#d91a1a"');
+		expect(response.headers["x-solution-branch-point-count"]).toBeUndefined();
+	});
+
+	it("reports a branch point count of zero for a 1x1 maze with showSolution enabled", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 1, height: 1, seed: 1, showSolution: true },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.headers["x-solution-branch-point-count"]).toBe("0");
+	});
+
+	it("returns 400 with the same error when width is missing and showSolution is enabled", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { height: 5, showSolution: true },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({ error: expect.any(String) });
+		expect(response.headers["x-solution-branch-point-count"]).toBeUndefined();
+	});
 });
