@@ -55,11 +55,79 @@ function initMazeForm() {
 	const errorElement = document.getElementById("form-error");
 	const previewElement = document.getElementById("maze-preview");
 	const downloadLink = document.getElementById("download-link");
+	const sendButton = document.getElementById("send-button");
+	const sendStatus = document.getElementById("send-status");
+	const pairingSection = document.getElementById("pairing-section");
+	const pairingCodeInput = document.getElementById("pairing-code");
+	const pairingSubmit = document.getElementById("pairing-submit");
+	const pairingError = document.getElementById("pairing-error");
+
+	let lastMazeRequestBody = null;
 
 	const hidePreview = () => {
 		previewElement.style.display = "none";
 		downloadLink.style.display = "none";
+		sendButton.style.display = "none";
+		sendStatus.textContent = "";
+		pairingSection.style.display = "none";
+		lastMazeRequestBody = null;
 	};
+
+	const sendToRemarkable = async () => {
+		sendStatus.textContent = "Sending to reMarkable...";
+		pairingSection.style.display = "none";
+
+		const response = await fetch("/api/mazes/send", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: lastMazeRequestBody,
+		});
+
+		if (response.ok) {
+			sendStatus.textContent = "Maze sent to reMarkable.";
+			return;
+		}
+
+		const body = await response.json();
+
+		if (body.error === "not_authenticated") {
+			sendStatus.textContent = "";
+			pairingSection.style.display = "block";
+			return;
+		}
+
+		sendStatus.textContent = body.error ?? "Failed to send maze to reMarkable";
+	};
+
+	sendButton.addEventListener("click", () => {
+		sendToRemarkable();
+	});
+
+	pairingSubmit.addEventListener("click", async () => {
+		pairingError.textContent = "";
+		const pairingCode = pairingCodeInput.value.trim();
+
+		if (!pairingCode) {
+			pairingError.textContent = "Pairing code is required";
+			return;
+		}
+
+		const response = await fetch("/api/remarkable/pair", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ pairingCode }),
+		});
+
+		if (!response.ok) {
+			const body = await response.json();
+			pairingError.textContent = body.error ?? "Pairing failed";
+			return;
+		}
+
+		pairingCodeInput.value = "";
+		pairingError.textContent = "";
+		await sendToRemarkable();
+	});
 
 	form.addEventListener("submit", async (event) => {
 		event.preventDefault();
@@ -96,6 +164,11 @@ function initMazeForm() {
 		const svgMarkup = await previewResponse.text();
 		previewElement.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
 		previewElement.style.display = "block";
+
+		lastMazeRequestBody = requestBody;
+		sendButton.style.display = "inline";
+		sendStatus.textContent = "";
+		pairingSection.style.display = "none";
 
 		const pdfResponse = await fetch("/api/mazes/generate", requestInit);
 

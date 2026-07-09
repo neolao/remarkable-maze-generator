@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Users can now generate a maze PDF through the web API by sending its parameters (size, seed, difficulty, and solution display mode) to `POST /api/mazes/generate`, receiving the PDF directly in response
 - Users can now configure a maze (width, height, difficulty) through a form on the web page and see an image preview of the generated maze right after submitting, with invalid input rejected before any request is sent
 - Users can now download the maze PDF generated through the web page with a dedicated download link, shown once a preview has been generated
+- Users can now send the maze generated through the web page directly to their reMarkable Cloud account with a "Send to reMarkable" button; if the browser isn't paired yet, a guided one-time pairing form appears and the send retries automatically once pairing succeeds (the same pairing used by the command line also works on the web)
 
 ## [0.3.0] - 2026-07-09
 

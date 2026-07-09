@@ -29,7 +29,23 @@
 
     <p>
       <a id="download-link" href="#" download="maze.pdf" style="display: none;">Download PDF</a>
+      <button id="send-button" type="button" style="display: none;">Send to reMarkable</button>
     </p>
+
+    <p id="send-status" role="status"></p>
+
+    <div id="pairing-section" style="display: none;">
+      <p>
+        Not connected to reMarkable yet. Get a one-time pairing code at
+        <a href="https://my.remarkable.com/device/browser/connect" target="_blank" rel="noopener">my.remarkable.com/device/browser/connect</a>.
+      </p>
+      <label>
+        Pairing code
+        <input type="text" id="pairing-code" name="pairing-code" />
+      </label>
+      <button id="pairing-submit" type="button">Pair device</button>
+      <p id="pairing-error" role="alert"></p>
+    </div>
 
     <script type="module" src="./app.js"></script>
   </body>

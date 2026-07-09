@@ -139,6 +139,12 @@ Defined in: `packages/web/src/maze-form-validation.ts`
 Discriminated union: `{ valid: true; value: MazeFormValue }` or `{ valid: false; error: string }` (a human-readable message naming the invalid field).
 Defined in: `packages/web/src/maze-form-validation.ts`
 
+## BuildServerOptions (web)
+| Field | Type | Notes |
+|---|---|---|
+| credentialsPath | string | optional, injectable for testing; defaults to the same path as the CLI's credentials file (`~/.config/remarkable-maze-generator/credentials.json`), so pairing done via either surface is shared |
+Defined in: `packages/web/src/server.ts`
+
 ## GenerateAndSendOptions (CLI)
 | Field | Type | Notes |
 |---|---|---|
