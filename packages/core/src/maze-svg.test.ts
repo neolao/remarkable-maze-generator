@@ -8,6 +8,10 @@ function countLineElements(svg: string): number {
 	return (svg.match(/<line /g) || []).length;
 }
 
+function countPathElements(svg: string): number {
+	return (svg.match(/<path /g) || []).length;
+}
+
 function countCircleElements(svg: string): number {
 	return (svg.match(/<circle /g) || []).length;
 }
@@ -67,11 +71,14 @@ describe("renderMazeToSvg", () => {
 
 		const svg = renderMazeToSvg(maze);
 
-		// One <line> per tube edge segment (both edges of every corridor —
-		// see ADR 026) — every segment is an independent solid stroke, no
-		// fill/border layering.
-		expect(countLineElements(svg)).toBe(computeTubeSegments(maze).length);
+		// One <line> or <path> (rounded turn corners, see ADR 030) per tube
+		// edge segment (both edges of every corridor — see ADR 026) — every
+		// segment is an independent solid stroke, no fill/border layering.
+		expect(countLineElements(svg) + countPathElements(svg)).toBe(
+			computeTubeSegments(maze).length,
+		);
 		expect(svg).toContain('stroke-linecap="round"');
+		expect(countPathElements(svg)).toBeGreaterThan(0);
 	});
 
 	it("renders a rectangle-crossing maze too small for any crossing without error", () => {

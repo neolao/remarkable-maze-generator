@@ -7,6 +7,21 @@ export interface LineSegment {
 	y2: number;
 }
 
+export interface ArcSegment {
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+	radius: number;
+	sweep: 0 | 1;
+}
+
+export type TubeSegment = LineSegment | ArcSegment;
+
+export function isArcSegment(segment: TubeSegment): segment is ArcSegment {
+	return "radius" in segment;
+}
+
 function validateMazeShape(maze: Maze): void {
 	if (
 		!Number.isInteger(maze.width) ||
@@ -68,10 +83,72 @@ export function computeWallSegments(maze: Maze): LineSegment[] {
  */
 export const TUBE_HALF_WIDTH_RATIO = 0.35;
 
+/**
+ * Fillet radius (as a fraction of the cell size) used to round a tube's two
+ * turn corners — where the two open arms meet, and where the two closed-side
+ * caps meet. Straight passages, dead ends, and crossings are unaffected (see
+ * ADR 030).
+ */
+export const TUBE_CORNER_RADIUS_RATIO = 0.08;
+
 function crossingAt(maze: Maze, x: number, y: number) {
 	return (maze.crossings ?? []).find(
 		(crossing) => crossing.x === x && crossing.y === y,
 	);
+}
+
+interface Point {
+	x: number;
+	y: number;
+}
+
+function unit(from: Point, to: Point): Point {
+	const dx = to.x - from.x;
+	const dy = to.y - from.y;
+	const length = Math.hypot(dx, dy);
+	return { x: dx / length, y: dy / length };
+}
+
+/**
+ * Replaces the sharp 90° corner at `vertex` — shared by two edges reaching
+ * toward `farPoint1` and `farPoint2` — with an arc tangent to both, each
+ * edge shortened by `radius` from the vertex (see ADR 030). The resulting
+ * sweep direction was confirmed by rendering a real turn end-to-end (a
+ * single isolated corner rendered on its own was not enough to catch a
+ * flipped sweep — it only becomes visually obvious once both of a turn's
+ * edges are rendered together and the tube either stays a consistent width
+ * around the bend or visibly pinches).
+ */
+function roundCorner(
+	vertex: Point,
+	farPoint1: Point,
+	farPoint2: Point,
+	radius: number,
+): { tangent1: Point; tangent2: Point; arc: ArcSegment } {
+	const r1 = unit(vertex, farPoint1);
+	const r2 = unit(vertex, farPoint2);
+	const tangent1 = {
+		x: vertex.x + radius * r1.x,
+		y: vertex.y + radius * r1.y,
+	};
+	const tangent2 = {
+		x: vertex.x + radius * r2.x,
+		y: vertex.y + radius * r2.y,
+	};
+	const sweep = r1.x * r2.y - r1.y * r2.x > 0 ? 0 : 1;
+
+	return {
+		tangent1,
+		tangent2,
+		arc: {
+			x1: tangent1.x,
+			y1: tangent1.y,
+			x2: tangent2.x,
+			y2: tangent2.y,
+			radius,
+			sweep,
+		},
+	};
 }
 
 /**
@@ -88,11 +165,11 @@ function crossingAt(maze: Maze, x: number, y: number) {
  * stop at the hub corners without crossing it, leaving a real gap exactly
  * where the over-axis tube passes.
  */
-export function computeTubeSegments(maze: Maze): LineSegment[] {
+export function computeTubeSegments(maze: Maze): TubeSegment[] {
 	validateMazeShape(maze);
 
 	const h = TUBE_HALF_WIDTH_RATIO;
-	const segments: LineSegment[] = [];
+	const segments: TubeSegment[] = [];
 
 	for (let y = 0; y < maze.height; y++) {
 		for (let x = 0; x < maze.width; x++) {
@@ -108,7 +185,7 @@ function computeCellTubeSegments(
 	x: number,
 	y: number,
 	h: number,
-): LineSegment[] {
+): TubeSegment[] {
 	const cx = x + 0.5;
 	const cy = y + 0.5;
 	const NW = { x: cx - h, y: cy - h };
@@ -144,35 +221,234 @@ function computeCellTubeSegments(
 	const cell = maze.cells[y][x];
 	const isEntrance = x === 0 && y === 0;
 	const isExit = x === maze.width - 1 && y === maze.height - 1;
-	const segments: LineSegment[] = [];
+	const northOpen = !cell.walls.north || isEntrance;
+	const southOpen = !cell.walls.south || isExit;
+	const eastOpen = !cell.walls.east;
+	const westOpen = !cell.walls.west;
 
-	if (!cell.walls.north || isEntrance) {
+	const openCount = [northOpen, southOpen, eastOpen, westOpen].filter(
+		Boolean,
+	).length;
+	const isTurn =
+		openCount === 2 && !(northOpen && southOpen) && !(eastOpen && westOpen);
+
+	if (isTurn) {
+		return computeTurnTubeSegments(x, y, cx, cy, h, NW, NE, SE, SW, {
+			northOpen,
+			southOpen,
+			eastOpen,
+			westOpen,
+		});
+	}
+
+	const segments: TubeSegment[] = [];
+
+	if (northOpen) {
 		segments.push({ x1: cx - h, y1: y, x2: NW.x, y2: NW.y });
 		segments.push({ x1: cx + h, y1: y, x2: NE.x, y2: NE.y });
 	} else {
 		segments.push({ x1: NW.x, y1: NW.y, x2: NE.x, y2: NE.y });
 	}
 
-	if (!cell.walls.south || isExit) {
+	if (southOpen) {
 		segments.push({ x1: SW.x, y1: SW.y, x2: cx - h, y2: y + 1 });
 		segments.push({ x1: SE.x, y1: SE.y, x2: cx + h, y2: y + 1 });
 	} else {
 		segments.push({ x1: SW.x, y1: SW.y, x2: SE.x, y2: SE.y });
 	}
 
-	if (!cell.walls.east) {
+	if (eastOpen) {
 		segments.push({ x1: NE.x, y1: NE.y, x2: x + 1, y2: cy - h });
 		segments.push({ x1: SE.x, y1: SE.y, x2: x + 1, y2: cy + h });
 	} else {
 		segments.push({ x1: NE.x, y1: NE.y, x2: SE.x, y2: SE.y });
 	}
 
-	if (!cell.walls.west) {
+	if (westOpen) {
 		segments.push({ x1: NW.x, y1: NW.y, x2: x, y2: cy - h });
 		segments.push({ x1: SW.x, y1: SW.y, x2: x, y2: cy + h });
 	} else {
 		segments.push({ x1: NW.x, y1: NW.y, x2: SW.x, y2: SW.y });
 	}
 
+	return segments;
+}
+
+interface TurnOpenSides {
+	northOpen: boolean;
+	southOpen: boolean;
+	eastOpen: boolean;
+	westOpen: boolean;
+}
+
+/**
+ * A turn cell's two "false" hub corners (each adjacent to one open and one
+ * closed side) stay untouched — they're already collinear with their
+ * neighboring straight edge (see ADR 030). Only the "open" corner (shared by
+ * the two open arms) and the "closed" corner (shared by the two closed-side
+ * caps) get rounded, via `roundCorner` with far points given in clockwise
+ * order so the arc always curves inward.
+ */
+function computeTurnTubeSegments(
+	x: number,
+	y: number,
+	cx: number,
+	cy: number,
+	h: number,
+	NW: Point,
+	NE: Point,
+	SE: Point,
+	SW: Point,
+	{ northOpen, eastOpen, southOpen }: TurnOpenSides,
+): TubeSegment[] {
+	const r = TUBE_CORNER_RADIUS_RATIO;
+	const segments: TubeSegment[] = [];
+
+	if (northOpen && eastOpen) {
+		const northFar = { x: cx + h, y };
+		const eastFar = { x: x + 1, y: cy - h };
+		const open = roundCorner(NE, northFar, eastFar, r);
+		const closed = roundCorner(SW, NW, SE, r);
+
+		segments.push({ x1: cx - h, y1: y, x2: NW.x, y2: NW.y });
+		segments.push({
+			x1: northFar.x,
+			y1: northFar.y,
+			x2: open.tangent1.x,
+			y2: open.tangent1.y,
+		});
+		segments.push(open.arc);
+		segments.push({
+			x1: open.tangent2.x,
+			y1: open.tangent2.y,
+			x2: eastFar.x,
+			y2: eastFar.y,
+		});
+		segments.push({ x1: SE.x, y1: SE.y, x2: x + 1, y2: cy + h });
+		segments.push({
+			x1: NW.x,
+			y1: NW.y,
+			x2: closed.tangent1.x,
+			y2: closed.tangent1.y,
+		});
+		segments.push(closed.arc);
+		segments.push({
+			x1: closed.tangent2.x,
+			y1: closed.tangent2.y,
+			x2: SE.x,
+			y2: SE.y,
+		});
+		return segments;
+	}
+
+	if (eastOpen && southOpen) {
+		const eastFar = { x: x + 1, y: cy + h };
+		const southFar = { x: cx + h, y: y + 1 };
+		const open = roundCorner(SE, eastFar, southFar, r);
+		const closed = roundCorner(NW, NE, SW, r);
+
+		segments.push({ x1: NE.x, y1: NE.y, x2: x + 1, y2: cy - h });
+		segments.push({
+			x1: eastFar.x,
+			y1: eastFar.y,
+			x2: open.tangent1.x,
+			y2: open.tangent1.y,
+		});
+		segments.push(open.arc);
+		segments.push({
+			x1: open.tangent2.x,
+			y1: open.tangent2.y,
+			x2: southFar.x,
+			y2: southFar.y,
+		});
+		segments.push({ x1: SW.x, y1: SW.y, x2: cx - h, y2: y + 1 });
+		segments.push({
+			x1: NE.x,
+			y1: NE.y,
+			x2: closed.tangent1.x,
+			y2: closed.tangent1.y,
+		});
+		segments.push(closed.arc);
+		segments.push({
+			x1: closed.tangent2.x,
+			y1: closed.tangent2.y,
+			x2: SW.x,
+			y2: SW.y,
+		});
+		return segments;
+	}
+
+	if (southOpen) {
+		// southOpen && westOpen
+		const southFar = { x: cx - h, y: y + 1 };
+		const westFar = { x, y: cy + h };
+		const open = roundCorner(SW, southFar, westFar, r);
+		const closed = roundCorner(NE, SE, NW, r);
+
+		segments.push({ x1: SE.x, y1: SE.y, x2: cx + h, y2: y + 1 });
+		segments.push({
+			x1: southFar.x,
+			y1: southFar.y,
+			x2: open.tangent1.x,
+			y2: open.tangent1.y,
+		});
+		segments.push(open.arc);
+		segments.push({
+			x1: open.tangent2.x,
+			y1: open.tangent2.y,
+			x2: westFar.x,
+			y2: westFar.y,
+		});
+		segments.push({ x1: NW.x, y1: NW.y, x2: x, y2: cy - h });
+		segments.push({
+			x1: SE.x,
+			y1: SE.y,
+			x2: closed.tangent1.x,
+			y2: closed.tangent1.y,
+		});
+		segments.push(closed.arc);
+		segments.push({
+			x1: closed.tangent2.x,
+			y1: closed.tangent2.y,
+			x2: NW.x,
+			y2: NW.y,
+		});
+		return segments;
+	}
+
+	// westOpen && northOpen
+	const westFar = { x, y: cy - h };
+	const northFar = { x: cx - h, y };
+	const open = roundCorner(NW, westFar, northFar, r);
+	const closed = roundCorner(SE, SW, NE, r);
+
+	segments.push({ x1: SW.x, y1: SW.y, x2: x, y2: cy + h });
+	segments.push({
+		x1: westFar.x,
+		y1: westFar.y,
+		x2: open.tangent1.x,
+		y2: open.tangent1.y,
+	});
+	segments.push(open.arc);
+	segments.push({
+		x1: open.tangent2.x,
+		y1: open.tangent2.y,
+		x2: northFar.x,
+		y2: northFar.y,
+	});
+	segments.push({ x1: cx + h, y1: y, x2: NE.x, y2: NE.y });
+	segments.push({
+		x1: SW.x,
+		y1: SW.y,
+		x2: closed.tangent1.x,
+		y2: closed.tangent1.y,
+	});
+	segments.push(closed.arc);
+	segments.push({
+		x1: closed.tangent2.x,
+		y1: closed.tangent2.y,
+		x2: NE.x,
+		y2: NE.y,
+	});
 	return segments;
 }

@@ -6,8 +6,12 @@ import {
 	StandardFonts,
 	rgb,
 } from "pdf-lib";
-import type { LineSegment } from "./maze-layout.js";
-import { computeTubeSegments, computeWallSegments } from "./maze-layout.js";
+import type { TubeSegment } from "./maze-layout.js";
+import {
+	computeTubeSegments,
+	computeWallSegments,
+	isArcSegment,
+} from "./maze-layout.js";
 import type { MazePosition } from "./maze-solver.js";
 import { solveMaze } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -76,7 +80,7 @@ function toPdfY(layout: MazeLayout, mazeY: number): number {
 
 function drawMazeSegments(
 	page: PDFPage,
-	segments: LineSegment[],
+	segments: TubeSegment[],
 	layout: MazeLayout,
 	thickness: number,
 	color: ReturnType<typeof rgb>,
@@ -85,15 +89,27 @@ function drawMazeSegments(
 	const { cellSize, leftOffset } = layout;
 
 	for (const segment of segments) {
+		const x1 = leftOffset + segment.x1 * cellSize;
+		const y1 = toPdfY(layout, segment.y1 * cellSize);
+		const x2 = leftOffset + segment.x2 * cellSize;
+		const y2 = toPdfY(layout, segment.y2 * cellSize);
+
+		if (isArcSegment(segment)) {
+			const radius = segment.radius * cellSize;
+			// toPdfY() flips the Y axis (unit-cell space is Y-down, PDF page
+			// space is Y-up) — that mirror reverses the arc's rotational
+			// direction, so the sweep flag must flip too to keep the same curve.
+			const sweep = segment.sweep === 1 ? 0 : 1;
+			page.drawSvgPath(
+				`M ${x1} ${y1} A ${radius} ${radius} 0 0 ${sweep} ${x2} ${y2}`,
+				{ borderColor: color, borderWidth: thickness, borderLineCap: lineCap },
+			);
+			continue;
+		}
+
 		page.drawLine({
-			start: {
-				x: leftOffset + segment.x1 * cellSize,
-				y: toPdfY(layout, segment.y1 * cellSize),
-			},
-			end: {
-				x: leftOffset + segment.x2 * cellSize,
-				y: toPdfY(layout, segment.y2 * cellSize),
-			},
+			start: { x: x1, y: y1 },
+			end: { x: x2, y: y2 },
 			thickness,
 			color,
 			lineCap,

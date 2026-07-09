@@ -1,5 +1,9 @@
-import { computeTubeSegments, computeWallSegments } from "./maze-layout.js";
-import type { LineSegment } from "./maze-layout.js";
+import {
+	computeTubeSegments,
+	computeWallSegments,
+	isArcSegment,
+} from "./maze-layout.js";
+import type { TubeSegment } from "./maze-layout.js";
 import { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
 import type { MazePosition } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -16,15 +20,24 @@ export interface RenderMazeToSvgOptions {
 }
 
 function renderLines(
-	segments: LineSegment[],
+	segments: TubeSegment[],
 	cellSizePx: number,
 	lineCap: "square" | "round",
 ): string {
 	return segments
-		.map(
-			(segment) =>
-				`<line x1="${segment.x1 * cellSizePx}" y1="${segment.y1 * cellSizePx}" x2="${segment.x2 * cellSizePx}" y2="${segment.y2 * cellSizePx}" stroke="black" stroke-width="${STROKE_WIDTH_PX}" stroke-linecap="${lineCap}" />`,
-		)
+		.map((segment) => {
+			const x1 = segment.x1 * cellSizePx;
+			const y1 = segment.y1 * cellSizePx;
+			const x2 = segment.x2 * cellSizePx;
+			const y2 = segment.y2 * cellSizePx;
+
+			if (isArcSegment(segment)) {
+				const r = segment.radius * cellSizePx;
+				return `<path d="M ${x1} ${y1} A ${r} ${r} 0 0 ${segment.sweep} ${x2} ${y2}" stroke="black" stroke-width="${STROKE_WIDTH_PX}" stroke-linecap="${lineCap}" fill="none" />`;
+			}
+
+			return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="black" stroke-width="${STROKE_WIDTH_PX}" stroke-linecap="${lineCap}" />`;
+		})
 		.join("");
 }
 

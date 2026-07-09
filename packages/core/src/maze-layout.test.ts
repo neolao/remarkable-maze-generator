@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
 	computeTubeSegments,
 	computeWallSegments,
+	isArcSegment,
 } from "./maze-layout.js";
 import { generateMaze } from "./maze.js";
 import type { Maze } from "./maze.js";
@@ -192,8 +194,11 @@ describe("computeTubeSegments", () => {
 		expect(hasSegment(SE, { x: cx + h, y: 2 })).toBe(true);
 	});
 
-	it("connects a turn cleanly, with no gap at the inside or outside corner", () => {
-		// Cell (1,1) open to north and east (a turn), closed south/west.
+	it("connects a turn cleanly, with no gap at the two untouched (collinear) corners", () => {
+		// Cell (1,1) open to north and east (a turn), closed south/west. The
+		// outside (NE) and inside (SW) corners are now rounded (see the
+		// dedicated rounding test below) — this test covers the other two
+		// hub corners (NW, SE), which stay sharp and collinear, unaffected.
 		const maze = buildFullyWalledMaze(3, 3);
 		maze.cells[0][1].walls.south = false;
 		maze.cells[1][1].walls.north = false;
@@ -204,8 +209,6 @@ describe("computeTubeSegments", () => {
 		const cx = 1.5;
 		const cy = 1.5;
 		const NW = { x: cx - h, y: cy - h };
-		const NE = { x: cx + h, y: cy - h };
-		const SW = { x: cx - h, y: cy + h };
 		const SE = { x: cx + h, y: cy + h };
 
 		const hasSegment = (
@@ -218,13 +221,8 @@ describe("computeTubeSegments", () => {
 					(s.x1 === b.x && s.y1 === b.y && s.x2 === a.x && s.y2 === a.y),
 			);
 
-		// Outside corner: north arm's east edge reaches NE, continued by the
-		// east arm's north edge from NE — sharing the NE endpoint exactly.
-		expect(hasSegment({ x: cx + h, y: 1 }, NE)).toBe(true);
-		expect(hasSegment(NE, { x: 2, y: cy - h })).toBe(true);
-		// Inside corner: west cap and south cap meet exactly at SW.
-		expect(hasSegment(NW, SW)).toBe(true);
-		expect(hasSegment(SW, SE)).toBe(true);
+		expect(hasSegment({ x: cx - h, y: 1 }, NW)).toBe(true);
+		expect(hasSegment(SE, { x: 2, y: cy + h })).toBe(true);
 	});
 
 	it("treats the entrance's north side and the exit's south side as open, regardless of wall data", () => {
@@ -304,6 +302,98 @@ describe("computeTubeSegments", () => {
 
 		const segments = computeTubeSegments(maze);
 
+		expect(segments.length).toBeGreaterThan(0);
+	});
+
+	it("rounds a turn's outer and inner corners with an arc, leaving the two collinear edges untouched", () => {
+		// Cell (1,1) open to north and east (a turn), closed south/west — same
+		// setup as the "connects a turn cleanly" test above.
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[0][1].walls.south = false;
+		maze.cells[1][1].walls.north = false;
+		maze.cells[1][1].walls.east = false;
+		maze.cells[1][2].walls.west = false;
+
+		const segments = computeTubeSegments(maze);
+		const r = TUBE_CORNER_RADIUS_RATIO;
+		const cx = 1.5;
+		const cy = 1.5;
+		const NE = { x: cx + h, y: cy - h };
+		const SW = { x: cx - h, y: cy + h };
+		const NW = { x: cx - h, y: cy - h };
+		const SE = { x: cx + h, y: cy + h };
+
+		const arcs = segments.filter(isArcSegment);
+		expect(arcs).toHaveLength(2);
+
+		const closeTo = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+		const arcNearNE = arcs.find(
+			(arc) =>
+				(closeTo(arc.x1, NE.x) || closeTo(arc.x2, NE.x)) &&
+				closeTo(Math.hypot(arc.x1 - NE.x, arc.y1 - NE.y), r) &&
+				closeTo(Math.hypot(arc.x2 - NE.x, arc.y2 - NE.y), r),
+		);
+		const arcNearSW = arcs.find(
+			(arc) =>
+				closeTo(Math.hypot(arc.x1 - SW.x, arc.y1 - SW.y), r) &&
+				closeTo(Math.hypot(arc.x2 - SW.x, arc.y2 - SW.y), r),
+		);
+		expect(arcNearNE).toBeDefined();
+		expect(arcNearSW).toBeDefined();
+		expect(arcNearNE?.radius).toBe(r);
+		expect(arcNearNE?.sweep).toBe(0);
+		expect(arcNearSW?.radius).toBe(r);
+		expect(arcNearSW?.sweep).toBe(0);
+
+		// No segment (line or arc) reaches all the way to the rounded corners...
+		const reachesPoint = (p: { x: number; y: number }) =>
+			segments.some(
+				(s) =>
+					(closeTo(s.x1, p.x) && closeTo(s.y1, p.y)) ||
+					(closeTo(s.x2, p.x) && closeTo(s.y2, p.y)),
+			);
+		expect(reachesPoint(NE)).toBe(false);
+		expect(reachesPoint(SW)).toBe(false);
+		// ...but the two untouched, collinear corners are still reached exactly.
+		expect(reachesPoint(NW)).toBe(true);
+		expect(reachesPoint(SE)).toBe(true);
+	});
+
+	it("keeps a straight passage as plain unrounded lines, with no arcs", () => {
+		const maze = buildFullyWalledMaze(3, 5);
+		maze.cells[1][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+		maze.cells[2][1].walls.south = false;
+		maze.cells[3][1].walls.north = false;
+
+		const segments = computeTubeSegments(maze);
+
+		expect(segments.filter(isArcSegment)).toHaveLength(0);
+	});
+
+	it("keeps a dead end as plain unrounded lines, with no arcs", () => {
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[1][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+
+		const segments = computeTubeSegments(maze);
+
+		expect(segments.filter(isArcSegment)).toHaveLength(0);
+	});
+
+	it("keeps a bridge crossing as plain unrounded lines, preserving the real gap", () => {
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[1][1].walls = {
+			north: false,
+			south: false,
+			east: false,
+			west: false,
+		};
+		maze.crossings = [{ x: 1, y: 1, underAxis: "vertical" }];
+
+		const segments = computeTubeSegments(maze);
+
+		expect(segments.filter(isArcSegment)).toHaveLength(0);
 		expect(segments.length).toBeGreaterThan(0);
 	});
 

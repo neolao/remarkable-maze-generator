@@ -82,6 +82,17 @@ Defined in: `packages/core/src/maze-pdf.ts`
 | y2 | number | |
 Defined in: `packages/core/src/maze-layout.ts` — shared wall geometry consumed by both the PDF and SVG renderers, see ADR 019
 
+## ArcSegment
+| Field | Type | Notes |
+|---|---|---|
+| x1 | number | start point, same unit cell coordinates as `LineSegment` |
+| y1 | number | |
+| x2 | number | end point |
+| y2 | number | |
+| radius | number | unit cell coordinates |
+| sweep | `0 \| 1` | SVG arc sweep-flag; `TubeSegment = LineSegment \| ArcSegment`, narrowed via the exported `isArcSegment()` type guard |
+Defined in: `packages/core/src/maze-layout.ts` — used only for a `rectangle-crossing` tube's two rounded turn corners per cell, see ADR 030
+
 ## RenderMazeToSvgOptions
 | Field | Type | Notes |
 |---|---|---|
