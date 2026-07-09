@@ -7,12 +7,7 @@ import {
 	rgb,
 } from "pdf-lib";
 import type { LineSegment } from "./maze-layout.js";
-import {
-	PATH_THICKNESS_RATIO,
-	computeCrossingUnderSegments,
-	computePathSegments,
-	computeWallSegments,
-} from "./maze-layout.js";
+import { computeTubeSegments, computeWallSegments } from "./maze-layout.js";
 import type { MazePosition } from "./maze-solver.js";
 import { solveMaze } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -21,9 +16,8 @@ export const REMARKABLE_2_PAGE_WIDTH_PT = (1404 / 226) * 72;
 export const REMARKABLE_2_PAGE_HEIGHT_PT = (1872 / 226) * 72;
 
 const PAGE_MARGIN_PT = 24;
-const WALL_THICKNESS_PT = 1.5;
-const WALL_COLOR = rgb(0, 0, 0);
-const PATH_COLOR = rgb(0, 0, 0);
+const STROKE_THICKNESS_PT = 1.5;
+const STROKE_COLOR = rgb(0, 0, 0);
 const SOLUTION_THICKNESS_PT = 2;
 const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
 const PARAMETERS_LABEL_SIZE_PT = 8;
@@ -156,16 +150,14 @@ function drawParametersLabel(
 
 function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
 	if (maze.type === "rectangle-crossing") {
-		// Every segment is drawn independently as a single solid stroke — no
-		// fill/border trick. A crossing's over-axis is a normal, uninterrupted
-		// segment; its under-axis has a real, drawn gap at the crossing point
-		// (see ADR 025), so no paint-order tricks are needed anywhere.
+		// Every line is independent — no fill or stroke-width layering. Each
+		// corridor is its own two edge lines (see ADR 026).
 		drawMazeSegments(
 			page,
-			[...computePathSegments(maze), ...computeCrossingUnderSegments(maze)],
+			computeTubeSegments(maze),
 			layout,
-			layout.cellSize * PATH_THICKNESS_RATIO,
-			PATH_COLOR,
+			STROKE_THICKNESS_PT,
+			STROKE_COLOR,
 			LineCapStyle.Round,
 		);
 	} else {
@@ -173,8 +165,8 @@ function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
 			page,
 			computeWallSegments(maze),
 			layout,
-			WALL_THICKNESS_PT,
-			WALL_COLOR,
+			STROKE_THICKNESS_PT,
+			STROKE_COLOR,
 			LineCapStyle.Butt,
 		);
 	}

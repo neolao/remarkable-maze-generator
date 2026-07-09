@@ -1,10 +1,7 @@
 import { inflateSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import {
-	computeCrossingUnderSegments,
-	computePathSegments,
-} from "./maze-layout.js";
+import { computeTubeSegments } from "./maze-layout.js";
 import {
 	REMARKABLE_2_PAGE_HEIGHT_PT,
 	REMARKABLE_2_PAGE_WIDTH_PT,
@@ -167,7 +164,7 @@ describe("renderMazeToPdf", () => {
 		expect(countStrokedLines(pdfBytes)).toBe(2);
 	});
 
-	it("draws a rectangle-crossing maze as independent solid strokes, not walls", async () => {
+	it("draws a rectangle-crossing maze as independent tube edge strokes, not walls", async () => {
 		const maze = generateMaze({
 			width: 8,
 			height: 6,
@@ -179,13 +176,10 @@ describe("renderMazeToPdf", () => {
 		const pdfBytes = await renderMazeToPdf(maze);
 
 		const strokedLines = countStrokedLines(pdfBytes);
-		// One stroke per path segment, plus one per crossing under-axis
-		// segment (see ADR 025) — every segment is an independent solid
-		// stroke, no fill/border layering.
-		const expectedSegments =
-			computePathSegments(maze).length +
-			computeCrossingUnderSegments(maze).length;
-		expect(strokedLines).toBe(expectedSegments);
+		// One stroke per tube edge segment (both edges of every corridor —
+		// see ADR 026) — every segment is an independent solid stroke, no
+		// fill/border layering.
+		expect(strokedLines).toBe(computeTubeSegments(maze).length);
 	});
 
 	it("does not error rendering a 1x1 rectangle-crossing maze, which has no room for a crossing", async () => {

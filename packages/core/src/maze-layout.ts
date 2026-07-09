@@ -59,151 +59,118 @@ export function computeWallSegments(maze: Maze): LineSegment[] {
 	return segments;
 }
 
-function cellCenter(x: number, y: number): { x: number; y: number } {
-	return { x: x + 0.5, y: y + 0.5 };
-}
+/**
+ * Half-width (as a fraction of the cell size) of the "rectangle-crossing"
+ * tube: each corridor is drawn as its two edge lines, offset this much from
+ * the centerline on either side — two independent solid strokes, no
+ * fill/border trick (see ADR 026).
+ */
+export const TUBE_HALF_WIDTH_RATIO = 0.2;
 
-function underAxisAt(
-	maze: Maze,
-	x: number,
-	y: number,
-): "vertical" | "horizontal" | undefined {
+function crossingAt(maze: Maze, x: number, y: number) {
 	return (maze.crossings ?? []).find(
 		(crossing) => crossing.x === x && crossing.y === y,
-	)?.underAxis;
+	);
 }
 
 /**
- * Stroke width (as a fraction of the cell size) for the "rectangle-crossing"
- * path rendering — a single, independent solid line per segment, no fill or
- * border trick (see ADR 025).
- */
-export const PATH_THICKNESS_RATIO = 0.15;
-
-// Half-length (in unit cell coordinates) of the real, geometric gap left in
-// the under-axis line at a crossing — proportional to the line's own
-// thickness so the break is clearly wider than the stroke, with a bit of
-// margin either side.
-const CROSSING_GAP_HALF_LENGTH = PATH_THICKNESS_RATIO + 0.05;
-
-/**
- * Corridor centerline segments in unit cell coordinates, used for the
- * "rectangle-crossing" maze type's path rendering (see ADR 023/025): one
- * segment per open connection between adjacent cells, plus a stub from the
- * entrance/exit cell center out to the boundary opening.
+ * The two edge lines of every corridor in a "rectangle-crossing" maze, in
+ * unit cell coordinates (see ADR 026). Computed per cell as the boundary of
+ * a "hub" (a small square at the cell center, sized `2 * halfWidth`) plus an
+ * "arm" reaching to the cell boundary for each open side — closed sides get
+ * a flat cap across the hub instead. Adjacent cells' arms meet exactly at
+ * the shared cell boundary, so straight runs and turns connect with no gap,
+ * using only simple independent line segments (no stroke-width layering).
  *
- * At a crossing cell, only the *over*-axis connections are included here
- * (drawn as perfectly ordinary, uninterrupted segments) — the *under*-axis
- * connections are excluded; `computeCrossingUnderSegments` draws them
- * instead, with a real geometric gap at the crossing point (see ADR 025).
+ * At a crossing cell, the *over* axis is drawn as two straight lines running
+ * the full width/height of the cell, uninterrupted; the *under* axis's arms
+ * stop at the hub corners without crossing it, leaving a real gap exactly
+ * where the over-axis tube passes.
  */
-export function computePathSegments(maze: Maze): LineSegment[] {
+export function computeTubeSegments(maze: Maze): LineSegment[] {
 	validateMazeShape(maze);
 
+	const h = TUBE_HALF_WIDTH_RATIO;
 	const segments: LineSegment[] = [];
 
 	for (let y = 0; y < maze.height; y++) {
 		for (let x = 0; x < maze.width; x++) {
-			const cell = maze.cells[y][x];
-			const center = cellCenter(x, y);
-			const selfUnderAxis = underAxisAt(maze, x, y);
-
-			if (!cell.walls.south && y < maze.height - 1) {
-				const neighborUnderAxis = underAxisAt(maze, x, y + 1);
-				const isUnderAxis =
-					selfUnderAxis === "vertical" || neighborUnderAxis === "vertical";
-				if (!isUnderAxis) {
-					const neighbor = cellCenter(x, y + 1);
-					segments.push({
-						x1: center.x,
-						y1: center.y,
-						x2: neighbor.x,
-						y2: neighbor.y,
-					});
-				}
-			}
-			if (!cell.walls.east && x < maze.width - 1) {
-				const neighborUnderAxis = underAxisAt(maze, x + 1, y);
-				const isUnderAxis =
-					selfUnderAxis === "horizontal" || neighborUnderAxis === "horizontal";
-				if (!isUnderAxis) {
-					const neighbor = cellCenter(x + 1, y);
-					segments.push({
-						x1: center.x,
-						y1: center.y,
-						x2: neighbor.x,
-						y2: neighbor.y,
-					});
-				}
-			}
+			segments.push(...computeCellTubeSegments(maze, x, y, h));
 		}
 	}
-
-	const entranceCenter = cellCenter(0, 0);
-	segments.push({
-		x1: entranceCenter.x,
-		y1: entranceCenter.y,
-		x2: entranceCenter.x,
-		y2: 0,
-	});
-
-	const exitCenter = cellCenter(maze.width - 1, maze.height - 1);
-	segments.push({
-		x1: exitCenter.x,
-		y1: exitCenter.y,
-		x2: exitCenter.x,
-		y2: maze.height,
-	});
 
 	return segments;
 }
 
-/**
- * The *under*-axis connections at each recorded crossing (see ADR 024): 2
- * segments, each reaching all the way to its real neighbor's center (so the
- * corridor stays fully, visibly connected beyond the crossing), but stopping
- * just short of the crossing's own center — a real, drawn gap rather than a
- * later paint-order trick, sized to clear the line's own thickness (see ADR
- * 025).
- */
-export function computeCrossingUnderSegments(maze: Maze): LineSegment[] {
+function computeCellTubeSegments(
+	maze: Maze,
+	x: number,
+	y: number,
+	h: number,
+): LineSegment[] {
+	const cx = x + 0.5;
+	const cy = y + 0.5;
+	const NW = { x: cx - h, y: cy - h };
+	const NE = { x: cx + h, y: cy - h };
+	const SE = { x: cx + h, y: cy + h };
+	const SW = { x: cx - h, y: cy + h };
+
+	const crossing = crossingAt(maze, x, y);
+	if (crossing) {
+		const overAxis =
+			crossing.underAxis === "vertical" ? "horizontal" : "vertical";
+
+		if (overAxis === "horizontal") {
+			return [
+				{ x1: x, y1: cy - h, x2: x + 1, y2: cy - h },
+				{ x1: x, y1: cy + h, x2: x + 1, y2: cy + h },
+				{ x1: NW.x, y1: NW.y, x2: cx - h, y2: y },
+				{ x1: NE.x, y1: NE.y, x2: cx + h, y2: y },
+				{ x1: SW.x, y1: SW.y, x2: cx - h, y2: y + 1 },
+				{ x1: SE.x, y1: SE.y, x2: cx + h, y2: y + 1 },
+			];
+		}
+		return [
+			{ x1: cx - h, y1: y, x2: cx - h, y2: y + 1 },
+			{ x1: cx + h, y1: y, x2: cx + h, y2: y + 1 },
+			{ x1: NW.x, y1: NW.y, x2: x, y2: cy - h },
+			{ x1: SW.x, y1: SW.y, x2: x, y2: cy + h },
+			{ x1: NE.x, y1: NE.y, x2: x + 1, y2: cy - h },
+			{ x1: SE.x, y1: SE.y, x2: x + 1, y2: cy + h },
+		];
+	}
+
+	const cell = maze.cells[y][x];
+	const isEntrance = x === 0 && y === 0;
+	const isExit = x === maze.width - 1 && y === maze.height - 1;
 	const segments: LineSegment[] = [];
 
-	for (const crossing of maze.crossings ?? []) {
-		const { x, y, underAxis } = crossing;
-		const center = cellCenter(x, y);
+	if (!cell.walls.north || isEntrance) {
+		segments.push({ x1: cx - h, y1: y, x2: NW.x, y2: NW.y });
+		segments.push({ x1: cx + h, y1: y, x2: NE.x, y2: NE.y });
+	} else {
+		segments.push({ x1: NW.x, y1: NW.y, x2: NE.x, y2: NE.y });
+	}
 
-		if (underAxis === "vertical") {
-			const north = cellCenter(x, y - 1);
-			const south = cellCenter(x, y + 1);
-			segments.push({
-				x1: north.x,
-				y1: north.y,
-				x2: center.x,
-				y2: center.y - CROSSING_GAP_HALF_LENGTH,
-			});
-			segments.push({
-				x1: south.x,
-				y1: south.y,
-				x2: center.x,
-				y2: center.y + CROSSING_GAP_HALF_LENGTH,
-			});
-		} else {
-			const east = cellCenter(x + 1, y);
-			const west = cellCenter(x - 1, y);
-			segments.push({
-				x1: east.x,
-				y1: east.y,
-				x2: center.x + CROSSING_GAP_HALF_LENGTH,
-				y2: center.y,
-			});
-			segments.push({
-				x1: west.x,
-				y1: west.y,
-				x2: center.x - CROSSING_GAP_HALF_LENGTH,
-				y2: center.y,
-			});
-		}
+	if (!cell.walls.south || isExit) {
+		segments.push({ x1: SW.x, y1: SW.y, x2: cx - h, y2: y + 1 });
+		segments.push({ x1: SE.x, y1: SE.y, x2: cx + h, y2: y + 1 });
+	} else {
+		segments.push({ x1: SW.x, y1: SW.y, x2: SE.x, y2: SE.y });
+	}
+
+	if (!cell.walls.east) {
+		segments.push({ x1: NE.x, y1: NE.y, x2: x + 1, y2: cy - h });
+		segments.push({ x1: SE.x, y1: SE.y, x2: x + 1, y2: cy + h });
+	} else {
+		segments.push({ x1: NE.x, y1: NE.y, x2: SE.x, y2: SE.y });
+	}
+
+	if (!cell.walls.west) {
+		segments.push({ x1: NW.x, y1: NW.y, x2: x, y2: cy - h });
+		segments.push({ x1: SW.x, y1: SW.y, x2: x, y2: cy + h });
+	} else {
+		segments.push({ x1: NW.x, y1: NW.y, x2: SW.x, y2: SW.y });
 	}
 
 	return segments;

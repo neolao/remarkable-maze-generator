@@ -1,6 +1,6 @@
 ---
 date: 2026-07-09
-status: accepted
+status: superseded by 026
 ---
 # Rectangle-crossing rendering: independent solid strokes, not a hollow-tube border trick
 
