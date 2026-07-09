@@ -4,7 +4,7 @@
 ## Modules
 - [`modules/core.md`](modules/core.md) — shared core (maze generation with a tunable difficulty level, solution path, PDF and SVG rendering sharing a common wall-geometry layer, batch PDF generation, generation-parameters footer, shared solution-mode validation, reMarkable Cloud auth + upload via `rmapi-js`, verified against a real account)
 - [`modules/cli.md`](modules/cli.md) — CLI (Commander) consuming `core` — `generate`, `send`, and combined `generate-and-send` commands implemented, with a `--solution` option on `generate`/`generate-and-send`
-- [`modules/web.md`](modules/web.md) — web server (Fastify) consuming `core` — a maze configuration form with SVG image preview, PDF download, and direct send-to-reMarkable (with guided pairing) all implemented
+- [`modules/web.md`](modules/web.md) — web server (Fastify) consuming `core` — a maze configuration form with SVG image preview, PDF download, and direct send-to-reMarkable (with guided pairing) all implemented, with a dedicated responsive stylesheet applied to the page
 
 ## Observed patterns
 - npm workspaces monorepo (`packages/*`), one `package.json` per package with `private: true`

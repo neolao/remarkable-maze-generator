@@ -1,6 +1,6 @@
 # Module: web
 **Role:** Web server (Fastify) serving the static web UI and a JSON/PDF/SVG/reMarkable API; the static page lets a user configure a maze, see an image preview, download the matching PDF, and send it directly to their reMarkable Cloud account, with a guided one-time pairing step if not already paired (see ADR 020).
-**Files:** `packages/web/src/server.ts`, `packages/web/src/maze-routes.ts`, `packages/web/src/maze-request.ts`, `packages/web/src/maze-form-validation.ts`, `packages/web/src/remarkable-routes.ts`, `packages/web/src/remarkable-credential-store.ts`, `packages/web/public/index.html`, `packages/web/public/app.js`
+**Files:** `packages/web/src/server.ts`, `packages/web/src/maze-routes.ts`, `packages/web/src/maze-request.ts`, `packages/web/src/maze-form-validation.ts`, `packages/web/src/remarkable-routes.ts`, `packages/web/src/remarkable-credential-store.ts`, `packages/web/public/index.html`, `packages/web/public/app.js`, `packages/web/public/style.css`
 **Exports:**
 - `buildServer(options？: BuildServerOptions): FastifyInstance` — wires a file-based `CredentialStore` (shared default path with the CLI) into the reMarkable routes, then registers all routes below.
 - `GET /api/version`
@@ -13,5 +13,6 @@
 - `createFileCredentialStore(filePath): CredentialStore`, `DEFAULT_CREDENTIALS_PATH` (same default path and file format as the CLI's own store — a device paired via either surface is recognized by both, see ADR 020)
 - `validateMazeFormInput(input): MazeFormValidationResult` (tested rules for width/height as positive integers and difficulty 1–5, mirrored by plain JS in `public/app.js` since the static page has no build step — see ADR 018)
 - Static files served from `public/`: a maze configuration form with an inline SVG preview, a "Download PDF" link, and a "Send to reMarkable" button (both shown only after a successful generation); sending shows a guided pairing form (one-time code input) when the browser isn't paired yet, and automatically retries the send once pairing succeeds — see ADR 019 (PDF preview) and ADR 020 (send/pairing)
+- `public/style.css`: dedicated stylesheet giving the page a coherent, responsive design (form, error message, preview, download/send buttons, pairing form), with a mobile breakpoint that stacks form fields into a single column; purely presentational, no change to `app.js` behavior, guarded by `public-page.test.ts` (stylesheet is linked and non-empty, required element ids are preserved, a mobile media query exists, accessibility roles on the error/status messages are preserved)
 
 **Depends on:** [`modules/core.md`](core.md)

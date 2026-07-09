@@ -18,6 +18,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Configure a maze (width, height, difficulty) through a web page form and see an image preview right after submitting, with invalid input caught before any request is sent
 - Download the maze PDF generated through the web page with a dedicated download link
 - Send the maze generated through the web page directly to your reMarkable Cloud account, with a guided one-time pairing step if the browser isn't paired yet (the same pairing already used by the CLI also works here)
+- Enjoy a polished, responsive design on the web maze configuration page, readable on both desktop and mobile screens
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->

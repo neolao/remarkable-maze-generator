@@ -2,49 +2,59 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Remarkable Maze Generator</title>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <h1>Remarkable Maze Generator</h1>
+    <div class="page">
+      <h1>Remarkable Maze Generator</h1>
 
-    <form id="maze-form">
-      <label>
-        Width
-        <input type="number" id="width" name="width" value="10" min="1" step="1" required />
-      </label>
-      <label>
-        Height
-        <input type="number" id="height" name="height" value="10" min="1" step="1" required />
-      </label>
-      <label>
-        Difficulty (1-5)
-        <input type="number" id="difficulty" name="difficulty" value="1" min="1" max="5" step="1" required />
-      </label>
-      <button type="submit">Generate</button>
-    </form>
+      <div class="card">
+        <form id="maze-form">
+          <div class="form-fields">
+            <label class="field">
+              Width
+              <input type="number" id="width" name="width" value="10" min="1" step="1" required />
+            </label>
+            <label class="field">
+              Height
+              <input type="number" id="height" name="height" value="10" min="1" step="1" required />
+            </label>
+            <label class="field">
+              Difficulty (1-5)
+              <input type="number" id="difficulty" name="difficulty" value="1" min="1" max="5" step="1" required />
+            </label>
+          </div>
+          <button type="submit" class="button">Generate</button>
+        </form>
 
-    <p id="form-error" role="alert"></p>
+        <p id="form-error" role="alert"></p>
+      </div>
 
-    <img id="maze-preview" alt="Generated maze preview" style="display: none; max-width: 100%; border: 1px solid #ccc;" />
+      <div class="card preview-card">
+        <img id="maze-preview" alt="Generated maze preview" style="display: none;" />
 
-    <p>
-      <a id="download-link" href="#" download="maze.pdf" style="display: none;">Download PDF</a>
-      <button id="send-button" type="button" style="display: none;">Send to reMarkable</button>
-    </p>
+        <div class="actions">
+          <a id="download-link" class="button" href="#" download="maze.pdf" style="display: none;">Download PDF</a>
+          <button id="send-button" class="button" type="button" style="display: none;">Send to reMarkable</button>
+        </div>
 
-    <p id="send-status" role="status"></p>
+        <p id="send-status" role="status"></p>
 
-    <div id="pairing-section" style="display: none;">
-      <p>
-        Not connected to reMarkable yet. Get a one-time pairing code at
-        <a href="https://my.remarkable.com/device/browser/connect" target="_blank" rel="noopener">my.remarkable.com/device/browser/connect</a>.
-      </p>
-      <label>
-        Pairing code
-        <input type="text" id="pairing-code" name="pairing-code" />
-      </label>
-      <button id="pairing-submit" type="button">Pair device</button>
-      <p id="pairing-error" role="alert"></p>
+        <div id="pairing-section" style="display: none;">
+          <p>
+            Not connected to reMarkable yet. Get a one-time pairing code at
+            <a href="https://my.remarkable.com/device/browser/connect" target="_blank" rel="noopener">my.remarkable.com/device/browser/connect</a>.
+          </p>
+          <label class="field">
+            Pairing code
+            <input type="text" id="pairing-code" name="pairing-code" />
+          </label>
+          <button id="pairing-submit" class="button" type="button">Pair device</button>
+          <p id="pairing-error" role="alert"></p>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="./app.js"></script>
