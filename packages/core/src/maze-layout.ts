@@ -63,9 +63,10 @@ export function computeWallSegments(maze: Maze): LineSegment[] {
  * Half-width (as a fraction of the cell size) of the "rectangle-crossing"
  * tube: each corridor is drawn as its two edge lines, offset this much from
  * the centerline on either side — two independent solid strokes, no
- * fill/border trick (see ADR 026).
+ * fill/border trick (see ADR 026). Above 0.25 the tube occupies more of the
+ * cell than the walls/gaps around it (see ADR 029).
  */
-export const TUBE_HALF_WIDTH_RATIO = 0.2;
+export const TUBE_HALF_WIDTH_RATIO = 0.35;
 
 function crossingAt(maze: Maze, x: number, y: number) {
 	return (maze.crossings ?? []).find(

@@ -306,4 +306,15 @@ describe("computeTubeSegments", () => {
 
 		expect(segments.length).toBeGreaterThan(0);
 	});
+
+	it("makes the tube wider than the non-tube area within a cell", () => {
+		// The tube occupies 2*h of the cell's width along its axis; it takes
+		// more room than the walls/gaps around it once h exceeds a quarter of
+		// the cell size (2*h > 1 - 2*h).
+		expect(TUBE_HALF_WIDTH_RATIO).toBeGreaterThan(0.25);
+	});
+
+	it("keeps the tube narrower than a full cell, leaving a real boundary margin", () => {
+		expect(TUBE_HALF_WIDTH_RATIO).toBeLessThan(0.5);
+	});
 });
