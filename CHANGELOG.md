@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-10
+
+### Changed
+
+- The web server now binds to `127.0.0.1` (loopback only) by default instead of `0.0.0.0`, since it has no authentication layer of its own; set the `HOST` environment variable to allow connections from other machines
+- Solving and rendering large mazes, and mazes with many bridge crossings, is now noticeably faster
+
+### Removed
+
+- Removed the unused batch maze/PDF generation API, which had no consumer in the CLI or the web app
+
+### Fixed
+
+- Fixed a denial-of-service issue where a single maze generation, preview, or send request with very large width/height values could exhaust the server's memory and crash it; maze dimensions are now capped at 200×200
+- Fixed the web page's "Send to reMarkable" and pairing forms sometimes failing silently on a network error, with no visible feedback to the user
+
+### Security
+
+- Added standard HTTP security headers (Content-Security-Policy, X-Frame-Options, and others) to all web server responses
+- Updated the static file-serving dependency to fix two known moderate-severity vulnerabilities
+
 ## [0.7.0] - 2026-07-10
 
 ### Added
@@ -94,7 +115,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
 
-[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.4.0...v0.5.0
