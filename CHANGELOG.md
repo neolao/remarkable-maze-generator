@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-10
+
 ### Added
 
 - Users can now choose the maze generation algorithm — growing tree (the previous default, unchanged), Kruskal, Wilson, or Aldous-Broder — via a new "Generation algorithm" option on the web configuration form and a new `--algorithm` option on the command line; the "bridge crossing" maze type still requires the growing tree algorithm and is rejected with a clear message for the other three
@@ -79,7 +81,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
 
-[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.2.0...v0.3.0
