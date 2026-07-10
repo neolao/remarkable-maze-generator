@@ -18,6 +18,7 @@ const REQUIRED_ELEMENT_IDS = [
 	"show-solution",
 	"form-error",
 	"maze-preview",
+	"maze-seed",
 	"solution-branch-count",
 	"download-link",
 	"send-button",

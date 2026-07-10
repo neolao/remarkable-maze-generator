@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The reMarkable target folder entered on the web configuration form is now remembered across visits, just like the other form fields, instead of being cleared every time
 - The web server now logs an explicit message before shutting down (on Ctrl+C, a stop signal, or an unexpected internal error), instead of sometimes disappearing silently with just a bare "Terminated" in the terminal
+- The maze sent to reMarkable now always matches the one shown in the web preview and available for PDF download, instead of sometimes being a different maze generated with a different random seed; the preview now also displays its seed so it can be confirmed at a glance
 
 ## [0.6.0] - 2026-07-10
 

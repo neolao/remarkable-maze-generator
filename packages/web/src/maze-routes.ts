@@ -1,4 +1,5 @@
 import {
+	type Maze,
 	findSolutionBranchPoints,
 	renderMazeToPdf,
 	renderMazeToSvg,
@@ -42,10 +43,11 @@ function handleGenerateMazePreview(
 ) {
 	const showSolution = request.body?.showSolution === true;
 
+	let maze: Maze;
 	let svg: string;
 	let branchPointCount: number | undefined;
 	try {
-		const maze = buildMazeFromRequest(request.body ?? {});
+		maze = buildMazeFromRequest(request.body ?? {});
 		svg = renderMazeToSvg(maze, { showSolution });
 		if (showSolution) branchPointCount = findSolutionBranchPoints(maze).length;
 	} catch (error) {
@@ -54,6 +56,7 @@ function handleGenerateMazePreview(
 	}
 
 	reply.header("content-type", "image/svg+xml");
+	reply.header("x-maze-seed", maze.seed);
 	if (branchPointCount !== undefined) {
 		reply.header("x-solution-branch-point-count", branchPointCount);
 	}

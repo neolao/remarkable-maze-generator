@@ -407,4 +407,39 @@ describe("POST /api/mazes/preview", () => {
 		expect(response.json()).toEqual({ error: expect.any(String) });
 		expect(response.headers["x-solution-branch-point-count"]).toBeUndefined();
 	});
+
+	it("reports the seed that was actually used to generate the maze when a seed is provided", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 5, height: 5, seed: 42 },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.headers["x-maze-seed"]).toBe("42");
+	});
+
+	it("reports the randomly resolved seed when no seed is provided, so callers can reuse it later", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 5, height: 5 },
+		});
+
+		expect(response.statusCode).toBe(200);
+		const reportedSeed = Number(response.headers["x-maze-seed"]);
+		expect(Number.isInteger(reportedSeed)).toBe(true);
+
+		const secondResponse = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 5, height: 5, seed: reportedSeed },
+		});
+
+		expect(secondResponse.body).toBe(response.body);
+	});
 });

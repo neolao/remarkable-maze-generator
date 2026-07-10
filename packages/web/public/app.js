@@ -149,6 +149,7 @@ function initMazeForm() {
 	const form = document.getElementById("maze-form");
 	const errorElement = document.getElementById("form-error");
 	const previewElement = document.getElementById("maze-preview");
+	const mazeSeedElement = document.getElementById("maze-seed");
 	const solutionBranchCountElement = document.getElementById(
 		"solution-branch-count",
 	);
@@ -199,6 +200,7 @@ function initMazeForm() {
 
 	const hidePreview = () => {
 		previewElement.style.display = "none";
+		mazeSeedElement.textContent = "";
 		solutionBranchCountElement.textContent = "";
 		downloadLink.style.display = "none";
 		remarkableFolderField.style.display = "none";
@@ -315,6 +317,22 @@ function initMazeForm() {
 		previewElement.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
 		previewElement.style.display = "block";
 
+		// The preview may resolve a random seed server-side when none was
+		// requested; reusing it below keeps the download and the send to
+		// reMarkable identical to what is shown in the preview.
+		const seed = Number(previewResponse.headers.get("x-maze-seed"));
+		mazeSeedElement.textContent = `Seed: ${seed}`;
+		const seededRequestBody = JSON.stringify({
+			...result.value,
+			seed,
+			showSolution: form["show-solution"].checked,
+		});
+		const seededRequestInit = {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: seededRequestBody,
+		};
+
 		const branchPointCount = previewResponse.headers.get(
 			"x-solution-branch-point-count",
 		);
@@ -323,13 +341,13 @@ function initMazeForm() {
 				? ""
 				: `Branch points on solution path: ${branchPointCount}`;
 
-		lastMazeRequestBody = requestBody;
+		lastMazeRequestBody = seededRequestBody;
 		remarkableFolderField.style.display = "block";
 		sendButton.style.display = "inline";
 		sendStatus.textContent = "";
 		pairingSection.style.display = "none";
 
-		const pdfResponse = await fetch("/api/mazes/generate", requestInit);
+		const pdfResponse = await fetch("/api/mazes/generate", seededRequestInit);
 
 		if (!pdfResponse.ok) {
 			downloadLink.style.display = "none";
