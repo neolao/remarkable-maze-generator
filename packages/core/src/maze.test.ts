@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { totalNodeCount as totalCircleNodeCount } from "./circle-maze/cells.js";
 import { countReachableNodes as countCircleReachableNodes } from "./circle-maze/test-helpers.js";
+import { solveMaze } from "./maze-solver.js";
 import {
 	MAZE_ALGORITHMS,
 	MAZE_TYPES,
+	PATH_LENGTH_MAX_ATTEMPTS,
+	PATH_LENGTH_TARGETS,
 	generateMaze,
 	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
+	invalidPathLengthTargetMessage,
 	isValidMazeAlgorithm,
 	isValidMazeType,
+	isValidPathLengthTarget,
 } from "./maze.js";
 
 function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
@@ -871,5 +876,179 @@ describe("generateMaze - circle type", () => {
 		});
 
 		expect(second.circleCells).toEqual(first.circleCells);
+	});
+});
+
+describe("PATH_LENGTH_TARGETS / isValidPathLengthTarget / invalidPathLengthTargetMessage", () => {
+	it("lists short, medium and long as the valid path length targets", () => {
+		expect(PATH_LENGTH_TARGETS).toEqual(["short", "medium", "long"]);
+	});
+
+	it.each(PATH_LENGTH_TARGETS)(
+		"accepts %s as a valid path length target",
+		(target) => {
+			expect(isValidPathLengthTarget(target)).toBe(true);
+		},
+	);
+
+	it("rejects an unknown path length target", () => {
+		expect(isValidPathLengthTarget("extra-long")).toBe(false);
+	});
+
+	it("describes the allowed values in the invalid path length target message", () => {
+		expect(invalidPathLengthTargetMessage("extra-long")).toBe(
+			'Invalid path length target "extra-long", expected one of: short, medium, long',
+		);
+	});
+});
+
+describe("generateMaze - pathLength option", () => {
+	it("performs a single-seed generation exactly as before when pathLength is not specified", () => {
+		const withOption = generateMaze({ width: 8, height: 6, seed: 42 });
+		const withoutMentioningIt = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 42,
+			pathLength: undefined,
+		});
+
+		expect(withOption.seed).toBe(42);
+		expect(withOption.pathLength).toBeUndefined();
+		expect(withoutMentioningIt).toEqual(withOption);
+	});
+
+	it("rejects an invalid pathLength value", () => {
+		expect(() =>
+			generateMaze({
+				width: 5,
+				height: 5,
+				seed: 1,
+				// biome-ignore lint/suspicious/noExplicitAny: deliberately passing an invalid target to test validation
+				pathLength: "extra-long" as any,
+			}),
+		).toThrow();
+	});
+
+	it("selects the candidate with the longest solution path among the attempted seeds when pathLength is 'long'", () => {
+		const width = 10;
+		const height = 10;
+		const seed = 100;
+		const difficulty = 3;
+
+		const attempts = Array.from({ length: PATH_LENGTH_MAX_ATTEMPTS }, (_, i) =>
+			generateMaze({ width, height, seed: seed + i, difficulty }),
+		);
+		const lengths = attempts.map((candidate) => solveMaze(candidate).length);
+		const expectedWinner = attempts[lengths.indexOf(Math.max(...lengths))];
+
+		const result = generateMaze({
+			width,
+			height,
+			seed,
+			difficulty,
+			pathLength: "long",
+		});
+
+		expect(result.seed).toBe(expectedWinner.seed);
+		expect(solveMaze(result).length).toBe(Math.max(...lengths));
+	});
+
+	it("selects the candidate with the shortest solution path among the attempted seeds when pathLength is 'short'", () => {
+		const width = 10;
+		const height = 10;
+		const seed = 100;
+		const difficulty = 3;
+
+		const attempts = Array.from({ length: PATH_LENGTH_MAX_ATTEMPTS }, (_, i) =>
+			generateMaze({ width, height, seed: seed + i, difficulty }),
+		);
+		const lengths = attempts.map((candidate) => solveMaze(candidate).length);
+		const expectedWinner = attempts[lengths.indexOf(Math.min(...lengths))];
+
+		const result = generateMaze({
+			width,
+			height,
+			seed,
+			difficulty,
+			pathLength: "short",
+		});
+
+		expect(result.seed).toBe(expectedWinner.seed);
+		expect(solveMaze(result).length).toBe(Math.min(...lengths));
+	});
+
+	it("selects the candidate closest to the median solution length among the attempted seeds when pathLength is 'medium'", () => {
+		const width = 10;
+		const height = 10;
+		const seed = 100;
+		const difficulty = 3;
+
+		const attempts = Array.from({ length: PATH_LENGTH_MAX_ATTEMPTS }, (_, i) =>
+			generateMaze({ width, height, seed: seed + i, difficulty }),
+		);
+		const lengths = attempts.map((candidate) => solveMaze(candidate).length);
+		const sorted = [...lengths].sort((a, b) => a - b);
+		const median = sorted[Math.floor((sorted.length - 1) / 2)];
+		const expectedWinnerIndex = lengths.reduce(
+			(bestIndex, length, index) =>
+				Math.abs(length - median) < Math.abs(lengths[bestIndex] - median)
+					? index
+					: bestIndex,
+			0,
+		);
+		const expectedWinner = attempts[expectedWinnerIndex];
+
+		const result = generateMaze({
+			width,
+			height,
+			seed,
+			difficulty,
+			pathLength: "medium",
+		});
+
+		expect(result.seed).toBe(expectedWinner.seed);
+	});
+
+	it("generates the same maze for the same seed and pathLength target", () => {
+		const first = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 7,
+			pathLength: "short",
+		});
+		const second = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 7,
+			pathLength: "short",
+		});
+
+		expect(second).toEqual(first);
+	});
+
+	it("does not throw and still returns a solvable maze on a tiny grid with little variation between candidates", () => {
+		const maze = generateMaze({
+			width: 2,
+			height: 2,
+			seed: 1,
+			pathLength: "long",
+		});
+
+		expect(maze.width).toBe(2);
+		expect(maze.height).toBe(2);
+		expect(solveMaze(maze).length).toBeGreaterThan(0);
+	});
+
+	it("also works for the circle maze type", () => {
+		const result = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			type: "circle",
+			pathLength: "long",
+		});
+
+		expect(result.type).toBe("circle");
+		expect(solveMaze(result).length).toBeGreaterThan(0);
 	});
 });

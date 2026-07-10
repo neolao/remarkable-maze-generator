@@ -4,6 +4,7 @@ import { generateAldousBroderMaze } from "./maze-algorithms/aldous-broder.js";
 import { generateGrowingTreeMaze } from "./maze-algorithms/growing-tree.js";
 import { generateKruskalMaze } from "./maze-algorithms/kruskal.js";
 import { generateWilsonMaze } from "./maze-algorithms/wilson.js";
+import { solveMaze } from "./maze-solver.js";
 
 export interface CellWalls {
 	north: boolean;
@@ -64,6 +65,29 @@ export function invalidMazeAlgorithmMessage(value: string): string {
 	return `Invalid maze algorithm "${value}", expected one of: ${MAZE_ALGORITHMS.join(", ")}`;
 }
 
+export type PathLengthTarget = "short" | "medium" | "long";
+
+export const PATH_LENGTH_TARGETS: PathLengthTarget[] = [
+	"short",
+	"medium",
+	"long",
+];
+
+export function isValidPathLengthTarget(
+	value: string,
+): value is PathLengthTarget {
+	return (PATH_LENGTH_TARGETS as string[]).includes(value);
+}
+
+export function invalidPathLengthTargetMessage(value: string): string {
+	return `Invalid path length target "${value}", expected one of: ${PATH_LENGTH_TARGETS.join(", ")}`;
+}
+
+// Bounds the number of candidate generations tried when `pathLength` is set
+// (see ADR 046), trading match quality for a predictable worst-case
+// generation time.
+export const PATH_LENGTH_MAX_ATTEMPTS = 10;
+
 export interface Maze {
 	width: number;
 	height: number;
@@ -82,6 +106,7 @@ export interface Maze {
 	 */
 	circleSectorCounts?: number[];
 	circleCells?: CircleCell[][];
+	pathLength?: PathLengthTarget;
 }
 
 export interface GenerateMazeOptions {
@@ -91,6 +116,7 @@ export interface GenerateMazeOptions {
 	difficulty?: number;
 	type?: MazeType;
 	algorithm?: MazeAlgorithm;
+	pathLength?: PathLengthTarget;
 }
 
 const MIN_DIFFICULTY = 1;
@@ -139,6 +165,12 @@ function validateAlgorithm(algorithm: MazeAlgorithm): void {
 	}
 }
 
+function validatePathLengthTarget(pathLength: PathLengthTarget): void {
+	if (!isValidPathLengthTarget(pathLength)) {
+		throw new Error(invalidPathLengthTargetMessage(pathLength));
+	}
+}
+
 // Bridge crossings are carved as part of the growing-tree traversal itself
 // (see ADR 024) — no other algorithm knows how to produce them (see ADR 033).
 function validateTypeAlgorithmCompatibility(
@@ -181,20 +213,23 @@ function generateCells(
 	}
 }
 
-export function generateMaze({
+interface GenerateCandidateOptions {
+	width: number;
+	height: number;
+	seed: number;
+	difficulty: number;
+	type: MazeType;
+	algorithm: MazeAlgorithm;
+}
+
+function generateMazeCandidate({
 	width,
 	height,
 	seed,
-	difficulty = MIN_DIFFICULTY,
-	type = DEFAULT_MAZE_TYPE,
-	algorithm = DEFAULT_MAZE_ALGORITHM,
-}: GenerateMazeOptions): Maze {
-	validateDimensions(width, height);
-	validateDifficulty(difficulty);
-	validateType(type);
-	validateAlgorithm(algorithm);
-	validateTypeAlgorithmCompatibility(type, algorithm);
-
+	difficulty,
+	type,
+	algorithm,
+}: GenerateCandidateOptions): Maze {
 	if (type === "circle") {
 		const { sectorCounts, cells: circleCells } = generateCircleMaze({
 			width,
@@ -236,4 +271,79 @@ export function generateMaze({
 		algorithm,
 		crossings: allowsCrossings ? crossings : undefined,
 	};
+}
+
+// Ranks candidates by their solution path length (see ADR 046): "short" and
+// "long" pick the extremes, "medium" picks whichever candidate lands closest
+// to the (lower) median — ties keep the earliest-generated candidate, so
+// selection stays deterministic for a given base seed.
+function selectCandidateByPathLength(
+	candidates: Maze[],
+	pathLength: PathLengthTarget,
+): Maze {
+	const lengths = candidates.map((candidate) => solveMaze(candidate).length);
+
+	if (pathLength === "short") {
+		return candidates[lengths.indexOf(Math.min(...lengths))];
+	}
+
+	if (pathLength === "long") {
+		return candidates[lengths.indexOf(Math.max(...lengths))];
+	}
+
+	const sortedLengths = [...lengths].sort((a, b) => a - b);
+	const median = sortedLengths[Math.floor((sortedLengths.length - 1) / 2)];
+	const winnerIndex = lengths.reduce(
+		(bestIndex, length, index) =>
+			Math.abs(length - median) < Math.abs(lengths[bestIndex] - median)
+				? index
+				: bestIndex,
+		0,
+	);
+
+	return candidates[winnerIndex];
+}
+
+export function generateMaze({
+	width,
+	height,
+	seed,
+	difficulty = MIN_DIFFICULTY,
+	type = DEFAULT_MAZE_TYPE,
+	algorithm = DEFAULT_MAZE_ALGORITHM,
+	pathLength,
+}: GenerateMazeOptions): Maze {
+	validateDimensions(width, height);
+	validateDifficulty(difficulty);
+	validateType(type);
+	validateAlgorithm(algorithm);
+	validateTypeAlgorithmCompatibility(type, algorithm);
+
+	if (pathLength === undefined) {
+		return generateMazeCandidate({
+			width,
+			height,
+			seed,
+			difficulty,
+			type,
+			algorithm,
+		});
+	}
+
+	validatePathLengthTarget(pathLength);
+
+	const candidates = Array.from(
+		{ length: PATH_LENGTH_MAX_ATTEMPTS },
+		(_, attempt) =>
+			generateMazeCandidate({
+				width,
+				height,
+				seed: seed + attempt,
+				difficulty,
+				type,
+				algorithm,
+			}),
+	);
+
+	return { ...selectCandidateByPathLength(candidates, pathLength), pathLength };
 }

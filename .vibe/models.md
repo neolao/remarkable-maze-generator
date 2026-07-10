@@ -13,6 +13,7 @@
 | crossings | MazeCrossing[] | optional; cells where a corridor tunnels through another's straight passage, only populated for `type: "rectangle-crossing"` — both axes are real, walkable connections, see ADR 024 |
 | circleSectorCounts | number[] | optional; only set for `type: "circle"` — the number of sectors in each ring, ring 0 (innermost) first, see ADR 037 |
 | circleCells | CircleCell[][] | optional; only set for `type: "circle"` — `circleCells[ring][sector]`, a variable number of sectors per ring so it doesn't fit the rectangular `cells` grid above, see ADR 037 |
+| pathLength | PathLengthTarget | optional; only set when a path-length target was requested — the category that was matched, not itself a generation parameter (see ADR 046) |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeType
@@ -21,6 +22,10 @@ Defined in: `packages/core/src/maze.ts`
 
 ## MazeAlgorithm
 String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); all 4 algorithms support `type: "circle"` too, reimplemented against its growing-sector graph (see ADR 037). See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
+Defined in: `packages/core/src/maze.ts`
+
+## PathLengthTarget
+String literal union: `"short" | "medium" | "long"`. When passed to `generateMaze()`, up to `PATH_LENGTH_MAX_ATTEMPTS` (10) candidate mazes are generated from incrementing seeds (`seed`, `seed + 1`, …) and the one whose solution length (via `solveMaze()`) best matches the target is returned — shortest/longest for `"short"`/`"long"`, closest to the (lower) median for `"medium"`; ties keep the earliest-generated candidate. Leaving it unset performs a single-seed generation, unchanged from before. See `PATH_LENGTH_TARGETS`, `isValidPathLengthTarget()`, `invalidPathLengthTargetMessage()` (ADR 046).
 Defined in: `packages/core/src/maze.ts`
 
 ## CircleCell
@@ -62,6 +67,7 @@ Defined in: `packages/core/src/maze.ts`
 | difficulty | number | optional integer 1–5, defaults to 1 (easiest); controls branch-point density, see ADR 015 |
 | type | MazeType | optional, defaults to `"rectangle"`, see ADR 022 |
 | algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; rejected if combined with `type: "rectangle-crossing"` and anything other than `"growing-tree"`, see ADR 033 |
+| pathLength | PathLengthTarget | optional; when set, triggers the multi-candidate seed search described under `PathLengthTarget` instead of a single-seed generation, see ADR 046 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazePosition
@@ -144,7 +150,10 @@ Defined in: `packages/core/src/remarkable-upload.ts`
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
 | difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
-| type | string | optional, `"rectangle"` or `"rectangle-crossing"`, defaults to `"rectangle"` (see ADR 022) |
+| type | string | optional, `"rectangle"`, `"rectangle-crossing"`, or `"circle"`, defaults to `"rectangle"` (see ADR 022, ADR 037) |
+| algorithm | string | optional, `"growing-tree"`, `"kruskal"`, `"wilson"`, or `"aldous-broder"`, defaults to `"growing-tree"` (see ADR 033) |
+| solution | string | optional, `"none"`, `"extra-page"`, or `"overlay"`, defaults to `"none"` (see ADR 021) |
+| pathLength | string | optional, `"short"`, `"medium"`, or `"long"`; defaults to unset (no path-length filtering), see ADR 046 |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 Defined in: `packages/cli/src/generate.ts`
@@ -166,7 +175,21 @@ Defined in: `packages/cli/src/send.ts`
 | height | string | raw form field value, parsed as a positive integer |
 | difficulty | string | raw form field value, parsed as an integer 1–5 |
 | type | string | optional raw form field value, defaults to `"rectangle"` when blank, validated via `core`'s `isValidMazeType` (see ADR 022) |
+| algorithm | string | optional raw form field value, defaults to `"growing-tree"` when blank, validated via `core`'s `isValidMazeAlgorithm` (see ADR 033) |
 | solution | string | optional raw form field value, defaults to `"none"` when blank, validated via `core`'s `isValidSolutionMode` (see ADR 021; backlog item 019) |
+| pathLength | string | optional raw form field value; left unset when blank (no default), validated via `core`'s `isValidPathLengthTarget` (see ADR 046) |
+Defined in: `packages/web/src/maze-form-validation.ts`
+
+## MazeFormValue (web)
+| Field | Type | Notes |
+|---|---|---|
+| width | number | |
+| height | number | |
+| difficulty | number | |
+| type | MazeType | resolved, always set |
+| algorithm | MazeAlgorithm | resolved, always set |
+| solution | SolutionDisplayMode | resolved, always set |
+| pathLength | PathLengthTarget | optional; only set when the form field wasn't blank — no default, unlike the other fields (see ADR 046) |
 Defined in: `packages/web/src/maze-form-validation.ts`
 
 ## MazeFormValidationResult (web)
@@ -183,6 +206,8 @@ Defined in: `packages/web/src/maze-form-validation.ts`
 | algorithm | string | raw form field value |
 | solution | string | raw form field value |
 | showSolution | boolean | "Show solution on preview" checkbox state |
+| folder | string | raw "reMarkable folder" field value, `""` when left blank (see ADR 043) |
+| pathLength | string | raw "Path length" field value, `""` when left at "None" (see ADR 046) |
 Round-tripped through a single cookie (`serializeFormPreferences`/`parseFormPreferences`); parsing rejects any value with a missing or wrong-typed field, returning `null` rather than a partial object (see ADR 042).
 Defined in: `packages/web/src/form-preferences.ts`
 
@@ -199,7 +224,10 @@ Defined in: `packages/web/src/server.ts`
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
 | difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
-| type | string | optional, `"rectangle"` or `"rectangle-crossing"`, defaults to `"rectangle"` (see ADR 022) |
+| type | string | optional, `"rectangle"`, `"rectangle-crossing"`, or `"circle"`, defaults to `"rectangle"` (see ADR 022, ADR 037) |
+| algorithm | string | optional, `"growing-tree"`, `"kruskal"`, `"wilson"`, or `"aldous-broder"`, defaults to `"growing-tree"` (see ADR 033) |
+| solution | string | optional, `"none"`, `"extra-page"`, or `"overlay"`, defaults to `"none"` (see ADR 021) |
+| pathLength | string | optional, `"short"`, `"medium"`, or `"long"`; defaults to unset (no path-length filtering), see ADR 046 |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 | visibleName | string | optional, defaults to `rectangle-<width>x<height>-<seed>` (see ADR 014) |

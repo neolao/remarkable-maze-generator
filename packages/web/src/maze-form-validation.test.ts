@@ -291,4 +291,44 @@ describe("validateMazeFormInput", () => {
 			error: expect.stringMatching(/prim/),
 		});
 	});
+
+	it("leaves pathLength unset when not provided, behaving exactly as before", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+		});
+
+		expect(result.valid).toBe(true);
+		expect(result.valid && result.value.pathLength).toBeUndefined();
+	});
+
+	it.each(["short", "medium", "long"])(
+		"accepts %s as a valid pathLength target",
+		(pathLength) => {
+			const result = validateMazeFormInput({
+				width: "10",
+				height: "8",
+				difficulty: "3",
+				pathLength,
+			});
+
+			expect(result.valid).toBe(true);
+			expect(result.valid && result.value.pathLength).toBe(pathLength);
+		},
+	);
+
+	it("rejects an unknown pathLength value with a clear message", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			pathLength: "extra-long",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/extra-long/),
+		});
+	});
 });

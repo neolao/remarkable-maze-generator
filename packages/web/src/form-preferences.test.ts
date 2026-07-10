@@ -14,6 +14,7 @@ const SAMPLE_PREFERENCES = {
 	solution: "overlay",
 	showSolution: true,
 	folder: "Maze Archive",
+	pathLength: "long",
 };
 
 describe("form preferences cookie name", () => {
@@ -36,6 +37,12 @@ describe("serializeFormPreferences / parseFormPreferences round trip", () => {
 
 	it("round-trips an empty folder value correctly", () => {
 		const preferences = { ...SAMPLE_PREFERENCES, folder: "" };
+		const serialized = serializeFormPreferences(preferences);
+		expect(parseFormPreferences(serialized)).toEqual(preferences);
+	});
+
+	it("round-trips an empty pathLength value correctly", () => {
+		const preferences = { ...SAMPLE_PREFERENCES, pathLength: "" };
 		const serialized = serializeFormPreferences(preferences);
 		expect(parseFormPreferences(serialized)).toEqual(preferences);
 	});
@@ -67,6 +74,12 @@ describe("parseFormPreferences edge cases", () => {
 
 	it("returns null for a cookie written before the folder field existed", () => {
 		const { folder, ...rest } = SAMPLE_PREFERENCES;
+		const serialized = encodeURIComponent(JSON.stringify(rest));
+		expect(parseFormPreferences(serialized)).toBeNull();
+	});
+
+	it("returns null for a cookie written before the pathLength field existed", () => {
+		const { pathLength, ...rest } = SAMPLE_PREFERENCES;
 		const serialized = encodeURIComponent(JSON.stringify(rest));
 		expect(parseFormPreferences(serialized)).toBeNull();
 	});

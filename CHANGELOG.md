@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Users can now request a shorter or longer maze solution path via a new "Path length" option (none, short, medium, or long), available both on the web configuration form and as a new `--path-length` option on the command line's `generate` and `generate-and-send` commands; the generator tries several random seeds and keeps the maze that best matches the requested length
+
 ## [0.8.0] - 2026-07-10
 
 ### Changed

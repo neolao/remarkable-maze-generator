@@ -15,6 +15,7 @@ const REQUIRED_ELEMENT_IDS = [
 	"maze-type",
 	"maze-algorithm",
 	"solution-mode",
+	"path-length",
 	"show-solution",
 	"form-error",
 	"maze-preview",
@@ -104,5 +105,18 @@ describe("public maze configuration page", () => {
 		expect(optionsMarkup).toContain('value="kruskal"');
 		expect(optionsMarkup).toContain('value="wilson"');
 		expect(optionsMarkup).toContain('value="aldous-broder"');
+	});
+
+	it("exposes the path length target as a select defaulting to no filtering", () => {
+		const match = html.match(
+			/<select[^>]+id="path-length"[^>]*>([\s\S]*?)<\/select>/,
+		);
+		expect(match).not.toBeNull();
+
+		const optionsMarkup = match?.[1] ?? "";
+		expect(optionsMarkup).toContain('value=""');
+		expect(optionsMarkup).toContain('value="short"');
+		expect(optionsMarkup).toContain('value="medium"');
+		expect(optionsMarkup).toContain('value="long"');
 	});
 });

@@ -36,6 +36,10 @@ program
 		"--solution <mode>",
 		"solution display mode: none, extra-page, or overlay (defaults to none)",
 	)
+	.option(
+		"--path-length <target>",
+		"request a shorter or longer solution path: short, medium, or long (defaults to unset, no path-length filtering)",
+	)
 	.action(
 		async (opts: {
 			width: string;
@@ -45,6 +49,7 @@ program
 			type?: string;
 			algorithm?: string;
 			solution?: string;
+			pathLength?: string;
 			output?: string;
 		}) => {
 			try {
@@ -67,6 +72,7 @@ program
 					type: opts.type,
 					algorithm: opts.algorithm,
 					solution: opts.solution,
+					pathLength: opts.pathLength,
 					output: opts.output,
 				});
 				console.log(`Maze written to ${outputPath}`);
@@ -140,6 +146,10 @@ program
 		"--solution <mode>",
 		"solution display mode: none, extra-page, or overlay (defaults to none)",
 	)
+	.option(
+		"--path-length <target>",
+		"request a shorter or longer solution path: short, medium, or long (defaults to unset, no path-length filtering)",
+	)
 	.action(
 		async (opts: {
 			width: string;
@@ -152,6 +162,7 @@ program
 			type?: string;
 			algorithm?: string;
 			solution?: string;
+			pathLength?: string;
 		}) => {
 			try {
 				const width = parseIntegerOption(opts.width, "--width");
@@ -173,6 +184,7 @@ program
 					type: opts.type,
 					algorithm: opts.algorithm,
 					solution: opts.solution,
+					pathLength: opts.pathLength,
 					output: opts.output,
 					visibleName: opts.visibleName,
 					folder: opts.folder,

@@ -2,6 +2,7 @@ import {
 	type Maze,
 	type MazeAlgorithm,
 	type MazeType,
+	type PathLengthTarget,
 	generateMaze,
 	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
@@ -28,11 +29,12 @@ export interface GenerateMazeRequestBody {
 	type?: string;
 	algorithm?: string;
 	solution?: string;
+	pathLength?: string;
 	showSolution?: boolean;
 }
 
 export function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {
-	const { width, height, seed, difficulty, type, algorithm } = body;
+	const { width, height, seed, difficulty, type, algorithm, pathLength } = body;
 	return generateMaze({
 		width: width as number,
 		height: height as number,
@@ -40,5 +42,6 @@ export function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {
 		difficulty,
 		type: type as MazeType | undefined,
 		algorithm: algorithm as MazeAlgorithm | undefined,
+		pathLength: pathLength as PathLengthTarget | undefined,
 	});
 }

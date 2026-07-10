@@ -229,6 +229,39 @@ describe("POST /api/mazes/generate", () => {
 			error: expect.stringMatching(/rectangle-crossing.*growing-tree/),
 		});
 	});
+
+	it("accepts the long pathLength target, producing a different maze than without it", async () => {
+		const app = buildServer();
+
+		const withoutOption = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 12, height: 12, seed: 3 },
+		});
+		const withOption = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 12, height: 12, seed: 3, pathLength: "long" },
+		});
+
+		expect(withOption.statusCode).toBe(200);
+		expect(withOption.rawPayload).not.toEqual(withoutOption.rawPayload);
+	});
+
+	it("returns 400 with a clear message when the pathLength target is invalid", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 5, height: 5, pathLength: "extra-long" },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/extra-long/),
+		});
+	});
 });
 
 describe("POST /api/mazes/preview", () => {
@@ -353,6 +386,39 @@ describe("POST /api/mazes/preview", () => {
 		expect(crossingResponse.statusCode).toBe(200);
 		expect(crossingResponse.body.startsWith("<svg")).toBe(true);
 		expect(crossingResponse.body).not.toBe(rectangleResponse.body);
+	});
+
+	it("accepts the long pathLength target on the preview endpoint too", async () => {
+		const app = buildServer();
+
+		const withoutOption = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 12, height: 12, seed: 3 },
+		});
+		const withOption = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 12, height: 12, seed: 3, pathLength: "long" },
+		});
+
+		expect(withOption.statusCode).toBe(200);
+		expect(withOption.body).not.toBe(withoutOption.body);
+	});
+
+	it("returns 400 with a clear message when the pathLength target is invalid on the preview endpoint", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 5, height: 5, pathLength: "extra-long" },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/extra-long/),
+		});
 	});
 
 	it("returns 400 with a clear message when the maze type is invalid", async () => {

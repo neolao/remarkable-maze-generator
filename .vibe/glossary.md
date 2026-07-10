@@ -50,6 +50,11 @@
 **Code:** `MazeAlgorithm`, `MAZE_ALGORITHMS`, `algorithm` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 033); each algorithm implemented in its own module under `packages/core/src/maze-algorithms/`
 **Do not confuse with:** Maze type, Difficulty
 
+## Path length target
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `PathLengthTarget`, `PATH_LENGTH_TARGETS`, `pathLength` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 046)
+**Do not confuse with:** Difficulty (difficulty tunes branch-point density during generation; path length target instead selects, after the fact, among several full generations, whichever one's solution length best matches)
+
 ## Ring
 **Definition:** [what this concept means in the domain — fill in]
 **Code:** `ring` index, `CircleNode`, `sectorCounts` in `packages/core/src/circle-maze/` (see ADR 037)

@@ -10,6 +10,8 @@ const DEFAULT_MAZE_ALGORITHM = "growing-tree";
 const SOLUTION_MODES = ["none", "extra-page", "overlay"];
 const DEFAULT_SOLUTION_MODE = "none";
 
+const PATH_LENGTH_TARGETS = ["short", "medium", "long"];
+
 const FORM_PREFERENCES_COOKIE_NAME = "maze-form-preferences";
 const FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
@@ -25,7 +27,8 @@ function isMazeFormPreferences(value) {
 		typeof value.algorithm === "string" &&
 		typeof value.solution === "string" &&
 		typeof value.showSolution === "boolean" &&
-		typeof value.folder === "string"
+		typeof value.folder === "string" &&
+		typeof value.pathLength === "string"
 	);
 }
 
@@ -72,6 +75,7 @@ function validateMazeFormInput({
 	type,
 	algorithm,
 	solution,
+	pathLength,
 }) {
 	const parsePositiveInteger = (raw, fieldLabel) => {
 		if (raw.trim() === "" || !/^-?\d+$/.test(raw.trim())) {
@@ -132,6 +136,19 @@ function validateMazeFormInput({
 		};
 	}
 
+	// Unlike type/algorithm/solution, an unset pathLength has no default to
+	// fall back to: it means "no path-length filtering" (see ADR 046).
+	const resolvedPathLength = pathLength?.trim() || undefined;
+	if (
+		resolvedPathLength !== undefined &&
+		!PATH_LENGTH_TARGETS.includes(resolvedPathLength)
+	) {
+		return {
+			valid: false,
+			error: `Invalid path length target "${resolvedPathLength}", expected one of: ${PATH_LENGTH_TARGETS.join(", ")}`,
+		};
+	}
+
 	return {
 		valid: true,
 		value: {
@@ -141,6 +158,7 @@ function validateMazeFormInput({
 			type: resolvedType,
 			algorithm: resolvedAlgorithm,
 			solution: resolvedSolution,
+			pathLength: resolvedPathLength,
 		},
 	};
 }
@@ -154,6 +172,7 @@ function initMazeForm() {
 		"solution-branch-count",
 	);
 	const downloadLink = document.getElementById("download-link");
+	const pathLengthSelect = document.getElementById("path-length");
 	const remarkableFolderField = document.getElementById(
 		"remarkable-folder-field",
 	);
@@ -179,6 +198,7 @@ function initMazeForm() {
 				solution: form["solution-mode"].value,
 				showSolution: form["show-solution"].checked,
 				folder: remarkableFolderInput.value.trim(),
+				pathLength: pathLengthSelect.value,
 			}),
 			FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS,
 		);
@@ -196,6 +216,7 @@ function initMazeForm() {
 		form["solution-mode"].value = storedPreferences.solution;
 		form["show-solution"].checked = storedPreferences.showSolution;
 		remarkableFolderInput.value = storedPreferences.folder;
+		pathLengthSelect.value = storedPreferences.pathLength;
 	}
 
 	const hidePreview = () => {
@@ -293,6 +314,7 @@ function initMazeForm() {
 			type: form["maze-type"].value,
 			algorithm: form["maze-algorithm"].value,
 			solution: form["solution-mode"].value,
+			pathLength: pathLengthSelect.value,
 		});
 
 		if (!result.valid) {
@@ -331,9 +353,14 @@ function initMazeForm() {
 		// reMarkable identical to what is shown in the preview.
 		const seed = Number(previewResponse.headers.get("x-maze-seed"));
 		mazeSeedElement.textContent = `Seed: ${seed}`;
+		// pathLength has already done its job resolving `seed` above (see
+		// ADR 046) — dropping it here keeps the PDF download and the
+		// reMarkable upload pinned to that exact seed instead of re-running
+		// the candidate search from it as a new base.
 		const seededRequestBody = JSON.stringify({
 			...result.value,
 			seed,
+			pathLength: undefined,
 			showSolution: form["show-solution"].checked,
 		});
 		const seededRequestInit = {

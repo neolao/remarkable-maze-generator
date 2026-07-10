@@ -3,13 +3,16 @@ import { resolve } from "node:path";
 import {
 	type MazeAlgorithm,
 	type MazeType,
+	type PathLengthTarget,
 	type SolutionDisplayMode,
 	generateMaze,
 	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
+	invalidPathLengthTargetMessage,
 	invalidSolutionModeMessage,
 	isValidMazeAlgorithm,
 	isValidMazeType,
+	isValidPathLengthTarget,
 	isValidSolutionMode,
 	renderMazeToPdf,
 } from "@remarkable-maze-generator/core";
@@ -24,6 +27,7 @@ export interface GenerateOptions {
 	type?: string;
 	algorithm?: string;
 	solution?: string;
+	pathLength?: string;
 	output?: string;
 	cwd?: string;
 }
@@ -54,6 +58,12 @@ export async function runGenerate(
 	) {
 		throw new Error(invalidMazeAlgorithmMessage(options.algorithm));
 	}
+	if (
+		options.pathLength !== undefined &&
+		!isValidPathLengthTarget(options.pathLength)
+	) {
+		throw new Error(invalidPathLengthTargetMessage(options.pathLength));
+	}
 
 	const maze = generateMaze({
 		width: options.width,
@@ -62,6 +72,7 @@ export async function runGenerate(
 		difficulty: options.difficulty,
 		type: options.type as MazeType | undefined,
 		algorithm: options.algorithm as MazeAlgorithm | undefined,
+		pathLength: options.pathLength as PathLengthTarget | undefined,
 	});
 	const pdfBytes = await renderMazeToPdf(maze, {
 		solution: options.solution as SolutionDisplayMode | undefined,

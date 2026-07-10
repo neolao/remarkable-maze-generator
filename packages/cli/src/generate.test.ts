@@ -335,4 +335,64 @@ describe("runGenerate", () => {
 			}),
 		).rejects.toThrow(/rectangle-crossing.*growing-tree/);
 	});
+
+	it("keeps producing the exact same maze when pathLength is omitted", async () => {
+		const withoutOption = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			output: join(workDir, "without-path-length.pdf"),
+			cwd: workDir,
+		});
+		const withUndefined = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			pathLength: undefined,
+			output: join(workDir, "with-undefined-path-length.pdf"),
+			cwd: workDir,
+		});
+
+		const [withoutBytes, withBytes] = await Promise.all([
+			readFile(withoutOption.outputPath),
+			readFile(withUndefined.outputPath),
+		]);
+		expect(withoutBytes).toEqual(withBytes);
+	});
+
+	it("forwards the pathLength option, producing a different maze than without it", async () => {
+		const withoutOption = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			output: join(workDir, "without-path-length.pdf"),
+			cwd: workDir,
+		});
+		const long = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			pathLength: "long",
+			output: join(workDir, "long.pdf"),
+			cwd: workDir,
+		});
+
+		const [withoutBytes, longBytes] = await Promise.all([
+			readFile(withoutOption.outputPath),
+			readFile(long.outputPath),
+		]);
+		expect(longBytes).not.toEqual(withoutBytes);
+	});
+
+	it("rejects an invalid pathLength value with a clear error", async () => {
+		await expect(
+			runGenerate({
+				width: 5,
+				height: 5,
+				seed: 1,
+				pathLength: "extra-long",
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/extra-long/);
+	});
 });
