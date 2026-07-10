@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - The reMarkable target folder entered on the web configuration form is now remembered across visits, just like the other form fields, instead of being cleared every time
+- The web server now logs an explicit message before shutting down (on Ctrl+C, a stop signal, or an unexpected internal error), instead of sometimes disappearing silently with just a bare "Terminated" in the terminal
 
 ## [0.6.0] - 2026-07-10
 

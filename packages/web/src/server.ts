@@ -4,6 +4,7 @@ import fastifyStatic from "@fastify/static";
 import { CORE_VERSION } from "@remarkable-maze-generator/core";
 import Fastify from "fastify";
 import { registerMazeRoutes } from "./maze-routes.js";
+import { registerProcessLifecycleHandlers } from "./process-lifecycle.js";
 import {
 	DEFAULT_CREDENTIALS_PATH,
 	createFileCredentialStore,
@@ -47,5 +48,6 @@ export function buildServer(options: BuildServerOptions = {}) {
 
 if (process.env.NODE_ENV !== "test") {
 	const app = buildServer();
+	registerProcessLifecycleHandlers(app);
 	app.listen({ port: resolvePort(), host: "0.0.0.0" });
 }
