@@ -5,6 +5,7 @@ import {
 	TUBE_HALF_WIDTH_RATIO,
 	computeCellCenter,
 	computeCircleDiameter,
+	computeCircleInnerRadius,
 	computeCircleSegments,
 	computeTubeSegments,
 	computeWallSegments,
@@ -552,12 +553,45 @@ describe("computeTubeSegments", () => {
 	});
 });
 
+describe("computeCircleInnerRadius", () => {
+	it("stays at the minimum ratio when there are few enough sectors", () => {
+		const maze = generateMaze({ width: 4, height: 5, seed: 1, type: "circle" });
+
+		expect(computeCircleInnerRadius(maze)).toBe(CIRCLE_INNER_RADIUS_RATIO);
+	});
+
+	it("grows past the minimum ratio once enough sectors would otherwise pinch the innermost passage", () => {
+		const maze = generateMaze({
+			width: 32,
+			height: 5,
+			seed: 1,
+			type: "circle",
+		});
+
+		expect(computeCircleInnerRadius(maze)).toBeGreaterThan(
+			CIRCLE_INNER_RADIUS_RATIO,
+		);
+	});
+
+	it("keeps the innermost ring's tangential passage width at least as wide as its radial thickness (1 unit)", () => {
+		for (const width of [4, 8, 16, 32, 64]) {
+			const maze = generateMaze({ width, height: 5, seed: 1, type: "circle" });
+			const angleStep = (2 * Math.PI) / width;
+
+			const innermostTangentialWidth =
+				computeCircleInnerRadius(maze) * angleStep;
+
+			expect(innermostTangentialWidth).toBeGreaterThanOrEqual(1 - 1e-9);
+		}
+	});
+});
+
 describe("computeCircleDiameter", () => {
 	it("grows with the number of rings, twice the inner radius plus the ring count", () => {
 		const maze = generateMaze({ width: 8, height: 5, seed: 1, type: "circle" });
 
 		expect(computeCircleDiameter(maze)).toBe(
-			2 * (CIRCLE_INNER_RADIUS_RATIO + 5),
+			2 * (computeCircleInnerRadius(maze) + 5),
 		);
 	});
 });
@@ -700,7 +734,7 @@ describe("computeCellCenter", () => {
 		const point = computeCellCenter(maze, { x: 3, y: 2 });
 		const distance = Math.hypot(point.x - center, point.y - center);
 
-		expect(distance).toBeCloseTo(CIRCLE_INNER_RADIUS_RATIO + 2 + 0.5, 9);
+		expect(distance).toBeCloseTo(computeCircleInnerRadius(maze) + 2 + 0.5, 9);
 	});
 
 	it("places different sectors of the same ring at different angles (not all on top of each other)", () => {

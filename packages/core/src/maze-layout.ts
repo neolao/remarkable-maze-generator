@@ -75,14 +75,28 @@ export function computeWallSegments(maze: Maze): LineSegment[] {
 }
 
 /**
- * Radius (in ring-width units, i.e. the same unit as one cell) of the hole at
- * the very center of a "circle" maze — ring `y`'s inner edge sits at
- * `CIRCLE_INNER_RADIUS_RATIO + y`, its outer edge at
- * `CIRCLE_INNER_RADIUS_RATIO + y + 1` (see ADR 034). A plain `0` would put
- * every sector's inner corner at the exact same point, which is both visually
- * cluttered and geometrically degenerate for the entrance opening.
+ * Minimum radius (in ring-width units, i.e. the same unit as one cell) of the
+ * hole at the very center of a "circle" maze. A plain `0` would put every
+ * sector's inner corner at the exact same point, which is both visually
+ * cluttered and geometrically degenerate for the entrance opening — see
+ * `computeCircleInnerRadius` for the actual (usually larger) radius used.
  */
 export const CIRCLE_INNER_RADIUS_RATIO = 1;
+
+/**
+ * The actual inner radius used for a given maze: at least
+ * `CIRCLE_INNER_RADIUS_RATIO`, but grown as needed so the innermost ring's
+ * passage is at least as wide (tangentially, `radius * angleStep`) as a
+ * ring's own radial thickness (1 unit). Without this, a maze with many
+ * sectors would pinch its passages down to needle-thin wedges near the
+ * center while the outermost ring stayed comfortably wide — the sector angle
+ * shrinks the available tangential space at any fixed radius, and that space
+ * only grows in from there, never back out (see ADR 034 follow-up).
+ */
+export function computeCircleInnerRadius(maze: Maze): number {
+	const angleStep = (2 * Math.PI) / maze.width;
+	return Math.max(CIRCLE_INNER_RADIUS_RATIO, 1 / angleStep);
+}
 
 /**
  * Side length (in unit cell coordinates) of the square bounding box a
@@ -92,7 +106,7 @@ export const CIRCLE_INNER_RADIUS_RATIO = 1;
  * types.
  */
 export function computeCircleDiameter(maze: Maze): number {
-	return 2 * (CIRCLE_INNER_RADIUS_RATIO + maze.height);
+	return 2 * (computeCircleInnerRadius(maze) + maze.height);
 }
 
 function circlePoint(maze: Maze, radius: number, angle: number): Point {
@@ -146,10 +160,11 @@ export function computeCircleSegments(maze: Maze): TubeSegment[] {
 
 	const segments: TubeSegment[] = [];
 	const angleStep = (2 * Math.PI) / maze.width;
+	const innerRadiusBase = computeCircleInnerRadius(maze);
 
 	for (let y = 0; y < maze.height; y++) {
-		const innerRadius = CIRCLE_INNER_RADIUS_RATIO + y;
-		const outerRadius = CIRCLE_INNER_RADIUS_RATIO + y + 1;
+		const innerRadius = innerRadiusBase + y;
+		const outerRadius = innerRadiusBase + y + 1;
 
 		for (let x = 0; x < maze.width; x++) {
 			const cell = maze.cells[y][x];
@@ -194,7 +209,7 @@ export function computeCellCenter(
 
 	const angleStep = (2 * Math.PI) / maze.width;
 	const angle = (position.x + 0.5) * angleStep;
-	const radius = CIRCLE_INNER_RADIUS_RATIO + position.y + 0.5;
+	const radius = computeCircleInnerRadius(maze) + position.y + 0.5;
 	return circlePoint(maze, radius, angle);
 }
 
