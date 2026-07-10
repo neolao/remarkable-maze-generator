@@ -24,7 +24,8 @@ function isMazeFormPreferences(value) {
 		typeof value.type === "string" &&
 		typeof value.algorithm === "string" &&
 		typeof value.solution === "string" &&
-		typeof value.showSolution === "boolean"
+		typeof value.showSolution === "boolean" &&
+		typeof value.folder === "string"
 	);
 }
 
@@ -165,6 +166,23 @@ function initMazeForm() {
 
 	let lastMazeRequestBody = null;
 
+	const persistFormPreferences = () => {
+		writeCookie(
+			FORM_PREFERENCES_COOKIE_NAME,
+			serializeFormPreferences({
+				width: form.width.value,
+				height: form.height.value,
+				difficulty: form.difficulty.value,
+				type: form["maze-type"].value,
+				algorithm: form["maze-algorithm"].value,
+				solution: form["solution-mode"].value,
+				showSolution: form["show-solution"].checked,
+				folder: remarkableFolderInput.value.trim(),
+			}),
+			FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS,
+		);
+	};
+
 	const storedPreferences = parseFormPreferences(
 		readCookie(FORM_PREFERENCES_COOKIE_NAME),
 	);
@@ -176,6 +194,7 @@ function initMazeForm() {
 		form["maze-algorithm"].value = storedPreferences.algorithm;
 		form["solution-mode"].value = storedPreferences.solution;
 		form["show-solution"].checked = storedPreferences.showSolution;
+		remarkableFolderInput.value = storedPreferences.folder;
 	}
 
 	const hidePreview = () => {
@@ -194,6 +213,7 @@ function initMazeForm() {
 		pairingSection.style.display = "none";
 
 		const folder = remarkableFolderInput.value.trim();
+		persistFormPreferences();
 		const sendRequestBody = JSON.stringify({
 			...JSON.parse(lastMazeRequestBody),
 			folder: folder === "" ? undefined : folder,
@@ -270,19 +290,7 @@ function initMazeForm() {
 			return;
 		}
 
-		writeCookie(
-			FORM_PREFERENCES_COOKIE_NAME,
-			serializeFormPreferences({
-				width: form.width.value,
-				height: form.height.value,
-				difficulty: form.difficulty.value,
-				type: form["maze-type"].value,
-				algorithm: form["maze-algorithm"].value,
-				solution: form["solution-mode"].value,
-				showSolution: form["show-solution"].checked,
-			}),
-			FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS,
-		);
+		persistFormPreferences();
 
 		const requestBody = JSON.stringify({
 			...result.value,
