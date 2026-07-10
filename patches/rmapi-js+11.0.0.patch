@@ -1,0 +1,10 @@
+diff --git a/node_modules/rmapi-js/dist/raw.js b/node_modules/rmapi-js/dist/raw.js
+index 123ea2a..c5c7bc4 100644
+--- a/node_modules/rmapi-js/dist/raw.js
++++ b/node_modules/rmapi-js/dist/raw.js
+@@ -1,4 +1,4 @@
+-import CRC32C from "crc-32/crc32c";
++import CRC32C from "crc-32/crc32c.js";
+ import { z } from "zod";
+ import { ValidationError } from "./error.js";
+ import { concatArrays } from "./utils.js";

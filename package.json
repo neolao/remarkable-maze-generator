@@ -11,12 +11,16 @@
 		"test": "vitest run",
 		"lint": "biome check --write .",
 		"build": "npm run build --workspaces --if-present",
-		"cli": "npm run start --workspace packages/cli",
-		"web": "npm run dev --workspace packages/web"
+		"postinstall": "patch-package",
+		"dev:cli": "npm run start --workspace packages/cli --",
+		"start:cli": "npm run start:prod --workspace packages/cli --",
+		"dev:web": "npm run dev --workspace packages/web",
+		"start:web": "npm run start --workspace packages/web"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@types/node": "^26.1.0",
+		"patch-package": "^8.0.1",
 		"typescript": "^5.7.3",
 		"vitest": "^3.0.5"
 	}

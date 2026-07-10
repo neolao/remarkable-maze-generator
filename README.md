@@ -39,10 +39,12 @@ The project is an npm workspaces monorepo: `npm install` installs dependencies f
 <!-- vibe:end:install -->
 
 <!-- vibe:begin:usage -->
+### Command line
+
 Generate a maze PDF from the command line:
 
 ```bash
-npm run start --workspace packages/cli -- generate --width 20 --height 15
+npm run dev:cli -- generate --width 20 --height 15
 ```
 
 Or, using the `generate.sh` shortcut at the repository root:
@@ -56,7 +58,7 @@ Options: `--width` and `--height` (required, number of cells — for the `circle
 Upload a local PDF file to your reMarkable Cloud account:
 
 ```bash
-npm run start --workspace packages/cli -- send maze.pdf
+npm run dev:cli -- send maze.pdf
 ```
 
 Or, using the `send.sh` shortcut at the repository root:
@@ -70,7 +72,7 @@ The first time, you'll be prompted for a one-time pairing code (get one at https
 Generate a maze PDF and upload it to your reMarkable Cloud account in a single command:
 
 ```bash
-npm run start --workspace packages/cli -- generate-and-send --width 20 --height 15
+npm run dev:cli -- generate-and-send --width 20 --height 15
 ```
 
 Or, using the `generate-and-send.sh` shortcut at the repository root:
@@ -84,16 +86,35 @@ Accepts the same `--width`, `--height`, `--seed`, `--difficulty`, `--type`, `--a
 See the CLI's built-in help:
 
 ```bash
-npm run start --workspace packages/cli -- --help
+npm run dev:cli -- --help
 ```
+
+### Web server
 
 Run the web server (development mode, auto-reload):
 
 ```bash
-npm run web
+npm run dev:web
 ```
 
 Then open http://localhost:3000 in a browser to configure a maze (width, height, difficulty, maze type — Rectangle, Rectangle crossing, or Circle — and generation algorithm — Growing tree, Kruskal, Wilson, or Aldous-Broder) through the form, see an image preview, download the generated PDF, or send it straight to your reMarkable Cloud account with the "Send to reMarkable" button. The form remembers your last-used settings — including the "reMarkable folder" field — in a cookie and pre-fills them automatically the next time you visit. Choose a "Solution in PDF" mode (none, extra page, or overlay) to control whether the downloaded/sent PDF includes the solution, the same choice available on the command line. Check "Show solution on preview" to trace the solution path on the preview image itself, with a circle on every branch point and the total branch point count shown below it — a separate option from the PDF solution mode. Optionally fill in the "reMarkable folder" field first to upload into a specific, already-existing folder instead of the account root. The first time, a one-time pairing code is requested (get one at https://my.remarkable.com/device/browser/connect); it's remembered afterwards, the same way as the CLI's `send` command.
+
+### Production
+
+Build once (or again after changing the code):
+
+```bash
+npm run build
+```
+
+Then start the web server or the CLI as many times as you want, instantly, without rebuilding:
+
+```bash
+npm run start:web
+npm run start:cli -- generate --width 20 --height 15
+```
+
+### Tests and code style
 
 Run the tests:
 
