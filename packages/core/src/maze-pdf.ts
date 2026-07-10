@@ -296,12 +296,6 @@ async function createEmptyDocument(): Promise<PDFDocument> {
 	return document;
 }
 
-function validateBatch(mazes: Maze[]): void {
-	if (mazes.length === 0) {
-		throw new Error("Cannot render a maze batch with zero mazes");
-	}
-}
-
 export async function renderMazeToPdf(
 	maze: Maze,
 	options: RenderMazeToPdfOptions = {},
@@ -310,27 +304,4 @@ export async function renderMazeToPdf(
 	const font = await document.embedFont(StandardFonts.Helvetica);
 	addMazePages(document, font, maze, options);
 	return document.save();
-}
-
-export async function renderMazeBatchToPdf(
-	mazes: Maze[],
-	options: RenderMazeToPdfOptions = {},
-): Promise<Uint8Array> {
-	validateBatch(mazes);
-
-	const document = await createEmptyDocument();
-	const font = await document.embedFont(StandardFonts.Helvetica);
-	for (const maze of mazes) {
-		addMazePages(document, font, maze, options);
-	}
-	return document.save();
-}
-
-export async function renderMazeBatchToPdfs(
-	mazes: Maze[],
-	options: RenderMazeToPdfOptions = {},
-): Promise<Uint8Array[]> {
-	validateBatch(mazes);
-
-	return Promise.all(mazes.map((maze) => renderMazeToPdf(maze, options)));
 }

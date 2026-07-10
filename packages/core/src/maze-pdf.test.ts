@@ -12,11 +12,9 @@ import {
 	SOLUTION_MODES,
 	invalidSolutionModeMessage,
 	isValidSolutionMode,
-	renderMazeBatchToPdf,
-	renderMazeBatchToPdfs,
 	renderMazeToPdf,
 } from "./maze-pdf.js";
-import { generateMaze, generateMazeBatch } from "./maze.js";
+import { generateMaze } from "./maze.js";
 import type { Maze } from "./maze.js";
 
 function countStrokedLines(pdfBytes: Uint8Array): number {
@@ -300,69 +298,6 @@ describe("renderMazeToPdf", () => {
 	});
 });
 
-describe("renderMazeBatchToPdf", () => {
-	it("combines N mazes into a single PDF with one page per maze", async () => {
-		const mazes = generateMazeBatch({
-			width: 6,
-			height: 6,
-			seed: 10,
-			count: 4,
-		});
-		const pdfBytes = await renderMazeBatchToPdf(mazes);
-
-		const doc = await PDFDocument.load(pdfBytes);
-		expect(doc.getPageCount()).toBe(4);
-	});
-
-	it("produces a batch of 1 identical to the single-maze renderer", async () => {
-		const maze = generateMaze({ width: 6, height: 6, seed: 5 });
-
-		const batchBytes = await renderMazeBatchToPdf([maze]);
-		const singleBytes = await renderMazeToPdf(maze);
-
-		expect(Buffer.from(batchBytes)).toEqual(Buffer.from(singleBytes));
-	});
-
-	it("reflects a different maze in the resulting PDF bytes", async () => {
-		const [mazeA] = generateMazeBatch({
-			width: 6,
-			height: 6,
-			seed: 20,
-			count: 2,
-		});
-		const mazeB = generateMaze({ width: 6, height: 6, seed: 999 });
-
-		const original = await renderMazeBatchToPdf([mazeA, mazeA]);
-		const changed = await renderMazeBatchToPdf([mazeA, mazeB]);
-
-		expect(Buffer.from(changed)).not.toEqual(Buffer.from(original));
-	});
-
-	it("applies the solution option to every page in the batch", async () => {
-		const mazes = generateMazeBatch({
-			width: 6,
-			height: 6,
-			seed: 30,
-			count: 2,
-		});
-
-		const withoutSolution = await renderMazeBatchToPdf(mazes);
-		const withExtraPages = await renderMazeBatchToPdf(mazes, {
-			solution: "extra-page",
-		});
-
-		const doc = await PDFDocument.load(withExtraPages);
-		expect(doc.getPageCount()).toBe(4);
-		expect(Buffer.from(withExtraPages)).not.toEqual(
-			Buffer.from(withoutSolution),
-		);
-	});
-
-	it("rejects an empty batch instead of producing an empty PDF", async () => {
-		await expect(renderMazeBatchToPdf([])).rejects.toThrow();
-	});
-});
-
 describe("isValidSolutionMode", () => {
 	it.each(SOLUTION_MODES)("accepts %j as a valid solution mode", (mode) => {
 		expect(isValidSolutionMode(mode)).toBe(true);
@@ -385,55 +320,6 @@ describe("invalidSolutionModeMessage", () => {
 		for (const mode of SOLUTION_MODES) {
 			expect(message).toContain(mode);
 		}
-	});
-});
-
-describe("renderMazeBatchToPdfs", () => {
-	it("returns one separate valid PDF per maze", async () => {
-		const mazes = generateMazeBatch({
-			width: 6,
-			height: 6,
-			seed: 40,
-			count: 3,
-		});
-		const pdfs = await renderMazeBatchToPdfs(mazes);
-
-		expect(pdfs).toHaveLength(3);
-		for (const pdfBytes of pdfs) {
-			const header = Buffer.from(pdfBytes.slice(0, 5)).toString("ascii");
-			expect(header).toBe("%PDF-");
-			const doc = await PDFDocument.load(pdfBytes);
-			expect(doc.getPageCount()).toBe(1);
-		}
-	});
-
-	it("produces a batch of 1 identical to the single-maze renderer", async () => {
-		const maze = generateMaze({ width: 6, height: 6, seed: 55 });
-
-		const [batchPdf] = await renderMazeBatchToPdfs([maze]);
-		const singlePdf = await renderMazeToPdf(maze);
-
-		expect(Buffer.from(batchPdf)).toEqual(Buffer.from(singlePdf));
-	});
-
-	it("applies the solution option to every separate PDF", async () => {
-		const mazes = generateMazeBatch({
-			width: 6,
-			height: 6,
-			seed: 60,
-			count: 2,
-		});
-
-		const pdfs = await renderMazeBatchToPdfs(mazes, { solution: "extra-page" });
-
-		for (const pdfBytes of pdfs) {
-			const doc = await PDFDocument.load(pdfBytes);
-			expect(doc.getPageCount()).toBe(2);
-		}
-	});
-
-	it("rejects an empty batch instead of returning an empty array", async () => {
-		await expect(renderMazeBatchToPdfs([])).rejects.toThrow();
 	});
 });
 

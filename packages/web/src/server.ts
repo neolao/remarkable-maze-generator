@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fastifyHelmet from "@fastify/helmet";
 import fastifyStatic from "@fastify/static";
 import { CORE_VERSION } from "@remarkable-maze-generator/core";
 import Fastify from "fastify";
@@ -18,6 +19,7 @@ export interface BuildServerOptions {
 }
 
 const DEFAULT_PORT = 3001;
+const DEFAULT_HOST = "127.0.0.1";
 
 export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
 	const raw = env.PORT;
@@ -29,11 +31,25 @@ export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
 	return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
 }
 
+export function resolveHost(env: NodeJS.ProcessEnv = process.env): string {
+	return env.HOST || DEFAULT_HOST;
+}
+
 export function buildServer(options: BuildServerOptions = {}) {
 	const app = Fastify({ logger: true });
 	const store = createFileCredentialStore(
 		options.credentialsPath ?? DEFAULT_CREDENTIALS_PATH,
 	);
+
+	app.register(fastifyHelmet, {
+		contentSecurityPolicy: {
+			directives: {
+				defaultSrc: ["'self'"],
+				scriptSrc: ["'self'"],
+				imgSrc: ["'self'", "data:"],
+			},
+		},
+	});
 
 	app.register(fastifyStatic, {
 		root: path.join(__dirname, "../public"),
@@ -49,5 +65,5 @@ export function buildServer(options: BuildServerOptions = {}) {
 if (process.env.NODE_ENV !== "test") {
 	const app = buildServer();
 	registerProcessLifecycleHandlers(app);
-	app.listen({ port: resolvePort(), host: "0.0.0.0" });
+	app.listen({ port: resolvePort(), host: resolveHost() });
 }

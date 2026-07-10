@@ -27,7 +27,7 @@
 
 ## Difficulty
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `difficulty` field of `GenerateMazeOptions` / `GenerateMazeBatchOptions`, integer 1–5, in `packages/core/src/maze.ts` (see ADR 015)
+**Code:** `difficulty` field of `GenerateMazeOptions`, integer 1–5, in `packages/core/src/maze.ts` (see ADR 015)
 **Do not confuse with:** —
 
 ## Maze type

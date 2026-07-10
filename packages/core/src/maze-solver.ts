@@ -25,15 +25,25 @@ function nodeKey(node: Node): string {
 	return `${node.x},${node.y},${node.axis}`;
 }
 
-function isCrossingCell(maze: Maze, x: number, y: number): boolean {
-	return (maze.crossings ?? []).some(
-		(crossing) => crossing.x === x && crossing.y === y,
+function crossingCellKey(x: number, y: number): string {
+	return `${x},${y}`;
+}
+
+function buildCrossingCellSet(maze: Maze): Set<string> {
+	return new Set(
+		(maze.crossings ?? []).map((crossing) =>
+			crossingCellKey(crossing.x, crossing.y),
+		),
 	);
 }
 
-function getOpenMoves(maze: Maze, node: Node): Node[] {
+function getOpenMoves(
+	maze: Maze,
+	node: Node,
+	crossingCells: Set<string>,
+): Node[] {
 	const cell = maze.cells[node.y][node.x];
-	const cellIsCrossing = isCrossingCell(maze, node.x, node.y);
+	const cellIsCrossing = crossingCells.has(crossingCellKey(node.x, node.y));
 	const moves: Node[] = [];
 
 	const tryMove = (open: boolean, dx: number, dy: number, axis: Axis) => {
@@ -44,7 +54,7 @@ function getOpenMoves(maze: Maze, node: Node): Node[] {
 		moves.push({
 			x,
 			y,
-			axis: isCrossingCell(maze, x, y) ? axis : "",
+			axis: crossingCells.has(crossingCellKey(x, y)) ? axis : "",
 		});
 	};
 
@@ -82,16 +92,18 @@ function solvePathNodes(maze: Maze): Node[] {
 	const cameFrom = new Map<string, Node>();
 	const visited = new Set<string>([nodeKey(start)]);
 	const queue: Node[] = [start];
+	let head = 0;
+	const crossingCells = buildCrossingCellSet(maze);
 
-	while (queue.length > 0) {
-		const current = queue.shift();
-		if (!current) break;
+	while (head < queue.length) {
+		const current = queue[head];
+		head++;
 
 		if (current.x === exitX && current.y === exitY) {
 			return reconstructPath(cameFrom, start, current);
 		}
 
-		for (const neighbor of getOpenMoves(maze, current)) {
+		for (const neighbor of getOpenMoves(maze, current, crossingCells)) {
 			const key = nodeKey(neighbor);
 			if (visited.has(key)) continue;
 			visited.add(key);
@@ -132,10 +144,11 @@ export function findSolutionBranchPoints(maze: Maze): MazePosition[] {
 	}
 
 	const nodes = solvePathNodes(maze);
+	const crossingCells = buildCrossingCellSet(maze);
 	const branchPoints: MazePosition[] = [];
 
 	for (let i = 1; i < nodes.length - 1; i++) {
-		if (getOpenMoves(maze, nodes[i]).length > 2) {
+		if (getOpenMoves(maze, nodes[i], crossingCells).length > 2) {
 			branchPoints.push({ x: nodes[i].x, y: nodes[i].y });
 		}
 	}

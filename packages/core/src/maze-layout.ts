@@ -1,4 +1,4 @@
-import type { Maze } from "./maze.js";
+import type { Maze, MazeCrossing } from "./maze.js";
 
 export interface LineSegment {
 	x1: number;
@@ -102,10 +102,16 @@ export const TUBE_HALF_WIDTH_RATIO = 0.35;
  */
 export const TUBE_CORNER_RADIUS_RATIO = 0.08;
 
-function crossingAt(maze: Maze, x: number, y: number) {
-	return (maze.crossings ?? []).find(
-		(crossing) => crossing.x === x && crossing.y === y,
-	);
+function crossingKey(x: number, y: number): string {
+	return `${x},${y}`;
+}
+
+function buildCrossingLookup(maze: Maze): Map<string, MazeCrossing> {
+	const lookup = new Map<string, MazeCrossing>();
+	for (const crossing of maze.crossings ?? []) {
+		lookup.set(crossingKey(crossing.x, crossing.y), crossing);
+	}
+	return lookup;
 }
 
 interface Point {
@@ -181,10 +187,11 @@ export function computeTubeSegments(maze: Maze): TubeSegment[] {
 
 	const h = TUBE_HALF_WIDTH_RATIO;
 	const segments: TubeSegment[] = [];
+	const crossingLookup = buildCrossingLookup(maze);
 
 	for (let y = 0; y < maze.height; y++) {
 		for (let x = 0; x < maze.width; x++) {
-			segments.push(...computeCellTubeSegments(maze, x, y, h));
+			segments.push(...computeCellTubeSegments(maze, x, y, h, crossingLookup));
 		}
 	}
 
@@ -196,6 +203,7 @@ function computeCellTubeSegments(
 	x: number,
 	y: number,
 	h: number,
+	crossingLookup: Map<string, MazeCrossing>,
 ): TubeSegment[] {
 	const cx = x + 0.5;
 	const cy = y + 0.5;
@@ -204,7 +212,7 @@ function computeCellTubeSegments(
 	const SE = { x: cx + h, y: cy + h };
 	const SW = { x: cx - h, y: cy + h };
 
-	const crossing = crossingAt(maze, x, y);
+	const crossing = crossingLookup.get(crossingKey(x, y));
 	if (crossing) {
 		const overAxis =
 			crossing.underAxis === "vertical" ? "horizontal" : "vertical";

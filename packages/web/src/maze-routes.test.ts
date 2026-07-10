@@ -1,6 +1,21 @@
+import { inflateSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildServer } from "./server.js";
+
+// Straight maze walls are drawn with pdf-lib's drawLine(), which emits one
+// "S" (stroke) content-stream operator per line — the PDF equivalent of one
+// SVG <line> element for the same maze layout.
+function countPdfStrokedLines(pdfBytes: Uint8Array): number {
+	const text = Buffer.from(pdfBytes).toString("latin1");
+	const streamMatch = text.match(/stream\r?\n([\s\S]*?)endstream/);
+	if (!streamMatch) throw new Error("No content stream found in PDF");
+
+	const compressed = Buffer.from(streamMatch[1], "latin1");
+	const content = inflateSync(compressed).toString("latin1");
+
+	return (content.match(/^S$/gm) || []).length;
+}
 
 describe("POST /api/mazes/generate", () => {
 	it("returns a valid PDF for valid parameters", async () => {
@@ -298,16 +313,27 @@ describe("POST /api/mazes/preview", () => {
 
 	it("produces the same maze layout as /api/mazes/generate for the same parameters", async () => {
 		const app = buildServer();
+		const payload = { width: 6, height: 6, seed: 99, difficulty: 2 };
 
 		const previewResponse = await app.inject({
 			method: "POST",
 			url: "/api/mazes/preview",
-			payload: { width: 6, height: 6, seed: 99, difficulty: 2 },
+			payload,
+		});
+		const generateResponse = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload,
 		});
 
 		expect(previewResponse.statusCode).toBe(200);
-		const lineCount = (previewResponse.body.match(/<line /g) || []).length;
-		expect(lineCount).toBeGreaterThan(0);
+		expect(generateResponse.statusCode).toBe(200);
+
+		const svgLineCount = (previewResponse.body.match(/<line /g) || []).length;
+		const pdfLineCount = countPdfStrokedLines(generateResponse.rawPayload);
+
+		expect(svgLineCount).toBeGreaterThan(0);
+		expect(svgLineCount).toBe(pdfLineCount);
 	});
 
 	it("accepts the rectangle-crossing maze type and renders it distinctly from the classic type", async () => {

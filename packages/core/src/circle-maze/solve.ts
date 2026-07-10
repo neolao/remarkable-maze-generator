@@ -83,10 +83,11 @@ function solvePathNodes(maze: CircleMazeLike): CircleMazePosition[] {
 	const cameFrom = new Map<string, CircleMazePosition>();
 	const visited = new Set<string>([nodeKey(start)]);
 	const queue: CircleMazePosition[] = [start];
+	let head = 0;
 
-	while (queue.length > 0) {
-		const current = queue.shift();
-		if (!current) break;
+	while (head < queue.length) {
+		const current = queue[head];
+		head++;
 
 		if (current.ring === exit.ring && current.sector === exit.sector) {
 			return reconstructPath(cameFrom, start, current);

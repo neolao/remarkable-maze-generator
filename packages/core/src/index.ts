@@ -5,7 +5,6 @@ export const CORE_VERSION = pkg.version;
 export type {
 	Cell,
 	CellWalls,
-	GenerateMazeBatchOptions,
 	GenerateMazeOptions,
 	Maze,
 	MazeAlgorithm,
@@ -16,7 +15,6 @@ export {
 	MAZE_ALGORITHMS,
 	MAZE_TYPES,
 	generateMaze,
-	generateMazeBatch,
 	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
 	isValidMazeAlgorithm,
@@ -34,8 +32,6 @@ export {
 	SOLUTION_MODES,
 	invalidSolutionModeMessage,
 	isValidSolutionMode,
-	renderMazeBatchToPdf,
-	renderMazeBatchToPdfs,
 	renderMazeToPdf,
 } from "./maze-pdf.js";
 export type { RenderMazeToSvgOptions } from "./maze-svg.js";

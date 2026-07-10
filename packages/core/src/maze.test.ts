@@ -5,7 +5,6 @@ import {
 	MAZE_ALGORITHMS,
 	MAZE_TYPES,
 	generateMaze,
-	generateMazeBatch,
 	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
 	isValidMazeAlgorithm,
@@ -249,12 +248,21 @@ describe("generateMaze", () => {
 		{ width: 5, height: 0 },
 		{ width: -3, height: 5 },
 		{ width: 5, height: -3 },
+		{ width: 201, height: 5 },
+		{ width: 5, height: 201 },
 	])(
 		"rejects invalid dimensions width=$width height=$height",
 		({ width, height }) => {
 			expect(() => generateMaze({ width, height, seed: 1 })).toThrow();
 		},
 	);
+
+	it("accepts dimensions at the maximum allowed size", () => {
+		const maze = generateMaze({ width: 200, height: 200, seed: 1 });
+
+		expect(maze.width).toBe(200);
+		expect(maze.height).toBe(200);
+	});
 
 	it("produces a maze with more branch points at higher difficulty, for the same size and seed", () => {
 		const easy = generateMaze({
@@ -863,112 +871,5 @@ describe("generateMaze - circle type", () => {
 		});
 
 		expect(second.circleCells).toEqual(first.circleCells);
-	});
-});
-
-describe("generateMazeBatch", () => {
-	it("generates the requested number of distinct mazes", () => {
-		const mazes = generateMazeBatch({
-			width: 6,
-			height: 6,
-			seed: 10,
-			count: 5,
-		});
-
-		expect(mazes).toHaveLength(5);
-		const uniqueLayouts = new Set(
-			mazes.map((maze) => JSON.stringify(maze.cells)),
-		);
-		expect(uniqueLayouts.size).toBe(5);
-	});
-
-	it("produces a batch of 1 identical to a single generateMaze call", () => {
-		const [batchMaze] = generateMazeBatch({
-			width: 8,
-			height: 6,
-			seed: 42,
-			count: 1,
-		});
-		const singleMaze = generateMaze({ width: 8, height: 6, seed: 42 });
-
-		expect(batchMaze).toEqual(singleMaze);
-	});
-
-	it("reproduces the exact same batch when given the same starting seed", () => {
-		const first = generateMazeBatch({ width: 5, height: 5, seed: 7, count: 3 });
-		const second = generateMazeBatch({
-			width: 5,
-			height: 5,
-			seed: 7,
-			count: 3,
-		});
-
-		expect(second).toEqual(first);
-	});
-
-	it.each([{ count: 0 }, { count: -2 }])(
-		"rejects an invalid batch count=$count",
-		({ count }) => {
-			expect(() =>
-				generateMazeBatch({ width: 5, height: 5, seed: 1, count }),
-			).toThrow();
-		},
-	);
-
-	it("applies the given difficulty to every maze in the batch", () => {
-		const [batchMaze] = generateMazeBatch({
-			width: 8,
-			height: 6,
-			seed: 42,
-			count: 1,
-			difficulty: 5,
-		});
-		const singleMaze = generateMaze({
-			width: 8,
-			height: 6,
-			seed: 42,
-			difficulty: 5,
-		});
-
-		expect(batchMaze).toEqual(singleMaze);
-	});
-
-	it("gives each maze in a batch its own resolved seed", () => {
-		const mazes = generateMazeBatch({
-			width: 5,
-			height: 5,
-			seed: 10,
-			count: 3,
-		});
-
-		expect(mazes.map((maze) => maze.seed)).toEqual([10, 11, 12]);
-	});
-
-	it("forwards the maze type to every maze in the batch", () => {
-		const mazes = generateMazeBatch({
-			width: 8,
-			height: 8,
-			seed: 1,
-			count: 2,
-			type: "rectangle-crossing",
-		});
-
-		for (const maze of mazes) {
-			expect(maze.type).toBe("rectangle-crossing");
-		}
-	});
-
-	it("forwards the maze algorithm to every maze in the batch", () => {
-		const mazes = generateMazeBatch({
-			width: 6,
-			height: 6,
-			seed: 1,
-			count: 2,
-			algorithm: "growing-tree",
-		});
-
-		for (const maze of mazes) {
-			expect(maze.algorithm).toBe("growing-tree");
-		}
 	});
 });

@@ -93,30 +93,24 @@ export interface GenerateMazeOptions {
 	algorithm?: MazeAlgorithm;
 }
 
-export interface GenerateMazeBatchOptions {
-	width: number;
-	height: number;
-	seed: number;
-	count: number;
-	difficulty?: number;
-	type?: MazeType;
-	algorithm?: MazeAlgorithm;
-}
-
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 const DEFAULT_MAZE_TYPE: MazeType = "rectangle";
 const DEFAULT_MAZE_ALGORITHM: MazeAlgorithm = "growing-tree";
+
+const MAX_DIMENSION = 200;
 
 function validateDimensions(width: number, height: number): void {
 	if (
 		!Number.isInteger(width) ||
 		!Number.isInteger(height) ||
 		width <= 0 ||
-		height <= 0
+		height <= 0 ||
+		width > MAX_DIMENSION ||
+		height > MAX_DIMENSION
 	) {
 		throw new Error(
-			`Maze width and height must be positive integers, got width=${width}, height=${height}`,
+			`Maze width and height must be integers between 1 and ${MAX_DIMENSION}, got width=${width}, height=${height}`,
 		);
 	}
 }
@@ -242,31 +236,4 @@ export function generateMaze({
 		algorithm,
 		crossings: allowsCrossings ? crossings : undefined,
 	};
-}
-
-export function generateMazeBatch({
-	width,
-	height,
-	seed,
-	count,
-	difficulty,
-	type,
-	algorithm,
-}: GenerateMazeBatchOptions): Maze[] {
-	if (!Number.isInteger(count) || count <= 0) {
-		throw new Error(
-			`Maze batch count must be a positive integer, got count=${count}`,
-		);
-	}
-
-	return Array.from({ length: count }, (_, index) =>
-		generateMaze({
-			width,
-			height,
-			seed: seed + index,
-			difficulty,
-			type,
-			algorithm,
-		}),
-	);
 }

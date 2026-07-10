@@ -2,7 +2,7 @@ import corePkg from "@remarkable-maze-generator/core/package.json" with {
 	type: "json",
 };
 import { describe, expect, it } from "vitest";
-import { buildServer, resolvePort } from "./server.js";
+import { buildServer, resolveHost, resolvePort } from "./server.js";
 
 describe("web server", () => {
 	it("responds with the core version on /api/version", async () => {
@@ -30,5 +30,15 @@ describe("resolvePort", () => {
 	it("falls back to 3001 when PORT is zero or negative", () => {
 		expect(resolvePort({ PORT: "0" })).toBe(3001);
 		expect(resolvePort({ PORT: "-1" })).toBe(3001);
+	});
+});
+
+describe("resolveHost", () => {
+	it("returns 127.0.0.1 when HOST is not set", () => {
+		expect(resolveHost({})).toBe("127.0.0.1");
+	});
+
+	it("returns the HOST env variable when set", () => {
+		expect(resolveHost({ HOST: "0.0.0.0" })).toBe("0.0.0.0");
 	});
 });

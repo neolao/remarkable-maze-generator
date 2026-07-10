@@ -56,24 +56,12 @@ Defined in: `packages/core/src/maze.ts`
 ## GenerateMazeOptions
 | Field | Type | Notes |
 |---|---|---|
-| width | number | must be a positive integer |
-| height | number | must be a positive integer |
+| width | number | must be a positive integer, capped at `MAX_DIMENSION` (200) |
+| height | number | must be a positive integer, capped at `MAX_DIMENSION` (200) |
 | seed | number | same seed reproduces the same maze |
 | difficulty | number | optional integer 1–5, defaults to 1 (easiest); controls branch-point density, see ADR 015 |
 | type | MazeType | optional, defaults to `"rectangle"`, see ADR 022 |
 | algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; rejected if combined with `type: "rectangle-crossing"` and anything other than `"growing-tree"`, see ADR 033 |
-Defined in: `packages/core/src/maze.ts`
-
-## GenerateMazeBatchOptions
-| Field | Type | Notes |
-|---|---|---|
-| width | number | must be a positive integer, shared by every maze in the batch |
-| height | number | must be a positive integer, shared by every maze in the batch |
-| seed | number | starting seed; maze at index i uses `seed + i` |
-| count | number | must be a positive integer, number of mazes to generate |
-| difficulty | number | optional integer 1–5, defaults to 1; applied to every maze in the batch, see ADR 015 |
-| type | MazeType | optional, defaults to `"rectangle"`; applied to every maze in the batch, see ADR 022 |
-| algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; applied to every maze in the batch, see ADR 033 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazePosition

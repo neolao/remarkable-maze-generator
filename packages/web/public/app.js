@@ -214,33 +214,38 @@ function initMazeForm() {
 		sendStatus.textContent = "Sending to reMarkable...";
 		pairingSection.style.display = "none";
 
-		const folder = remarkableFolderInput.value.trim();
-		persistFormPreferences();
-		const sendRequestBody = JSON.stringify({
-			...JSON.parse(lastMazeRequestBody),
-			folder: folder === "" ? undefined : folder,
-		});
+		try {
+			const folder = remarkableFolderInput.value.trim();
+			persistFormPreferences();
+			const sendRequestBody = JSON.stringify({
+				...JSON.parse(lastMazeRequestBody),
+				folder: folder === "" ? undefined : folder,
+			});
 
-		const response = await fetch("/api/mazes/send", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: sendRequestBody,
-		});
+			const response = await fetch("/api/mazes/send", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: sendRequestBody,
+			});
 
-		if (response.ok) {
-			sendStatus.textContent = "Maze sent to reMarkable.";
-			return;
+			if (response.ok) {
+				sendStatus.textContent = "Maze sent to reMarkable.";
+				return;
+			}
+
+			const body = await response.json();
+
+			if (body.error === "not_authenticated") {
+				sendStatus.textContent = "";
+				pairingSection.style.display = "block";
+				return;
+			}
+
+			sendStatus.textContent =
+				body.error ?? "Failed to send maze to reMarkable";
+		} catch {
+			sendStatus.textContent = "Failed to send maze to reMarkable";
 		}
-
-		const body = await response.json();
-
-		if (body.error === "not_authenticated") {
-			sendStatus.textContent = "";
-			pairingSection.style.display = "block";
-			return;
-		}
-
-		sendStatus.textContent = body.error ?? "Failed to send maze to reMarkable";
 	};
 
 	sendButton.addEventListener("click", () => {
@@ -256,21 +261,25 @@ function initMazeForm() {
 			return;
 		}
 
-		const response = await fetch("/api/remarkable/pair", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ pairingCode }),
-		});
+		try {
+			const response = await fetch("/api/remarkable/pair", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ pairingCode }),
+			});
 
-		if (!response.ok) {
-			const body = await response.json();
-			pairingError.textContent = body.error ?? "Pairing failed";
-			return;
+			if (!response.ok) {
+				const body = await response.json();
+				pairingError.textContent = body.error ?? "Pairing failed";
+				return;
+			}
+
+			pairingCodeInput.value = "";
+			pairingError.textContent = "";
+			await sendToRemarkable();
+		} catch {
+			pairingError.textContent = "Pairing failed";
 		}
-
-		pairingCodeInput.value = "";
-		pairingError.textContent = "";
-		await sendToRemarkable();
 	});
 
 	form.addEventListener("submit", async (event) => {

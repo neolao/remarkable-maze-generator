@@ -74,18 +74,20 @@ export function generateGrowingTreeMaze({
 		(difficulty - MIN_DIFFICULTY) / (MAX_DIFFICULTY - MIN_DIFFICULTY);
 
 	const crossings: MazeCrossing[] = [];
+	const crossingCells = new Set<string>();
 	const isUsedAsCrossing = (x: number, y: number) =>
 		(x === 0 && y === 0) ||
 		(x === width - 1 && y === height - 1) ||
-		crossings.some((crossing) => crossing.x === x && crossing.y === y);
+		crossingCells.has(`${x},${y}`);
 	// Keeping crossings apart from one another avoids a "ladder" of several
 	// crossings stacked back-to-back between the same two parallel corridors,
 	// which reads as a repeating structural pattern rather than an occasional,
 	// notable bridge (see ADR 024 follow-up).
 	const isAdjacentToCrossing = (x: number, y: number) =>
-		crossings.some(
-			(crossing) => Math.abs(crossing.x - x) + Math.abs(crossing.y - y) === 1,
-		);
+		crossingCells.has(`${x - 1},${y}`) ||
+		crossingCells.has(`${x + 1},${y}`) ||
+		crossingCells.has(`${x},${y - 1}`) ||
+		crossingCells.has(`${x},${y + 1}`);
 
 	const active: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
 	visited[0][0] = true;
@@ -196,6 +198,7 @@ export function generateGrowingTreeMaze({
 			cells[targetY][targetX].walls[direction.opposite] = false;
 
 			crossings.push({ x: tunnelX, y: tunnelY, underAxis });
+			crossingCells.add(`${tunnelX},${tunnelY}`);
 			visited[targetY][targetX] = true;
 			active.push({ x: targetX, y: targetY });
 		}
