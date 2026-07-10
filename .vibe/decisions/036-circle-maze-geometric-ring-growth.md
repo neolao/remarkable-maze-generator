@@ -1,6 +1,6 @@
 ---
 date: 2026-07-10
-status: accepted
+status: superseded by 037
 ---
 # Circle maze: geometric ring growth instead of a fixed radial thickness
 

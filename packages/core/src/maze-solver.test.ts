@@ -118,23 +118,6 @@ describe("solveMaze", () => {
 		]);
 	});
 
-	it("walks through the horizontal wraparound on a circle maze", () => {
-		// The only open passage is the wraparound itself: west of column 0 is
-		// column 2 (the last column), not an invalid out-of-bounds cell (see
-		// ADR 034).
-		const maze = buildFullyWalledMaze(3, 1);
-		maze.type = "circle";
-		maze.cells[0][0].walls.west = false;
-		maze.cells[0][2].walls.east = false;
-
-		const path = solveMaze(maze);
-
-		expect(path).toEqual([
-			{ x: 0, y: 0 },
-			{ x: 2, y: 0 },
-		]);
-	});
-
 	it("does not error solving a generated circle maze of a reasonable size", () => {
 		const maze = generateMaze({
 			width: 10,

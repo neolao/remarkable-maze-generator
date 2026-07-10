@@ -1,6 +1,6 @@
 ---
 date: 2026-07-10
-status: accepted
+status: superseded by 037
 ---
 # Circle maze type as a polar rendering of the same rectangular grid
 

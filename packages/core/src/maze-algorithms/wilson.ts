@@ -4,14 +4,12 @@ import {
 	type Direction,
 	createGrid,
 	createSeededRandom,
-	wrapCoordinate,
 } from "./shared.js";
 
 export interface GenerateWilsonMazeOptions {
 	width: number;
 	height: number;
 	seed: number;
-	wrapsHorizontally: boolean;
 }
 
 export interface WilsonMazeResult {
@@ -36,7 +34,6 @@ export function generateWilsonMaze({
 	width,
 	height,
 	seed,
-	wrapsHorizontally,
 }: GenerateWilsonMazeOptions): WilsonMazeResult {
 	const random = createSeededRandom(seed);
 	const cells = createGrid(width, height);
@@ -63,12 +60,9 @@ export function generateWilsonMaze({
 
 		// The loop-erased random walk: `path` holds the current walk and
 		// `pathDirections[i]` the direction taken from `path[i]` to
-		// `path[i+1]` — tracked directly rather than re-derived from the two
-		// positions afterward, since a wraparound step's coordinate delta
-		// doesn't match any direction's plain `dx`/`dy` (see ADR 034).
-		// `positionInPath` lets a revisit collapse the loop it just closed
-		// back to its first occurrence instead of leaving a dead-end detour
-		// behind.
+		// `path[i+1]`. `positionInPath` lets a revisit collapse the loop it
+		// just closed back to its first occurrence instead of leaving a
+		// dead-end detour behind.
 		const path: Position[] = [start];
 		const pathDirections: Direction[] = [];
 		const positionInPath = new Map<string, number>([[positionKey(start), 0]]);
@@ -76,18 +70,14 @@ export function generateWilsonMaze({
 		let current = start;
 		while (!inMaze[current.y][current.x]) {
 			const candidateDirections = DIRECTIONS.filter((direction) => {
-				const nx = wrapCoordinate(
-					current.x + direction.dx,
-					width,
-					wrapsHorizontally,
-				);
+				const nx = current.x + direction.dx;
 				const ny = current.y + direction.dy;
 				return nx >= 0 && nx < width && ny >= 0 && ny < height;
 			});
 			const direction =
 				candidateDirections[Math.floor(random() * candidateDirections.length)];
 			const next: Position = {
-				x: wrapCoordinate(current.x + direction.dx, width, wrapsHorizontally),
+				x: current.x + direction.dx,
 				y: current.y + direction.dy,
 			};
 			const key = positionKey(next);

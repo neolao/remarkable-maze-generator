@@ -6,11 +6,14 @@ import {
 	StandardFonts,
 	rgb,
 } from "pdf-lib";
+import {
+	computeCircleCellCenter,
+	computeCircleMazeDiameter,
+	computeCircleMazeSegments,
+} from "./circle-maze/render.js";
 import type { TubeSegment } from "./maze-layout.js";
 import {
 	computeCellCenter,
-	computeCircleDiameter,
-	computeCircleSegments,
 	computeTubeSegments,
 	computeWallSegments,
 	isArcSegment,
@@ -60,11 +63,14 @@ interface MazeLayout {
 }
 
 // The "circle" type lays out its segments in a square bounding box sized by
-// its diameter (see ADR 034), not by `maze.width`/`maze.height` directly —
+// its diameter (see ADR 037), not by `maze.width`/`maze.height` directly —
 // every other type keeps using its cell grid dimensions as before.
 function logicalLayoutSize(maze: Maze): { width: number; height: number } {
 	if (maze.type === "circle") {
-		const diameter = computeCircleDiameter(maze);
+		const diameter = computeCircleMazeDiameter({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+		});
 		return { width: diameter, height: diameter };
 	}
 	return { width: maze.width, height: maze.height };
@@ -162,7 +168,16 @@ function drawSolutionPath(
 ): void {
 	const { cellSize, leftOffset } = layout;
 	const cellCenter = (position: MazePosition) => {
-		const unitCenter = computeCellCenter(maze, position);
+		const unitCenter =
+			maze.type === "circle"
+				? computeCircleCellCenter(
+						{
+							sectorCounts: maze.circleSectorCounts ?? [],
+							cells: maze.circleCells ?? [],
+						},
+						{ ring: position.y, sector: position.x },
+					)
+				: computeCellCenter(position);
 		return {
 			x: leftOffset + unitCenter.x * cellSize,
 			y: toPdfY(layout, unitCenter.y * cellSize),
@@ -221,7 +236,10 @@ function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
 	} else if (maze.type === "circle") {
 		drawMazeSegments(
 			page,
-			computeCircleSegments(maze),
+			computeCircleMazeSegments({
+				sectorCounts: maze.circleSectorCounts ?? [],
+				cells: maze.circleCells ?? [],
+			}),
 			layout,
 			STROKE_THICKNESS_PT,
 			STROKE_COLOR,

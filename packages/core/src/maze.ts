@@ -1,3 +1,5 @@
+import type { CircleCell } from "./circle-maze/cells.js";
+import { generateCircleMaze } from "./circle-maze/generate.js";
 import { generateAldousBroderMaze } from "./maze-algorithms/aldous-broder.js";
 import { generateGrowingTreeMaze } from "./maze-algorithms/growing-tree.js";
 import { generateKruskalMaze } from "./maze-algorithms/kruskal.js";
@@ -71,6 +73,15 @@ export interface Maze {
 	difficulty?: number;
 	algorithm?: MazeAlgorithm;
 	crossings?: MazeCrossing[];
+	/**
+	 * The real growing-sector circle topology (see ADR 037) — only set for
+	 * `type: "circle"`, whose cells don't fit the rectangular `cells` grid
+	 * above (a variable number of sectors per ring, not a uniform 2D array),
+	 * so it lives in these two separate fields instead. `cells` is an empty
+	 * array on a circle maze.
+	 */
+	circleSectorCounts?: number[];
+	circleCells?: CircleCell[][];
 }
 
 export interface GenerateMazeOptions {
@@ -153,7 +164,6 @@ interface GenerateCellsOptions {
 	seed: number;
 	difficulty: number;
 	allowsCrossings: boolean;
-	wrapsHorizontally: boolean;
 }
 
 interface GeneratedCells {
@@ -191,15 +201,35 @@ export function generateMaze({
 	validateAlgorithm(algorithm);
 	validateTypeAlgorithmCompatibility(type, algorithm);
 
+	if (type === "circle") {
+		const { sectorCounts, cells: circleCells } = generateCircleMaze({
+			width,
+			height,
+			seed,
+			difficulty,
+			algorithm,
+		});
+
+		return {
+			width,
+			height,
+			cells: [],
+			type,
+			seed,
+			difficulty,
+			algorithm,
+			circleSectorCounts: sectorCounts,
+			circleCells,
+		};
+	}
+
 	const allowsCrossings = type === "rectangle-crossing";
-	const wrapsHorizontally = type === "circle";
 	const { cells, crossings } = generateCells(algorithm, {
 		width,
 		height,
 		seed,
 		difficulty,
 		allowsCrossings,
-		wrapsHorizontally,
 	});
 
 	return {

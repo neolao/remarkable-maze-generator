@@ -1,4 +1,7 @@
-import { wrapCoordinate } from "./maze-algorithms/shared.js";
+import {
+	findCircleSolutionBranchPoints,
+	solveCircleMaze,
+} from "./circle-maze/solve.js";
 import type { Maze } from "./maze.js";
 
 export interface MazePosition {
@@ -33,16 +36,10 @@ function getOpenMoves(maze: Maze, node: Node): Node[] {
 	const cellIsCrossing = isCrossingCell(maze, node.x, node.y);
 	const moves: Node[] = [];
 
-	// The "circle" type wraps horizontally end-to-end (see ADR 034): its
-	// west/east walls at the grid boundary are real, walkable passages to the
-	// opposite column, not the always-closed boundary they are for every
-	// other type.
-	const wrapsHorizontally = maze.type === "circle";
-
 	const tryMove = (open: boolean, dx: number, dy: number, axis: Axis) => {
 		if (!open) return;
 		if (cellIsCrossing && node.axis !== "" && axis !== node.axis) return;
-		const x = wrapCoordinate(node.x + dx, maze.width, wrapsHorizontally);
+		const x = node.x + dx;
 		const y = node.y + dy;
 		moves.push({
 			x,
@@ -109,6 +106,12 @@ function solvePathNodes(maze: Maze): Node[] {
 }
 
 export function solveMaze(maze: Maze): MazePosition[] {
+	if (maze.type === "circle") {
+		return solveCircleMaze({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
+	}
 	return solvePathNodes(maze).map(({ x, y }) => ({ x, y }));
 }
 
@@ -121,6 +124,13 @@ export function solveMaze(maze: Maze): MazePosition[] {
  * limits it to the entered axis, so the other axis is never a real choice.
  */
 export function findSolutionBranchPoints(maze: Maze): MazePosition[] {
+	if (maze.type === "circle") {
+		return findCircleSolutionBranchPoints({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
+	}
+
 	const nodes = solvePathNodes(maze);
 	const branchPoints: MazePosition[] = [];
 

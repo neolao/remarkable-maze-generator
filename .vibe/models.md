@@ -3,23 +3,32 @@
 ## Maze
 | Field | Type | Notes |
 |---|---|---|
-| width | number | grid width in cells — for `type: "circle"`, the number of angular sectors |
+| width | number | grid width in cells — for `type: "circle"`, the number of angular sectors in the innermost ring |
 | height | number | grid height in cells — for `type: "circle"`, the number of concentric rings |
-| cells | Cell[][] | rows (`cells[y][x]`), one entry per grid cell; for `type: "circle"`, the same grid reinterpreted in polar coordinates (row 0 innermost ring), see ADR 034 |
-| type | MazeType | optional; `"rectangle"` (default), `"rectangle-crossing"`, or `"circle"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016, ADR 022, and ADR 034 |
+| cells | Cell[][] | rows (`cells[y][x]`), one entry per grid cell; empty (`[]`) for `type: "circle"`, which carries its cell data in `circleCells` instead (see below and ADR 037) |
+| type | MazeType | optional; `"rectangle"` (default), `"rectangle-crossing"`, or `"circle"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016, ADR 022, and ADR 037 |
 | seed | number | optional; the resolved seed used to generate this maze, see ADR 016 |
 | difficulty | number | optional; the resolved difficulty (1–5) used to generate this maze, see ADR 016 |
 | algorithm | MazeAlgorithm | optional; the resolved generation algorithm used for this maze, defaults to `"growing-tree"`, see ADR 033 |
 | crossings | MazeCrossing[] | optional; cells where a corridor tunnels through another's straight passage, only populated for `type: "rectangle-crossing"` — both axes are real, walkable connections, see ADR 024 |
+| circleSectorCounts | number[] | optional; only set for `type: "circle"` — the number of sectors in each ring, ring 0 (innermost) first, see ADR 037 |
+| circleCells | CircleCell[][] | optional; only set for `type: "circle"` — `circleCells[ring][sector]`, a variable number of sectors per ring so it doesn't fit the rectangular `cells` grid above, see ADR 037 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeType
-String literal union: `"rectangle" | "rectangle-crossing" | "circle"`. `"circle"` reuses the same grid and all 4 algorithms, laid out in polar coordinates with a horizontal wraparound (ADR 034). See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022, ADR 034).
+String literal union: `"rectangle" | "rectangle-crossing" | "circle"`. `"circle"` is a real growing-sector topology entirely separate from the rectangular grid (ADR 037, superseding ADR 034's polar transposition of the rectangular grid). See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022, ADR 037).
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeAlgorithm
-String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); all 4 algorithms support `type: "circle"` (see ADR 034). See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
+String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); all 4 algorithms support `type: "circle"` too, reimplemented against its growing-sector graph (see ADR 037). See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
 Defined in: `packages/core/src/maze.ts`
+
+## CircleCell
+| Field | Type | Notes |
+|---|---|---|
+| cwOpen | boolean | whether the wall to this cell's clockwise neighbor (same ring) is open — the counter-clockwise neighbor's wall is read from *that* neighbor's own `cwOpen`, never duplicated |
+| outwardOpen | boolean[] | one entry per outward child (in the next ring out), parallel to `outwardChildren(...)`'s order; there is no separate `inwardOpen` — a cell's inward wall is its parent's own matching `outwardOpen` entry |
+Defined in: `packages/core/src/circle-maze/cells.ts` (see ADR 037)
 
 ## MazeCrossing
 | Field | Type | Notes |

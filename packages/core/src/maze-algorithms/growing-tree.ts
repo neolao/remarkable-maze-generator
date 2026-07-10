@@ -1,5 +1,5 @@
 import type { Cell, CellWalls, MazeCrossing } from "../maze.js";
-import { createGrid, createSeededRandom, wrapCoordinate } from "./shared.js";
+import { createGrid, createSeededRandom } from "./shared.js";
 
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
@@ -43,7 +43,6 @@ export interface GenerateGrowingTreeMazeOptions {
 	seed: number;
 	difficulty: number;
 	allowsCrossings: boolean;
-	wrapsHorizontally: boolean;
 }
 
 export interface GrowingTreeMazeResult {
@@ -64,7 +63,6 @@ export function generateGrowingTreeMaze({
 	seed,
 	difficulty,
 	allowsCrossings,
-	wrapsHorizontally,
 }: GenerateGrowingTreeMazeOptions): GrowingTreeMazeResult {
 	const random = createSeededRandom(seed);
 	const cells = createGrid(width, height);
@@ -116,7 +114,7 @@ export function generateGrowingTreeMaze({
 
 		const unvisitedNeighbors = DIRECTIONS.map((direction) => ({
 			direction,
-			x: wrapCoordinate(current.x + direction.dx, width, wrapsHorizontally),
+			x: current.x + direction.dx,
 			y: current.y + direction.dy,
 		})).filter(
 			(neighbor) =>

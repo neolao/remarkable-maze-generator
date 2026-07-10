@@ -1,7 +1,10 @@
 import {
+	computeCircleCellCenter,
+	computeCircleMazeDiameter,
+	computeCircleMazeSegments,
+} from "./circle-maze/render.js";
+import {
 	computeCellCenter,
-	computeCircleDiameter,
-	computeCircleSegments,
 	computeTubeSegments,
 	computeWallSegments,
 	isArcSegment,
@@ -45,7 +48,16 @@ function renderLines(
 }
 
 function cellCenter(maze: Maze, position: MazePosition, cellSizePx: number) {
-	const unitCenter = computeCellCenter(maze, position);
+	const unitCenter =
+		maze.type === "circle"
+			? computeCircleCellCenter(
+					{
+						sectorCounts: maze.circleSectorCounts ?? [],
+						cells: maze.circleCells ?? [],
+					},
+					{ ring: position.y, sector: position.x },
+				)
+			: computeCellCenter(position);
 	return {
 		x: unitCenter.x * cellSizePx,
 		y: unitCenter.y * cellSizePx,
@@ -85,7 +97,10 @@ function renderBranchPointMarkers(
 
 function logicalSvgSize(maze: Maze): { width: number; height: number } {
 	if (maze.type === "circle") {
-		const diameter = computeCircleDiameter(maze);
+		const diameter = computeCircleMazeDiameter({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+		});
 		return { width: diameter, height: diameter };
 	}
 	return { width: maze.width, height: maze.height };
@@ -102,13 +117,20 @@ export function renderMazeToSvg(
 
 	// Every line is independent — no fill or stroke-width layering. For
 	// "rectangle-crossing", each corridor is its own two edge lines (see ADR
-	// 026); "circle" draws its ring/sector walls (see ADR 034); the classic
+	// 026); "circle" draws its ring/sector walls (see ADR 037); the classic
 	// type keeps drawing plain walls.
 	const lines =
 		maze.type === "rectangle-crossing"
 			? renderLines(computeTubeSegments(maze), cellSizePx, "round")
 			: maze.type === "circle"
-				? renderLines(computeCircleSegments(maze), cellSizePx, "square")
+				? renderLines(
+						computeCircleMazeSegments({
+							sectorCounts: maze.circleSectorCounts ?? [],
+							cells: maze.circleCells ?? [],
+						}),
+						cellSizePx,
+						"square",
+					)
 				: renderLines(computeWallSegments(maze), cellSizePx, "square");
 
 	const solutionMarkup = options.showSolution
