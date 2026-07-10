@@ -5,28 +5,55 @@
 // parent). Kept entirely separate from the rectangular grid and its
 // north/south/east/west model — the two topologies don't share code.
 
-// Ring boundaries sit at radius `ring` (inner) / `ring + 1` (outer), a
-// constant 1-unit radial thickness throughout — ring 0's inner edge is the
-// exact center point (radius 0), so its cells are plain pie slices, same as
-// every real circular maze diagram.
-const RADIAL_THICKNESS = 1;
+// Ring boundaries sit at radius `ring + hubRadius` (inner) / `ring + 1 +
+// hubRadius` (outer), a constant 1-unit radial thickness throughout — see
+// `computeHubRadius` for why ring 0's inner edge is not the exact center
+// point.
+export const RADIAL_THICKNESS = 1;
+
+// The hub is never smaller than one ring's own radial thickness — otherwise
+// a small starting `width` (few sectors, but each one still needs real
+// circumference to sit in) would cramp the entrance into a barely-visible
+// dot. See `computeHubRadius`.
+const MIN_HUB_RADIUS = RADIAL_THICKNESS;
+
+/**
+ * The radius of the entrance "hub" boundary around the center — and, by
+ * extension, how far outward the whole ring stack is pushed to make room for
+ * it (every ring's actual radius is `ring index + this value`). Ring 0 always
+ * has exactly `width` sectors (the maze's own starting sector count is a
+ * parameter, not derived), so its own cell arc length only matches the
+ * radial thickness if its radius is chosen to fit that width's circumference
+ * — solving `2 * PI * radius / width = RADIAL_THICKNESS` for `radius` gives
+ * this formula. Clamped to `MIN_HUB_RADIUS` for small widths, where that
+ * radius would otherwise be smaller than a single ring's own thickness.
+ */
+export function computeHubRadius(width: number): number {
+	return Math.max(MIN_HUB_RADIUS, (width * RADIAL_THICKNESS) / (2 * Math.PI));
+}
 
 /**
  * The number of sectors in each ring, ring 0 (innermost) first. Ring 0 always
- * has exactly `width` sectors. Each further ring's sector count is multiplied
- * by whatever small integer keeps a cell's arc length (the ring's
- * circumference divided by its sector count) close to the radial thickness —
- * otherwise cells would grow wider and wider (tangentially) than they are
- * tall (radially) as the radius increases, for a fixed sector count.
+ * has exactly `width` sectors. Every further ring's sector count is the
+ * previous ring's count multiplied by a rounded integer ratio, chosen to keep
+ * that ring's own cell arc length (circumference / sector count, evaluated at
+ * `ring index + computeHubRadius(width)`) close to the radial thickness. This
+ * is deliberately an exact multiple rather than an independently-computed
+ * count (see ADR 040, which supersedes ADR 038's independent-per-ring
+ * formula): it guarantees every child cell's boundary lines up exactly with
+ * its parent's — either the parent's own start angle, or an exact fraction of
+ * its span — instead of landing at an arbitrary rounded position inside it.
+ * Matches the reference algorithm at github.com/codebox/maze.js.
  */
 export function computeCircleSectorCounts(
 	width: number,
 	height: number,
 ): number[] {
 	const counts = [width];
+	const hubRadius = computeHubRadius(width);
 
 	for (let ring = 1; ring < height; ring++) {
-		const radius = ring;
+		const radius = ring + hubRadius;
 		const circumference = 2 * Math.PI * radius;
 		const previousCount = counts[ring - 1];
 		const estimatedCellWidth = circumference / previousCount;

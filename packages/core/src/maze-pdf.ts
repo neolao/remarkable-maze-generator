@@ -7,9 +7,9 @@ import {
 	rgb,
 } from "pdf-lib";
 import {
-	computeCircleCellCenter,
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
+	computeCircleSolutionPoints,
 } from "./circle-maze/render.js";
 import type { TubeSegment } from "./maze-layout.js";
 import {
@@ -167,30 +167,31 @@ function drawSolutionPath(
 	layout: MazeLayout,
 ): void {
 	const { cellSize, leftOffset } = layout;
-	const cellCenter = (position: MazePosition) => {
-		const unitCenter =
-			maze.type === "circle"
-				? computeCircleCellCenter(
-						{
-							sectorCounts: maze.circleSectorCounts ?? [],
-							cells: maze.circleCells ?? [],
-						},
-						{ ring: position.y, sector: position.x },
-					)
-				: computeCellCenter(position);
-		return {
-			x: leftOffset + unitCenter.x * cellSize,
-			y: toPdfY(layout, unitCenter.y * cellSize),
-		};
-	};
+	const toPdfPoint = (unitCenter: { x: number; y: number }) => ({
+		x: leftOffset + unitCenter.x * cellSize,
+		y: toPdfY(layout, unitCenter.y * cellSize),
+	});
 
-	for (let i = 0; i < path.length - 1; i++) {
-		const from = cellCenter(path[i]);
-		const to = cellCenter(path[i + 1]);
+	// For "circle", a straight line directly between two consecutive cells'
+	// centers looks like a diagonal cutting across the maze whenever they're
+	// on different rings — `computeCircleSolutionPoints` inserts an extra
+	// point at each ring boundary so the trace follows the radius through a
+	// ring transition instead (see ADR 041).
+	const points =
+		maze.type === "circle"
+			? computeCircleSolutionPoints(
+					{
+						sectorCounts: maze.circleSectorCounts ?? [],
+						cells: maze.circleCells ?? [],
+					},
+					path.map((position) => ({ ring: position.y, sector: position.x })),
+				).map(toPdfPoint)
+			: path.map((position) => toPdfPoint(computeCellCenter(position)));
 
+	for (let i = 0; i < points.length - 1; i++) {
 		page.drawLine({
-			start: from,
-			end: to,
+			start: points[i],
+			end: points[i + 1],
 			thickness: SOLUTION_THICKNESS_PT,
 			color: SOLUTION_COLOR,
 		});

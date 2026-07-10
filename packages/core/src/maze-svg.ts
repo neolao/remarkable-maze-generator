@@ -2,6 +2,7 @@ import {
 	computeCircleCellCenter,
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
+	computeCircleSolutionPoints,
 } from "./circle-maze/render.js";
 import {
 	computeCellCenter,
@@ -69,11 +70,26 @@ function renderSolutionTrace(
 	path: MazePosition[],
 	cellSizePx: number,
 ): string {
-	let markup = "";
+	// For "circle", a straight line directly between two consecutive cells'
+	// centers looks like a diagonal cutting across the maze whenever they're
+	// on different rings — `computeCircleSolutionPoints` inserts an extra
+	// point at each ring boundary so the trace follows the radius through a
+	// ring transition instead (see ADR 041).
+	const points =
+		maze.type === "circle"
+			? computeCircleSolutionPoints(
+					{
+						sectorCounts: maze.circleSectorCounts ?? [],
+						cells: maze.circleCells ?? [],
+					},
+					path.map((position) => ({ ring: position.y, sector: position.x })),
+				).map((point) => ({ x: point.x * cellSizePx, y: point.y * cellSizePx }))
+			: path.map((position) => cellCenter(maze, position, cellSizePx));
 
-	for (let i = 0; i < path.length - 1; i++) {
-		const from = cellCenter(maze, path[i], cellSizePx);
-		const to = cellCenter(maze, path[i + 1], cellSizePx);
+	let markup = "";
+	for (let i = 0; i < points.length - 1; i++) {
+		const from = points[i];
+		const to = points[i + 1];
 		markup += `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="${SOLUTION_COLOR}" stroke-width="${SOLUTION_STROKE_WIDTH_PX}" stroke-linecap="round" />`;
 	}
 

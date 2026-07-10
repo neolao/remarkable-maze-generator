@@ -50,6 +50,16 @@
 **Code:** `MazeAlgorithm`, `MAZE_ALGORITHMS`, `algorithm` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 033); each algorithm implemented in its own module under `packages/core/src/maze-algorithms/`
 **Do not confuse with:** Maze type, Difficulty
 
+## Ring
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `ring` index, `CircleNode`, `sectorCounts` in `packages/core/src/circle-maze/` (see ADR 037)
+**Do not confuse with:** Sector
+
+## Sector
+**Definition:** [what this concept means in the domain — fill in]
+**Code:** `sector` index, `CircleNode` in `packages/core/src/circle-maze/` (see ADR 037)
+**Do not confuse with:** Ring
+
 ## Pairing code
 **Definition:** [what this concept means in the domain — fill in]
 **Code:** `pairingCode` parameter of `registerDevice()` / `authenticate()` in `packages/core/src/remarkable-auth.ts`

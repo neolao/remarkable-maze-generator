@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Users can now choose the maze generation algorithm — growing tree (the previous default, unchanged), Kruskal, Wilson, or Aldous-Broder — via a new "Generation algorithm" option on the web configuration form and a new `--algorithm` option on the command line; the "bridge crossing" maze type still requires the growing tree algorithm and is rejected with a clear message for the other three
-- Users can now generate a "circle" maze type, laid out as concentric rings with more sectors added ring by ring so passage width stays consistent from the center to the outer edge, selectable from the web configuration form and the command line's `--type` option alongside the existing rectangle types
+- Users can now generate a "circle" maze type, laid out as concentric rings with more sectors added ring by ring — always an exact multiple of the ring inside it, so every ring's cells line up cleanly with the ring inside it instead of drifting out of alignment — selectable from the web configuration form and the command line's `--type` option alongside the existing rectangle types; the entrance is marked with a visible opening at the center, sized as a real starting circle rather than a barely-visible dot (mirroring the exit's opening on the outer edge), and both openings point toward the top of the circle; the solution path follows the radius when crossing from one ring to the next instead of cutting across at an angle
 
 ## [0.5.0] - 2026-07-09
 
