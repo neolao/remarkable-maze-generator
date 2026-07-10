@@ -16,6 +16,18 @@ export interface BuildServerOptions {
 	credentialsPath?: string;
 }
 
+const DEFAULT_PORT = 3001;
+
+export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
+	const raw = env.PORT;
+	if (!raw) {
+		return DEFAULT_PORT;
+	}
+
+	const parsed = Number(raw);
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
+}
+
 export function buildServer(options: BuildServerOptions = {}) {
 	const app = Fastify({ logger: true });
 	const store = createFileCredentialStore(
@@ -35,5 +47,5 @@ export function buildServer(options: BuildServerOptions = {}) {
 
 if (process.env.NODE_ENV !== "test") {
 	const app = buildServer();
-	app.listen({ port: 3000, host: "0.0.0.0" });
+	app.listen({ port: resolvePort(), host: "0.0.0.0" });
 }

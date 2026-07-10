@@ -8,10 +8,13 @@ description: Runtime verification recipe for packages/web — how to drive the r
 ## Basic server smoke
 
 ```bash
-npm run --workspace=packages/web dev
-curl -s http://127.0.0.1:3000/api/version
-curl -s -X POST http://127.0.0.1:3000/api/mazes/preview -H "content-type: application/json" -d '{"width":5,"height":5,"difficulty":1}'
+PORT=3002 npm run --workspace=packages/web dev
+curl -s http://127.0.0.1:3002/api/version
+curl -s -X POST http://127.0.0.1:3002/api/mazes/preview -H "content-type: application/json" -d '{"width":5,"height":5,"difficulty":1}'
 ```
+
+Using a scratch `PORT` (distinct from the app's real default, 3001) avoids
+clashing with a dev server the maintainer may already have running.
 
 Never point at the real `DEFAULT_CREDENTIALS_PATH`
 (`~/.config/remarkable-maze-generator/credentials.json`) during verification —
@@ -46,7 +49,7 @@ server through a custom Node ESM loader that swaps `core`'s
    `buildServer()` with an explicit temp `credentialsPath` (pre-seeded with
    `{"deviceToken":"fake-device-token"}`) and calls `app.listen()` on a
    scratch port (e.g. 3177) — import it with `NODE_ENV=test` set so the
-   module's own top-level `app.listen({port:3000})` side effect doesn't also
+   module's own top-level `app.listen({port: resolvePort()})` side effect doesn't also
    fire against the real default credentials path.
 3. Run it: `NODE_ENV=test node --import tsx --experimental-loader="file://<abs path to loader>" <abs path to bootstrap script>` (background it; `run_in_background: true` on the Bash tool works better here than manual `&`/`disown`, which tends to hang the tool call until timeout).
 4. Drive it with `curl` against `http://127.0.0.1:3177/...` — real HTTP, real
