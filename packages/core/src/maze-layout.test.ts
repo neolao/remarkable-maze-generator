@@ -5,7 +5,7 @@ import {
 	TUBE_HALF_WIDTH_RATIO,
 	computeCellCenter,
 	computeCircleDiameter,
-	computeCircleInnerRadius,
+	computeCircleRingRadius,
 	computeCircleSegments,
 	computeTubeSegments,
 	computeWallSegments,
@@ -553,45 +553,55 @@ describe("computeTubeSegments", () => {
 	});
 });
 
-describe("computeCircleInnerRadius", () => {
-	it("stays at the minimum ratio when there are few enough sectors", () => {
-		const maze = generateMaze({ width: 4, height: 5, seed: 1, type: "circle" });
+describe("computeCircleRingRadius", () => {
+	it("starts ring 0 at the inner radius ratio", () => {
+		const maze = generateMaze({ width: 8, height: 5, seed: 1, type: "circle" });
 
-		expect(computeCircleInnerRadius(maze)).toBe(CIRCLE_INNER_RADIUS_RATIO);
+		expect(computeCircleRingRadius(maze, 0)).toBe(CIRCLE_INNER_RADIUS_RATIO);
 	});
 
-	it("grows past the minimum ratio once enough sectors would otherwise pinch the innermost passage", () => {
-		const maze = generateMaze({
-			width: 32,
-			height: 5,
-			seed: 1,
-			type: "circle",
-		});
+	it("grows each successive ring by the same factor (geometric progression)", () => {
+		const maze = generateMaze({ width: 8, height: 5, seed: 1, type: "circle" });
 
-		expect(computeCircleInnerRadius(maze)).toBeGreaterThan(
-			CIRCLE_INNER_RADIUS_RATIO,
+		const ratios = [0, 1, 2, 3].map(
+			(ring) =>
+				computeCircleRingRadius(maze, ring + 1) /
+				computeCircleRingRadius(maze, ring),
 		);
+
+		for (const ratio of ratios) {
+			expect(ratio).toBeCloseTo(ratios[0], 9);
+		}
 	});
 
-	it("keeps the innermost ring's tangential passage width at least as wide as its radial thickness (1 unit)", () => {
-		for (const width of [4, 8, 16, 32, 64]) {
-			const maze = generateMaze({ width, height: 5, seed: 1, type: "circle" });
+	// The key correctness property behind ADR 036: a ring's radial thickness
+	// (outer radius minus inner radius) must track its own tangential
+	// (walkable, angular) width at every radius — otherwise passages pinch
+	// inward near the center or balloon outward near the edge, instead of
+	// staying self-similar throughout.
+	it("keeps radial thickness proportional to tangential width at every ring, for any sector count", () => {
+		for (const width of [3, 8, 16, 32, 64]) {
+			const maze = generateMaze({ width, height: 6, seed: 1, type: "circle" });
 			const angleStep = (2 * Math.PI) / width;
 
-			const innermostTangentialWidth =
-				computeCircleInnerRadius(maze) * angleStep;
+			for (let ring = 0; ring < maze.height; ring++) {
+				const innerRadius = computeCircleRingRadius(maze, ring);
+				const outerRadius = computeCircleRingRadius(maze, ring + 1);
+				const radialThickness = outerRadius - innerRadius;
+				const tangentialWidth = innerRadius * angleStep;
 
-			expect(innermostTangentialWidth).toBeGreaterThanOrEqual(1 - 1e-9);
+				expect(radialThickness).toBeCloseTo(tangentialWidth, 9);
+			}
 		}
 	});
 });
 
 describe("computeCircleDiameter", () => {
-	it("grows with the number of rings, twice the inner radius plus the ring count", () => {
+	it("grows geometrically with the ring count, matching the outer edge's own ring radius", () => {
 		const maze = generateMaze({ width: 8, height: 5, seed: 1, type: "circle" });
 
 		expect(computeCircleDiameter(maze)).toBe(
-			2 * (computeCircleInnerRadius(maze) + 5),
+			2 * computeCircleRingRadius(maze, 5),
 		);
 	});
 });
@@ -733,8 +743,10 @@ describe("computeCellCenter", () => {
 
 		const point = computeCellCenter(maze, { x: 3, y: 2 });
 		const distance = Math.hypot(point.x - center, point.y - center);
+		const expectedRadius =
+			(computeCircleRingRadius(maze, 2) + computeCircleRingRadius(maze, 3)) / 2;
 
-		expect(distance).toBeCloseTo(computeCircleInnerRadius(maze) + 2 + 0.5, 9);
+		expect(distance).toBeCloseTo(expectedRadius, 9);
 	});
 
 	it("places different sectors of the same ring at different angles (not all on top of each other)", () => {

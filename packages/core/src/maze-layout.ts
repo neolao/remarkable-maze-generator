@@ -75,27 +75,37 @@ export function computeWallSegments(maze: Maze): LineSegment[] {
 }
 
 /**
- * Minimum radius (in ring-width units, i.e. the same unit as one cell) of the
- * hole at the very center of a "circle" maze. A plain `0` would put every
+ * Radius (in unit cell coordinates) of the hole at the very center of a
+ * "circle" maze — ring 0's own inner edge. A plain `0` would put every
  * sector's inner corner at the exact same point, which is both visually
- * cluttered and geometrically degenerate for the entrance opening — see
- * `computeCircleInnerRadius` for the actual (usually larger) radius used.
+ * cluttered and geometrically degenerate for the entrance opening. The
+ * absolute value barely matters beyond that (see `computeCircleRingRadius`): every
+ * ring keeps the same proportions regardless of where the progression starts.
  */
 export const CIRCLE_INNER_RADIUS_RATIO = 1;
 
 /**
- * The actual inner radius used for a given maze: at least
- * `CIRCLE_INNER_RADIUS_RATIO`, but grown as needed so the innermost ring's
- * passage is at least as wide (tangentially, `radius * angleStep`) as a
- * ring's own radial thickness (1 unit). Without this, a maze with many
- * sectors would pinch its passages down to needle-thin wedges near the
- * center while the outermost ring stayed comfortably wide — the sector angle
- * shrinks the available tangential space at any fixed radius, and that space
- * only grows in from there, never back out (see ADR 034 follow-up).
+ * How much bigger each successive ring's radius is than the last, as a
+ * multiplier. A sector's tangential (walkable) width at radius `r` is
+ * `r * angleStep` — growing the radius geometrically by this same factor at
+ * every ring keeps a ring's radial thickness (`radius * (factor - 1)`)
+ * proportional to its own tangential width at every radius, so passages stay
+ * self-similar all the way from the center to the outer edge instead of
+ * pinching inward (small radius, same thickness) or ballooning outward (large
+ * radius, same thickness) — see ADR 036.
  */
-export function computeCircleInnerRadius(maze: Maze): number {
-	const angleStep = (2 * Math.PI) / maze.width;
-	return Math.max(CIRCLE_INNER_RADIUS_RATIO, 1 / angleStep);
+function circleRingGrowthFactor(maze: Maze): number {
+	return 1 + (2 * Math.PI) / maze.width;
+}
+
+/**
+ * The radius (in unit cell coordinates) of ring `ring`'s own inner edge —
+ * `ring === maze.height` gives the maze's outer edge. Rings grow
+ * geometrically outward from `CIRCLE_INNER_RADIUS_RATIO` (see
+ * `circleRingGrowthFactor`).
+ */
+export function computeCircleRingRadius(maze: Maze, ring: number): number {
+	return CIRCLE_INNER_RADIUS_RATIO * circleRingGrowthFactor(maze) ** ring;
 }
 
 /**
@@ -106,7 +116,7 @@ export function computeCircleInnerRadius(maze: Maze): number {
  * types.
  */
 export function computeCircleDiameter(maze: Maze): number {
-	return 2 * (computeCircleInnerRadius(maze) + maze.height);
+	return 2 * computeCircleRingRadius(maze, maze.height);
 }
 
 function circlePoint(maze: Maze, radius: number, angle: number): Point {
@@ -160,11 +170,10 @@ export function computeCircleSegments(maze: Maze): TubeSegment[] {
 
 	const segments: TubeSegment[] = [];
 	const angleStep = (2 * Math.PI) / maze.width;
-	const innerRadiusBase = computeCircleInnerRadius(maze);
 
 	for (let y = 0; y < maze.height; y++) {
-		const innerRadius = innerRadiusBase + y;
-		const outerRadius = innerRadiusBase + y + 1;
+		const innerRadius = computeCircleRingRadius(maze, y);
+		const outerRadius = computeCircleRingRadius(maze, y + 1);
 
 		for (let x = 0; x < maze.width; x++) {
 			const cell = maze.cells[y][x];
@@ -209,8 +218,9 @@ export function computeCellCenter(
 
 	const angleStep = (2 * Math.PI) / maze.width;
 	const angle = (position.x + 0.5) * angleStep;
-	const radius = computeCircleInnerRadius(maze) + position.y + 0.5;
-	return circlePoint(maze, radius, angle);
+	const innerRadius = computeCircleRingRadius(maze, position.y);
+	const outerRadius = computeCircleRingRadius(maze, position.y + 1);
+	return circlePoint(maze, (innerRadius + outerRadius) / 2, angle);
 }
 
 /**

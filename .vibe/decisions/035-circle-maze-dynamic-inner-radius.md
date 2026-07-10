@@ -1,6 +1,6 @@
 ---
 date: 2026-07-10
-status: accepted
+status: superseded by 036
 ---
 # Circle maze: dynamic inner radius to avoid pinched passages near the center
 
