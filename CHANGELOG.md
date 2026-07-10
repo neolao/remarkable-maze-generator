@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The web configuration form now remembers your last-used width, height, difficulty, maze type, generation algorithm, solution display mode, and "show solution on preview" choice, and pre-fills them automatically the next time you visit — a first-time visit, or one with no stored preferences, still shows the previous default values
+
 ## [0.6.0] - 2026-07-10
 
 ### Added

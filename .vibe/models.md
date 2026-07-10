@@ -185,6 +185,19 @@ Defined in: `packages/web/src/maze-form-validation.ts`
 Discriminated union: `{ valid: true; value: MazeFormValue }` or `{ valid: false; error: string }` (a human-readable message naming the invalid field).
 Defined in: `packages/web/src/maze-form-validation.ts`
 
+## MazeFormPreferences (web)
+| Field | Type | Notes |
+|---|---|---|
+| width | string | raw form field value, as typed by the user |
+| height | string | raw form field value |
+| difficulty | string | raw form field value |
+| type | string | raw form field value |
+| algorithm | string | raw form field value |
+| solution | string | raw form field value |
+| showSolution | boolean | "Show solution on preview" checkbox state |
+Round-tripped through a single cookie (`serializeFormPreferences`/`parseFormPreferences`); parsing rejects any value with a missing or wrong-typed field, returning `null` rather than a partial object (see ADR 042).
+Defined in: `packages/web/src/form-preferences.ts`
+
 ## BuildServerOptions (web)
 | Field | Type | Notes |
 |---|---|---|

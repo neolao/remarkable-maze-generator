@@ -10,6 +10,57 @@ const DEFAULT_MAZE_ALGORITHM = "growing-tree";
 const SOLUTION_MODES = ["none", "extra-page", "overlay"];
 const DEFAULT_SOLUTION_MODE = "none";
 
+const FORM_PREFERENCES_COOKIE_NAME = "maze-form-preferences";
+const FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+
+function isMazeFormPreferences(value) {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+	return (
+		typeof value.width === "string" &&
+		typeof value.height === "string" &&
+		typeof value.difficulty === "string" &&
+		typeof value.type === "string" &&
+		typeof value.algorithm === "string" &&
+		typeof value.solution === "string" &&
+		typeof value.showSolution === "boolean"
+	);
+}
+
+// Mirrors packages/web/src/form-preferences.ts; duplicated here because this
+// static page runs unmodified in the browser, with no build step available
+// to import the compiled/tested module.
+function serializeFormPreferences(preferences) {
+	return encodeURIComponent(JSON.stringify(preferences));
+}
+
+function parseFormPreferences(rawCookieValue) {
+	if (!rawCookieValue) {
+		return null;
+	}
+
+	let decoded;
+	try {
+		decoded = JSON.parse(decodeURIComponent(rawCookieValue));
+	} catch {
+		return null;
+	}
+
+	return isMazeFormPreferences(decoded) ? decoded : null;
+}
+
+function readCookie(name) {
+	const match = document.cookie
+		.split("; ")
+		.find((entry) => entry.startsWith(`${name}=`));
+	return match ? match.slice(name.length + 1) : undefined;
+}
+
+function writeCookie(name, value, maxAgeSeconds) {
+	document.cookie = `${name}=${value}; max-age=${maxAgeSeconds}; path=/; samesite=lax`;
+}
+
 // Mirrors the rules tested in packages/web/src/maze-form-validation.ts;
 // duplicated here because this static page runs unmodified in the browser,
 // with no build step available to import the compiled/tested module.
@@ -114,6 +165,19 @@ function initMazeForm() {
 
 	let lastMazeRequestBody = null;
 
+	const storedPreferences = parseFormPreferences(
+		readCookie(FORM_PREFERENCES_COOKIE_NAME),
+	);
+	if (storedPreferences) {
+		form.width.value = storedPreferences.width;
+		form.height.value = storedPreferences.height;
+		form.difficulty.value = storedPreferences.difficulty;
+		form["maze-type"].value = storedPreferences.type;
+		form["maze-algorithm"].value = storedPreferences.algorithm;
+		form["solution-mode"].value = storedPreferences.solution;
+		form["show-solution"].checked = storedPreferences.showSolution;
+	}
+
 	const hidePreview = () => {
 		previewElement.style.display = "none";
 		solutionBranchCountElement.textContent = "";
@@ -205,6 +269,20 @@ function initMazeForm() {
 			hidePreview();
 			return;
 		}
+
+		writeCookie(
+			FORM_PREFERENCES_COOKIE_NAME,
+			serializeFormPreferences({
+				width: form.width.value,
+				height: form.height.value,
+				difficulty: form.difficulty.value,
+				type: form["maze-type"].value,
+				algorithm: form["maze-algorithm"].value,
+				solution: form["solution-mode"].value,
+				showSolution: form["show-solution"].checked,
+			}),
+			FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS,
+		);
 
 		const requestBody = JSON.stringify({
 			...result.value,
