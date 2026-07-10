@@ -1,7 +1,7 @@
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 
-const MAZE_TYPES = ["rectangle", "rectangle-crossing"];
+const MAZE_TYPES = ["rectangle", "rectangle-crossing", "circle"];
 const DEFAULT_MAZE_TYPE = "rectangle";
 
 const MAZE_ALGORITHMS = ["growing-tree", "kruskal", "wilson", "aldous-broder"];

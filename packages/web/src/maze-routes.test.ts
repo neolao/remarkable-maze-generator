@@ -129,6 +129,24 @@ describe("POST /api/mazes/generate", () => {
 		expect(response.headers["content-type"]).toBe("application/pdf");
 	});
 
+	it("accepts the circle maze type", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 10,
+				height: 8,
+				seed: 3,
+				type: "circle",
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.headers["content-type"]).toBe("application/pdf");
+	});
+
 	it("returns 400 with a clear message when the maze type is invalid", async () => {
 		const app = buildServer();
 

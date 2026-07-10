@@ -1,3 +1,4 @@
+import { wrapCoordinate } from "./maze-algorithms/shared.js";
 import type { Maze } from "./maze.js";
 
 export interface MazePosition {
@@ -32,10 +33,16 @@ function getOpenMoves(maze: Maze, node: Node): Node[] {
 	const cellIsCrossing = isCrossingCell(maze, node.x, node.y);
 	const moves: Node[] = [];
 
+	// The "circle" type wraps horizontally end-to-end (see ADR 034): its
+	// west/east walls at the grid boundary are real, walkable passages to the
+	// opposite column, not the always-closed boundary they are for every
+	// other type.
+	const wrapsHorizontally = maze.type === "circle";
+
 	const tryMove = (open: boolean, dx: number, dy: number, axis: Axis) => {
 		if (!open) return;
 		if (cellIsCrossing && node.axis !== "" && axis !== node.axis) return;
-		const x = node.x + dx;
+		const x = wrapCoordinate(node.x + dx, maze.width, wrapsHorizontally);
 		const y = node.y + dy;
 		moves.push({
 			x,

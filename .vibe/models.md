@@ -3,10 +3,10 @@
 ## Maze
 | Field | Type | Notes |
 |---|---|---|
-| width | number | grid width in cells |
-| height | number | grid height in cells |
-| cells | Cell[][] | rows (`cells[y][x]`), one entry per grid cell |
-| type | MazeType | optional; `"rectangle"` (default) or `"rectangle-crossing"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016 and ADR 022 |
+| width | number | grid width in cells — for `type: "circle"`, the number of angular sectors |
+| height | number | grid height in cells — for `type: "circle"`, the number of concentric rings |
+| cells | Cell[][] | rows (`cells[y][x]`), one entry per grid cell; for `type: "circle"`, the same grid reinterpreted in polar coordinates (row 0 innermost ring), see ADR 034 |
+| type | MazeType | optional; `"rectangle"` (default), `"rectangle-crossing"`, or `"circle"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016, ADR 022, and ADR 034 |
 | seed | number | optional; the resolved seed used to generate this maze, see ADR 016 |
 | difficulty | number | optional; the resolved difficulty (1–5) used to generate this maze, see ADR 016 |
 | algorithm | MazeAlgorithm | optional; the resolved generation algorithm used for this maze, defaults to `"growing-tree"`, see ADR 033 |
@@ -14,11 +14,11 @@
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeType
-String literal union: `"rectangle" | "rectangle-crossing"`. See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022).
+String literal union: `"rectangle" | "rectangle-crossing" | "circle"`. `"circle"` reuses the same grid and all 4 algorithms, laid out in polar coordinates with a horizontal wraparound (ADR 034). See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022, ADR 034).
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeAlgorithm
-String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); the other three are only ever selectable with the plain `rectangle` type. See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
+String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); all 4 algorithms support `type: "circle"` (see ADR 034). See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
 Defined in: `packages/core/src/maze.ts`
 
 ## MazeCrossing

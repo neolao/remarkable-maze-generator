@@ -1,10 +1,16 @@
 import type { Cell } from "../maze.js";
-import { DIRECTIONS, createGrid, createSeededRandom } from "./shared.js";
+import {
+	DIRECTIONS,
+	createGrid,
+	createSeededRandom,
+	wrapCoordinate,
+} from "./shared.js";
 
 export interface GenerateAldousBroderMazeOptions {
 	width: number;
 	height: number;
 	seed: number;
+	wrapsHorizontally: boolean;
 }
 
 export interface AldousBroderMazeResult {
@@ -20,6 +26,7 @@ export function generateAldousBroderMaze({
 	width,
 	height,
 	seed,
+	wrapsHorizontally,
 }: GenerateAldousBroderMazeOptions): AldousBroderMazeResult {
 	const random = createSeededRandom(seed);
 	const cells = createGrid(width, height);
@@ -34,14 +41,18 @@ export function generateAldousBroderMaze({
 
 	while (remaining > 0) {
 		const candidateDirections = DIRECTIONS.filter((direction) => {
-			const nx = current.x + direction.dx;
+			const nx = wrapCoordinate(
+				current.x + direction.dx,
+				width,
+				wrapsHorizontally,
+			);
 			const ny = current.y + direction.dy;
 			return nx >= 0 && nx < width && ny >= 0 && ny < height;
 		});
 		const direction =
 			candidateDirections[Math.floor(random() * candidateDirections.length)];
 		const next = {
-			x: current.x + direction.dx,
+			x: wrapCoordinate(current.x + direction.dx, width, wrapsHorizontally),
 			y: current.y + direction.dy,
 		};
 

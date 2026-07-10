@@ -1,4 +1,7 @@
 import {
+	computeCellCenter,
+	computeCircleDiameter,
+	computeCircleSegments,
 	computeTubeSegments,
 	computeWallSegments,
 	isArcSegment,
@@ -41,19 +44,24 @@ function renderLines(
 		.join("");
 }
 
-function cellCenter(position: MazePosition, cellSizePx: number) {
+function cellCenter(maze: Maze, position: MazePosition, cellSizePx: number) {
+	const unitCenter = computeCellCenter(maze, position);
 	return {
-		x: position.x * cellSizePx + cellSizePx / 2,
-		y: position.y * cellSizePx + cellSizePx / 2,
+		x: unitCenter.x * cellSizePx,
+		y: unitCenter.y * cellSizePx,
 	};
 }
 
-function renderSolutionTrace(path: MazePosition[], cellSizePx: number): string {
+function renderSolutionTrace(
+	maze: Maze,
+	path: MazePosition[],
+	cellSizePx: number,
+): string {
 	let markup = "";
 
 	for (let i = 0; i < path.length - 1; i++) {
-		const from = cellCenter(path[i], cellSizePx);
-		const to = cellCenter(path[i + 1], cellSizePx);
+		const from = cellCenter(maze, path[i], cellSizePx);
+		const to = cellCenter(maze, path[i + 1], cellSizePx);
 		markup += `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="${SOLUTION_COLOR}" stroke-width="${SOLUTION_STROKE_WIDTH_PX}" stroke-linecap="round" />`;
 	}
 
@@ -61,6 +69,7 @@ function renderSolutionTrace(path: MazePosition[], cellSizePx: number): string {
 }
 
 function renderBranchPointMarkers(
+	maze: Maze,
 	branchPoints: MazePosition[],
 	cellSizePx: number,
 ): string {
@@ -68,10 +77,18 @@ function renderBranchPointMarkers(
 
 	return branchPoints
 		.map((position) => {
-			const center = cellCenter(position, cellSizePx);
+			const center = cellCenter(maze, position, cellSizePx);
 			return `<circle cx="${center.x}" cy="${center.y}" r="${radius}" fill="${SOLUTION_COLOR}" />`;
 		})
 		.join("");
+}
+
+function logicalSvgSize(maze: Maze): { width: number; height: number } {
+	if (maze.type === "circle") {
+		const diameter = computeCircleDiameter(maze);
+		return { width: diameter, height: diameter };
+	}
+	return { width: maze.width, height: maze.height };
 }
 
 export function renderMazeToSvg(
@@ -79,20 +96,24 @@ export function renderMazeToSvg(
 	options: RenderMazeToSvgOptions = {},
 ): string {
 	const cellSizePx = options.cellSizePx ?? DEFAULT_CELL_SIZE_PX;
-	const width = maze.width * cellSizePx;
-	const height = maze.height * cellSizePx;
+	const { width: logicalWidth, height: logicalHeight } = logicalSvgSize(maze);
+	const width = logicalWidth * cellSizePx;
+	const height = logicalHeight * cellSizePx;
 
 	// Every line is independent — no fill or stroke-width layering. For
 	// "rectangle-crossing", each corridor is its own two edge lines (see ADR
-	// 026); the classic type keeps drawing plain walls.
+	// 026); "circle" draws its ring/sector walls (see ADR 034); the classic
+	// type keeps drawing plain walls.
 	const lines =
 		maze.type === "rectangle-crossing"
 			? renderLines(computeTubeSegments(maze), cellSizePx, "round")
-			: renderLines(computeWallSegments(maze), cellSizePx, "square");
+			: maze.type === "circle"
+				? renderLines(computeCircleSegments(maze), cellSizePx, "square")
+				: renderLines(computeWallSegments(maze), cellSizePx, "square");
 
 	const solutionMarkup = options.showSolution
-		? renderSolutionTrace(solveMaze(maze), cellSizePx) +
-			renderBranchPointMarkers(findSolutionBranchPoints(maze), cellSizePx)
+		? renderSolutionTrace(maze, solveMaze(maze), cellSizePx) +
+			renderBranchPointMarkers(maze, findSolutionBranchPoints(maze), cellSizePx)
 		: "";
 
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="white" />${lines}${solutionMarkup}</svg>`;

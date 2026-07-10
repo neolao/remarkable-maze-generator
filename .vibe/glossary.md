@@ -32,7 +32,7 @@
 
 ## Maze type
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `MazeType`, `MAZE_TYPES`, `type` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 022)
+**Code:** `MazeType`, `MAZE_TYPES`, `type` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 022, ADR 034)
 **Do not confuse with:** Difficulty
 
 ## Branch point

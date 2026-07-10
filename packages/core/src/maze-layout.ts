@@ -75,6 +75,130 @@ export function computeWallSegments(maze: Maze): LineSegment[] {
 }
 
 /**
+ * Radius (in ring-width units, i.e. the same unit as one cell) of the hole at
+ * the very center of a "circle" maze — ring `y`'s inner edge sits at
+ * `CIRCLE_INNER_RADIUS_RATIO + y`, its outer edge at
+ * `CIRCLE_INNER_RADIUS_RATIO + y + 1` (see ADR 034). A plain `0` would put
+ * every sector's inner corner at the exact same point, which is both visually
+ * cluttered and geometrically degenerate for the entrance opening.
+ */
+export const CIRCLE_INNER_RADIUS_RATIO = 1;
+
+/**
+ * Side length (in unit cell coordinates) of the square bounding box a
+ * "circle" maze is laid out in — the same coordinate system `computeCircleSegments`
+ * and `computeCellCenter` use, so the PDF/SVG renderers can size their canvas
+ * from this the same way they use `maze.width`/`maze.height` for the other
+ * types.
+ */
+export function computeCircleDiameter(maze: Maze): number {
+	return 2 * (CIRCLE_INNER_RADIUS_RATIO + maze.height);
+}
+
+function circlePoint(maze: Maze, radius: number, angle: number): Point {
+	const center = computeCircleDiameter(maze) / 2;
+	return {
+		x: center + radius * Math.cos(angle),
+		y: center + radius * Math.sin(angle),
+	};
+}
+
+// The existing ArcSegment renderer always draws the *minor* arc between its
+// two endpoints (a fixed SVG "large-arc-flag" of 0 — see `drawMazeSegments`
+// and `renderLines`), so any span at or beyond 180° must be split in half,
+// recursively, until every piece is safely under that threshold.
+function circleArcSegments(
+	maze: Maze,
+	radius: number,
+	startAngle: number,
+	endAngle: number,
+): ArcSegment[] {
+	if (endAngle - startAngle >= Math.PI) {
+		const midAngle = (startAngle + endAngle) / 2;
+		return [
+			...circleArcSegments(maze, radius, startAngle, midAngle),
+			...circleArcSegments(maze, radius, midAngle, endAngle),
+		];
+	}
+
+	const from = circlePoint(maze, radius, startAngle);
+	const to = circlePoint(maze, radius, endAngle);
+	// Sweep 1 (the SVG "positive-angle" direction) matches increasing angle in
+	// `circlePoint`'s Y-down parametrization, so this always traces the short
+	// way from `startAngle` to `endAngle` — confirmed by rendering a real
+	// circle maze end-to-end (see the "Rendering" runtime smoke check).
+	return [{ x1: from.x, y1: from.y, x2: to.x, y2: to.y, radius, sweep: 1 }];
+}
+
+/**
+ * Wall segments for the "circle" maze type, in the same unit coordinate
+ * system as `computeWallSegments` (scaled/offset identically by the PDF/SVG
+ * renderers) — a column becomes an angular sector, a row a concentric ring
+ * (row 0 innermost, see ADR 034). Ring-boundary walls (`north`/`south`)
+ * become arcs; the sole angular boundary between two sectors (`west`) becomes
+ * a radial line — `east` is never drawn separately, since generation always
+ * mirrors it onto the next sector's own `west` (including across the
+ * wraparound), the same way interior walls are never double-drawn in
+ * `computeWallSegments`.
+ */
+export function computeCircleSegments(maze: Maze): TubeSegment[] {
+	validateMazeShape(maze);
+
+	const segments: TubeSegment[] = [];
+	const angleStep = (2 * Math.PI) / maze.width;
+
+	for (let y = 0; y < maze.height; y++) {
+		const innerRadius = CIRCLE_INNER_RADIUS_RATIO + y;
+		const outerRadius = CIRCLE_INNER_RADIUS_RATIO + y + 1;
+
+		for (let x = 0; x < maze.width; x++) {
+			const cell = maze.cells[y][x];
+			const isEntrance = x === 0 && y === 0;
+			const isExit = x === maze.width - 1 && y === maze.height - 1;
+			const startAngle = x * angleStep;
+			const endAngle = (x + 1) * angleStep;
+
+			if (cell.walls.north && !isEntrance) {
+				segments.push(
+					...circleArcSegments(maze, innerRadius, startAngle, endAngle),
+				);
+			}
+			if (cell.walls.west) {
+				const from = circlePoint(maze, innerRadius, startAngle);
+				const to = circlePoint(maze, outerRadius, startAngle);
+				segments.push({ x1: from.x, y1: from.y, x2: to.x, y2: to.y });
+			}
+			if (y === maze.height - 1 && cell.walls.south && !isExit) {
+				segments.push(
+					...circleArcSegments(maze, outerRadius, startAngle, endAngle),
+				);
+			}
+		}
+	}
+
+	return segments;
+}
+
+/**
+ * The physical center of cell (x,y), in the same unit coordinate system as
+ * the wall/tube/circle segment computations above — used to place the
+ * solution trace and branch-point markers correctly regardless of maze type.
+ */
+export function computeCellCenter(
+	maze: Maze,
+	position: { x: number; y: number },
+): Point {
+	if (maze.type !== "circle") {
+		return { x: position.x + 0.5, y: position.y + 0.5 };
+	}
+
+	const angleStep = (2 * Math.PI) / maze.width;
+	const angle = (position.x + 0.5) * angleStep;
+	const radius = CIRCLE_INNER_RADIUS_RATIO + position.y + 0.5;
+	return circlePoint(maze, radius, angle);
+}
+
+/**
  * Half-width (as a fraction of the cell size) of the "rectangle-crossing"
  * tube: each corridor is drawn as its two edge lines, offset this much from
  * the centerline on either side — two independent solid strokes, no

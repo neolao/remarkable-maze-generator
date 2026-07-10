@@ -8,6 +8,9 @@ import {
 } from "pdf-lib";
 import type { TubeSegment } from "./maze-layout.js";
 import {
+	computeCellCenter,
+	computeCircleDiameter,
+	computeCircleSegments,
 	computeTubeSegments,
 	computeWallSegments,
 	isArcSegment,
@@ -56,16 +59,29 @@ interface MazeLayout {
 	topOffset: number;
 }
 
+// The "circle" type lays out its segments in a square bounding box sized by
+// its diameter (see ADR 034), not by `maze.width`/`maze.height` directly —
+// every other type keeps using its cell grid dimensions as before.
+function logicalLayoutSize(maze: Maze): { width: number; height: number } {
+	if (maze.type === "circle") {
+		const diameter = computeCircleDiameter(maze);
+		return { width: diameter, height: diameter };
+	}
+	return { width: maze.width, height: maze.height };
+}
+
 function computeLayout(maze: Maze): MazeLayout {
+	const { width: logicalWidth, height: logicalHeight } =
+		logicalLayoutSize(maze);
 	const drawableWidth = REMARKABLE_2_PAGE_WIDTH_PT - 2 * PAGE_MARGIN_PT;
 	const drawableHeight = REMARKABLE_2_PAGE_HEIGHT_PT - 2 * PAGE_MARGIN_PT;
 	const cellSize = Math.min(
-		drawableWidth / maze.width,
-		drawableHeight / maze.height,
+		drawableWidth / logicalWidth,
+		drawableHeight / logicalHeight,
 	);
 
-	const mazeWidthPt = cellSize * maze.width;
-	const mazeHeightPt = cellSize * maze.height;
+	const mazeWidthPt = cellSize * logicalWidth;
+	const mazeHeightPt = cellSize * logicalHeight;
 
 	return {
 		cellSize,
@@ -140,14 +156,18 @@ function drawMazeSegments(
 
 function drawSolutionPath(
 	page: PDFPage,
+	maze: Maze,
 	path: MazePosition[],
 	layout: MazeLayout,
 ): void {
 	const { cellSize, leftOffset } = layout;
-	const cellCenter = (position: MazePosition) => ({
-		x: leftOffset + position.x * cellSize + cellSize / 2,
-		y: toPdfY(layout, position.y * cellSize + cellSize / 2),
-	});
+	const cellCenter = (position: MazePosition) => {
+		const unitCenter = computeCellCenter(maze, position);
+		return {
+			x: leftOffset + unitCenter.x * cellSize,
+			y: toPdfY(layout, unitCenter.y * cellSize),
+		};
+	};
 
 	for (let i = 0; i < path.length - 1; i++) {
 		const from = cellCenter(path[i]);
@@ -198,6 +218,15 @@ function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
 			STROKE_COLOR,
 			LineCapStyle.Round,
 		);
+	} else if (maze.type === "circle") {
+		drawMazeSegments(
+			page,
+			computeCircleSegments(maze),
+			layout,
+			STROKE_THICKNESS_PT,
+			STROKE_COLOR,
+			LineCapStyle.Butt,
+		);
 	} else {
 		drawMazeSegments(
 			page,
@@ -228,14 +257,14 @@ function addMazePages(
 	if (parametersLabel) drawParametersLabel(mazePage, font, parametersLabel);
 
 	if (solutionMode === "overlay") {
-		drawSolutionPath(mazePage, solveMaze(maze), layout);
+		drawSolutionPath(mazePage, maze, solveMaze(maze), layout);
 	} else if (solutionMode === "extra-page") {
 		const solutionPage = document.addPage([
 			REMARKABLE_2_PAGE_WIDTH_PT,
 			REMARKABLE_2_PAGE_HEIGHT_PT,
 		]);
 		drawMaze(solutionPage, maze, layout);
-		drawSolutionPath(solutionPage, solveMaze(maze), layout);
+		drawSolutionPath(solutionPage, maze, solveMaze(maze), layout);
 		if (parametersLabel)
 			drawParametersLabel(solutionPage, font, parametersLabel);
 	}

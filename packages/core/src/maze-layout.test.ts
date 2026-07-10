@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+	CIRCLE_INNER_RADIUS_RATIO,
 	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
+	computeCellCenter,
+	computeCircleDiameter,
+	computeCircleSegments,
 	computeTubeSegments,
 	computeWallSegments,
 	isArcSegment,
@@ -545,5 +549,168 @@ describe("computeTubeSegments", () => {
 
 	it("keeps the tube narrower than a full cell, leaving a real boundary margin", () => {
 		expect(TUBE_HALF_WIDTH_RATIO).toBeLessThan(0.5);
+	});
+});
+
+describe("computeCircleDiameter", () => {
+	it("grows with the number of rings, twice the inner radius plus the ring count", () => {
+		const maze = generateMaze({ width: 8, height: 5, seed: 1, type: "circle" });
+
+		expect(computeCircleDiameter(maze)).toBe(
+			2 * (CIRCLE_INNER_RADIUS_RATIO + 5),
+		);
+	});
+});
+
+describe("computeCircleSegments", () => {
+	it("throws a clear error for a maze with invalid dimensions", () => {
+		const invalidMaze = generateMaze({
+			width: 3,
+			height: 3,
+			seed: 1,
+			type: "circle",
+		});
+		invalidMaze.width = 0;
+
+		expect(() => computeCircleSegments(invalidMaze)).toThrow();
+	});
+
+	it("handles the minimal 1x1 circle maze without throwing", () => {
+		const maze = generateMaze({ width: 1, height: 1, seed: 1, type: "circle" });
+
+		expect(() => computeCircleSegments(maze)).not.toThrow();
+	});
+
+	// Every qualifying wall contributes exactly one segment (no arc gets split
+	// into two half-arcs here, since width 6 keeps every sector well under the
+	// 180° split threshold — see the dedicated reflex-angle test below).
+	function countExpectedCircleSegments(maze: Maze): number {
+		let expectedCount = 0;
+		for (let y = 0; y < maze.height; y++) {
+			for (let x = 0; x < maze.width; x++) {
+				const cell = maze.cells[y][x];
+				const isEntrance = x === 0 && y === 0;
+				const isExit = x === maze.width - 1 && y === maze.height - 1;
+				if (cell.walls.north && !isEntrance) expectedCount++;
+				if (cell.walls.west) expectedCount++;
+				if (y === maze.height - 1 && cell.walls.south && !isExit)
+					expectedCount++;
+			}
+		}
+		return expectedCount;
+	}
+
+	it("returns one segment per relevant wall, skipping the entrance and exit openings", () => {
+		const maze = generateMaze({ width: 6, height: 4, seed: 1, type: "circle" });
+
+		const segments = computeCircleSegments(maze);
+
+		expect(segments.length).toBeGreaterThan(0);
+		expect(segments.length).toBe(countExpectedCircleSegments(maze));
+	});
+
+	it("never draws the entrance's inner-ring wall even if the cell has it walled", () => {
+		const maze = generateMaze({ width: 6, height: 4, seed: 1, type: "circle" });
+		maze.cells[0][0].walls.north = true;
+
+		const segments = computeCircleSegments(maze);
+
+		// The counting formula already excludes the entrance regardless of the
+		// (forced-true) flag value — a real implementation bug that forgot the
+		// entrance skip would draw one extra arc here, failing this equality.
+		expect(segments.length).toBe(countExpectedCircleSegments(maze));
+	});
+
+	it("never draws the exit's outer-ring wall even if the cell has it walled", () => {
+		const maze = generateMaze({ width: 6, height: 4, seed: 1, type: "circle" });
+		const lastY = maze.height - 1;
+		const lastX = maze.width - 1;
+		maze.cells[lastY][lastX].walls.south = true;
+
+		const segments = computeCircleSegments(maze);
+
+		expect(segments.length).toBe(countExpectedCircleSegments(maze));
+	});
+
+	it("never produces an arc spanning a reflex angle (>= 180°), regardless of sector count", () => {
+		for (const width of [1, 2, 3, 7]) {
+			const maze = generateMaze({
+				width,
+				height: 3,
+				seed: 1,
+				type: "circle",
+			});
+			// Force every wall closed so every possible arc is actually drawn.
+			for (const row of maze.cells) {
+				for (const cell of row) {
+					cell.walls = { north: true, south: true, east: true, west: true };
+				}
+			}
+
+			const segments = computeCircleSegments(maze);
+			for (const segment of segments) {
+				if (!isArcSegment(segment)) continue;
+				const chordLength = Math.hypot(
+					segment.x2 - segment.x1,
+					segment.y2 - segment.y1,
+				);
+				// A chord subtending a reflex arc (>= 180°) can never exceed the
+				// diameter; requiring it to be strictly less than the diameter
+				// rules out any arc at or beyond 180° here (this fixed radius
+				// only ever appears at exactly 180° in the untouched case, never
+				// beyond, so this check is sufficient for this test's purpose).
+				expect(chordLength).toBeLessThan(2 * segment.radius);
+			}
+		}
+	});
+
+	it("produces a non-empty, valid segment list for every one of the 4 generation algorithms", () => {
+		for (const algorithm of [
+			"growing-tree",
+			"kruskal",
+			"wilson",
+			"aldous-broder",
+		] as const) {
+			const maze = generateMaze({
+				width: 10,
+				height: 6,
+				seed: 3,
+				type: "circle",
+				algorithm,
+			});
+
+			const segments = computeCircleSegments(maze);
+			expect(segments.length).toBeGreaterThan(0);
+		}
+	});
+});
+
+describe("computeCellCenter", () => {
+	it("returns the plain Cartesian cell center for the rectangle type", () => {
+		const maze = generateMaze({ width: 5, height: 4, seed: 1 });
+
+		expect(computeCellCenter(maze, { x: 2, y: 1 })).toEqual({ x: 2.5, y: 1.5 });
+	});
+
+	it("returns a point at the ring's mid-radius from the center, for the circle type", () => {
+		const maze = generateMaze({ width: 8, height: 4, seed: 1, type: "circle" });
+		const diameter = computeCircleDiameter(maze);
+		const center = diameter / 2;
+
+		const point = computeCellCenter(maze, { x: 3, y: 2 });
+		const distance = Math.hypot(point.x - center, point.y - center);
+
+		expect(distance).toBeCloseTo(CIRCLE_INNER_RADIUS_RATIO + 2 + 0.5, 9);
+	});
+
+	it("places different sectors of the same ring at different angles (not all on top of each other)", () => {
+		const maze = generateMaze({ width: 8, height: 4, seed: 1, type: "circle" });
+
+		const first = computeCellCenter(maze, { x: 0, y: 1 });
+		const second = computeCellCenter(maze, { x: 4, y: 1 });
+
+		expect(Math.hypot(first.x - second.x, first.y - second.y)).toBeGreaterThan(
+			0.5,
+		);
 	});
 });

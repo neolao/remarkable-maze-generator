@@ -35,3 +35,16 @@ export function createGrid(width: number, height: number): Cell[][] {
 		})),
 	);
 }
+
+// The "circle" type reuses this same rectangular grid, walked as a cylinder
+// instead of a plane: column `width - 1`'s east neighbor is column 0, and vice
+// versa (see ADR 034). `wraps` is false for every other type, where an
+// out-of-range column is simply not a neighbor.
+export function wrapCoordinate(
+	value: number,
+	size: number,
+	wraps: boolean,
+): number {
+	if (!wraps) return value;
+	return ((value % size) + size) % size;
+}

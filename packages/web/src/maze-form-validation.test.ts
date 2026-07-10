@@ -54,6 +54,27 @@ describe("validateMazeFormInput", () => {
 		});
 	});
 
+	it("accepts circle as a valid maze type", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			type: "circle",
+		});
+
+		expect(result).toEqual({
+			valid: true,
+			value: {
+				width: 10,
+				height: 8,
+				difficulty: 3,
+				type: "circle",
+				algorithm: "growing-tree",
+				solution: "none",
+			},
+		});
+	});
+
 	it("rejects an unknown maze type with a clear message", () => {
 		const result = validateMazeFormInput({
 			width: "10",

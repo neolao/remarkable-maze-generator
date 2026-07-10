@@ -68,6 +68,18 @@ describe("public maze configuration page", () => {
 		);
 	});
 
+	it("exposes the maze type as a select with all three types", () => {
+		const match = html.match(
+			/<select[^>]+id="maze-type"[^>]*>([\s\S]*?)<\/select>/,
+		);
+		expect(match).not.toBeNull();
+
+		const optionsMarkup = match?.[1] ?? "";
+		expect(optionsMarkup).toContain('value="rectangle"');
+		expect(optionsMarkup).toContain('value="rectangle-crossing"');
+		expect(optionsMarkup).toContain('value="circle"');
+	});
+
 	it("exposes the solution display mode as a select with all three modes", () => {
 		const match = html.match(
 			/<select[^>]+id="solution-mode"[^>]*>([\s\S]*?)<\/select>/,

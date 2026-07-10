@@ -25,9 +25,13 @@ export interface MazeCrossing {
 	underAxis: "vertical" | "horizontal";
 }
 
-export type MazeType = "rectangle" | "rectangle-crossing";
+export type MazeType = "rectangle" | "rectangle-crossing" | "circle";
 
-export const MAZE_TYPES: MazeType[] = ["rectangle", "rectangle-crossing"];
+export const MAZE_TYPES: MazeType[] = [
+	"rectangle",
+	"rectangle-crossing",
+	"circle",
+];
 
 export function isValidMazeType(value: string): value is MazeType {
 	return (MAZE_TYPES as string[]).includes(value);
@@ -149,6 +153,7 @@ interface GenerateCellsOptions {
 	seed: number;
 	difficulty: number;
 	allowsCrossings: boolean;
+	wrapsHorizontally: boolean;
 }
 
 interface GeneratedCells {
@@ -187,12 +192,14 @@ export function generateMaze({
 	validateTypeAlgorithmCompatibility(type, algorithm);
 
 	const allowsCrossings = type === "rectangle-crossing";
+	const wrapsHorizontally = type === "circle";
 	const { cells, crossings } = generateCells(algorithm, {
 		width,
 		height,
 		seed,
 		difficulty,
 		allowsCrossings,
+		wrapsHorizontally,
 	});
 
 	return {

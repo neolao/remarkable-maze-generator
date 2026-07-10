@@ -1,10 +1,11 @@
 import type { Cell } from "../maze.js";
-import { createGrid, createSeededRandom } from "./shared.js";
+import { createGrid, createSeededRandom, wrapCoordinate } from "./shared.js";
 
 export interface GenerateKruskalMazeOptions {
 	width: number;
 	height: number;
 	seed: number;
+	wrapsHorizontally: boolean;
 }
 
 export interface KruskalMazeResult {
@@ -64,6 +65,7 @@ export function generateKruskalMaze({
 	width,
 	height,
 	seed,
+	wrapsHorizontally,
 }: GenerateKruskalMazeOptions): KruskalMazeResult {
 	const random = createSeededRandom(seed);
 	const cells = createGrid(width, height);
@@ -74,13 +76,22 @@ export function generateKruskalMaze({
 			if (x + 1 < width) edges.push({ x, y, direction: "east" });
 			if (y + 1 < height) edges.push({ x, y, direction: "south" });
 		}
+		// Closes the ring: the last column's east neighbor is column 0 (see
+		// ADR 034). Skipped when width is 1 — that "neighbor" would be the same
+		// cell, not a real second connection.
+		if (wrapsHorizontally && width > 1) {
+			edges.push({ x: width - 1, y, direction: "east" });
+		}
 	}
 
 	const disjointSet = new DisjointSet(width * height);
 	const cellIndex = (x: number, y: number) => y * width + x;
 
 	for (const edge of shuffle(edges, random)) {
-		const neighborX = edge.direction === "east" ? edge.x + 1 : edge.x;
+		const neighborX =
+			edge.direction === "east"
+				? wrapCoordinate(edge.x + 1, width, wrapsHorizontally)
+				: edge.x;
 		const neighborY = edge.direction === "south" ? edge.y + 1 : edge.y;
 
 		const connected = disjointSet.union(

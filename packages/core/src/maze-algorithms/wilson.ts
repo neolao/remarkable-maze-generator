@@ -1,10 +1,17 @@
 import type { Cell } from "../maze.js";
-import { DIRECTIONS, createGrid, createSeededRandom } from "./shared.js";
+import {
+	DIRECTIONS,
+	type Direction,
+	createGrid,
+	createSeededRandom,
+	wrapCoordinate,
+} from "./shared.js";
 
 export interface GenerateWilsonMazeOptions {
 	width: number;
 	height: number;
 	seed: number;
+	wrapsHorizontally: boolean;
 }
 
 export interface WilsonMazeResult {
@@ -29,6 +36,7 @@ export function generateWilsonMaze({
 	width,
 	height,
 	seed,
+	wrapsHorizontally,
 }: GenerateWilsonMazeOptions): WilsonMazeResult {
 	const random = createSeededRandom(seed);
 	const cells = createGrid(width, height);
@@ -53,23 +61,33 @@ export function generateWilsonMaze({
 			start = allCells[Math.floor(random() * allCells.length)];
 		} while (inMaze[start.y][start.x]);
 
-		// The loop-erased random walk: `path` holds the current walk, and
-		// `positionInPath` lets a revisit collapse the loop it just closed back
-		// to its first occurrence instead of leaving a dead-end detour behind.
+		// The loop-erased random walk: `path` holds the current walk and
+		// `pathDirections[i]` the direction taken from `path[i]` to
+		// `path[i+1]` — tracked directly rather than re-derived from the two
+		// positions afterward, since a wraparound step's coordinate delta
+		// doesn't match any direction's plain `dx`/`dy` (see ADR 034).
+		// `positionInPath` lets a revisit collapse the loop it just closed
+		// back to its first occurrence instead of leaving a dead-end detour
+		// behind.
 		const path: Position[] = [start];
+		const pathDirections: Direction[] = [];
 		const positionInPath = new Map<string, number>([[positionKey(start), 0]]);
 
 		let current = start;
 		while (!inMaze[current.y][current.x]) {
 			const candidateDirections = DIRECTIONS.filter((direction) => {
-				const nx = current.x + direction.dx;
+				const nx = wrapCoordinate(
+					current.x + direction.dx,
+					width,
+					wrapsHorizontally,
+				);
 				const ny = current.y + direction.dy;
 				return nx >= 0 && nx < width && ny >= 0 && ny < height;
 			});
 			const direction =
 				candidateDirections[Math.floor(random() * candidateDirections.length)];
 			const next: Position = {
-				x: current.x + direction.dx,
+				x: wrapCoordinate(current.x + direction.dx, width, wrapsHorizontally),
 				y: current.y + direction.dy,
 			};
 			const key = positionKey(next);
@@ -79,9 +97,11 @@ export function generateWilsonMaze({
 				while (path.length > loopStart + 1) {
 					const removed = path.pop();
 					if (removed) positionInPath.delete(positionKey(removed));
+					pathDirections.pop();
 				}
 			} else {
 				path.push(next);
+				pathDirections.push(direction);
 				positionInPath.set(key, path.length - 1);
 			}
 			current = next;
@@ -90,11 +110,7 @@ export function generateWilsonMaze({
 		for (let i = 0; i < path.length - 1; i++) {
 			const a = path[i];
 			const b = path[i + 1];
-			const direction = DIRECTIONS.find(
-				(candidate) => candidate.dx === b.x - a.x && candidate.dy === b.y - a.y,
-			);
-			if (!direction)
-				throw new Error("Unreachable: walk step was not a single-cell move");
+			const direction = pathDirections[i];
 
 			cells[a.y][a.x].walls[direction.wall] = false;
 			cells[b.y][b.x].walls[direction.opposite] = false;

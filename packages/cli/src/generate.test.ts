@@ -239,6 +239,30 @@ describe("runGenerate", () => {
 		).rejects.toThrow(/hexagon/);
 	});
 
+	it("forwards the circle type, producing a maze rendered as a circle", async () => {
+		const rectangle = await runGenerate({
+			width: 12,
+			height: 8,
+			seed: 3,
+			output: join(workDir, "rectangle.pdf"),
+			cwd: workDir,
+		});
+		const circle = await runGenerate({
+			width: 12,
+			height: 8,
+			seed: 3,
+			type: "circle",
+			output: join(workDir, "circle.pdf"),
+			cwd: workDir,
+		});
+
+		const [rectangleBytes, circleBytes] = await Promise.all([
+			readFile(rectangle.outputPath),
+			readFile(circle.outputPath),
+		]);
+		expect(circleBytes).not.toEqual(rectangleBytes);
+	});
+
 	it("defaults to the growing-tree algorithm when the algorithm option is omitted", async () => {
 		const withoutAlgorithm = await runGenerate({
 			width: 8,

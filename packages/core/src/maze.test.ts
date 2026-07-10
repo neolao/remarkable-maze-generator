@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { countOpenPassages } from "./maze-algorithms/test-helpers.js";
 import {
 	MAZE_ALGORITHMS,
 	MAZE_TYPES,
@@ -10,9 +11,16 @@ import {
 	isValidMazeType,
 } from "./maze.js";
 
-function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
+// `wraps: true` treats the east neighbor of the last column as column 0 (and
+// vice versa), matching the "circle" type's horizontal wraparound (ADR 034) —
+// irrelevant for the other types, where that boundary wall is never open.
+function countReachableCells(
+	maze: ReturnType<typeof generateMaze>,
+	wraps = false,
+): number {
 	const visited = new Set<string>();
 	const stack = [{ x: 0, y: 0 }];
+	const wrapX = (x: number) => ((x % maze.width) + maze.width) % maze.width;
 
 	while (stack.length > 0) {
 		const current = stack.pop();
@@ -26,8 +34,16 @@ function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
 
 		if (!cell.walls.north) stack.push({ x: current.x, y: current.y - 1 });
 		if (!cell.walls.south) stack.push({ x: current.x, y: current.y + 1 });
-		if (!cell.walls.east) stack.push({ x: current.x + 1, y: current.y });
-		if (!cell.walls.west) stack.push({ x: current.x - 1, y: current.y });
+		if (!cell.walls.east)
+			stack.push({
+				x: wraps ? wrapX(current.x + 1) : current.x + 1,
+				y: current.y,
+			});
+		if (!cell.walls.west)
+			stack.push({
+				x: wraps ? wrapX(current.x - 1) : current.x - 1,
+				y: current.y,
+			});
 	}
 
 	return visited.size;
@@ -381,8 +397,8 @@ describe("generateMaze - dead-end branch length", () => {
 });
 
 describe("MAZE_TYPES / isValidMazeType / invalidMazeTypeMessage", () => {
-	it("lists rectangle and rectangle-crossing as the valid maze types", () => {
-		expect(MAZE_TYPES).toEqual(["rectangle", "rectangle-crossing"]);
+	it("lists rectangle, rectangle-crossing and circle as the valid maze types", () => {
+		expect(MAZE_TYPES).toEqual(["rectangle", "rectangle-crossing", "circle"]);
 	});
 
 	it.each(MAZE_TYPES)("accepts %s as a valid maze type", (type) => {
@@ -395,7 +411,7 @@ describe("MAZE_TYPES / isValidMazeType / invalidMazeTypeMessage", () => {
 
 	it("describes the allowed values in the invalid maze type message", () => {
 		expect(invalidMazeTypeMessage("hexagon")).toBe(
-			'Invalid maze type "hexagon", expected one of: rectangle, rectangle-crossing',
+			'Invalid maze type "hexagon", expected one of: rectangle, rectangle-crossing, circle',
 		);
 	});
 });
@@ -772,6 +788,130 @@ describe("generateMaze - aldous-broder algorithm", () => {
 		});
 
 		expect(hard.cells).toEqual(easy.cells);
+	});
+});
+
+describe("generateMaze - circle type", () => {
+	it("records the circle type on the returned maze", () => {
+		const maze = generateMaze({ width: 8, height: 6, seed: 1, type: "circle" });
+
+		expect(maze.type).toBe("circle");
+	});
+
+	it.each(MAZE_ALGORITHMS)(
+		"produces a fully connected perfect maze with the %s algorithm, using the horizontal wraparound",
+		(algorithm) => {
+			const maze = generateMaze({
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "circle",
+				algorithm,
+			});
+
+			expect(countReachableCells(maze, true)).toBe(8 * 6);
+			expect(countOpenPassages(maze.cells)).toBe(8 * 6 - 1);
+		},
+	);
+
+	it("does not connect the first and last column when reachability ignores the wraparound", () => {
+		// Sanity check for the `wraps` flag itself: without considering the
+		// wraparound connection, a plain BFS should NOT find every cell
+		// reachable, proving the wraparound edge is load-bearing for the count
+		// above rather than a no-op.
+		const maze = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "circle",
+			algorithm: "kruskal",
+		});
+
+		expect(countReachableCells(maze, false)).toBeLessThan(8 * 6);
+	});
+
+	it("fully connects a single ring (height 1) entirely through the wraparound", () => {
+		const maze = generateMaze({
+			width: 6,
+			height: 1,
+			seed: 5,
+			type: "circle",
+			algorithm: "kruskal",
+		});
+
+		expect(countReachableCells(maze, true)).toBe(6);
+	});
+
+	it("fully connects a single sector (width 1) like a plain linear chain", () => {
+		const maze = generateMaze({
+			width: 1,
+			height: 6,
+			seed: 5,
+			type: "circle",
+			algorithm: "wilson",
+		});
+
+		expect(countReachableCells(maze, true)).toBe(6);
+	});
+
+	it("does not error on a 1x1 circle maze", () => {
+		const maze = generateMaze({ width: 1, height: 1, seed: 1, type: "circle" });
+
+		expect(countReachableCells(maze, true)).toBe(1);
+	});
+
+	it("does not restrict the circle type to a specific algorithm", () => {
+		for (const algorithm of MAZE_ALGORITHMS) {
+			expect(() =>
+				generateMaze({
+					width: 6,
+					height: 6,
+					seed: 1,
+					type: "circle",
+					algorithm,
+				}),
+			).not.toThrow();
+		}
+	});
+
+	it("still applies difficulty to the growing-tree algorithm with the circle type", () => {
+		const easy = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle",
+			algorithm: "growing-tree",
+			difficulty: 1,
+		});
+		const hard = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle",
+			algorithm: "growing-tree",
+			difficulty: 5,
+		});
+
+		expect(hard.cells).not.toEqual(easy.cells);
+	});
+
+	it("generates the same circle maze twice for the same seed", () => {
+		const first = generateMaze({
+			width: 10,
+			height: 8,
+			seed: 42,
+			type: "circle",
+			algorithm: "aldous-broder",
+		});
+		const second = generateMaze({
+			width: 10,
+			height: 8,
+			seed: 42,
+			type: "circle",
+			algorithm: "aldous-broder",
+		});
+
+		expect(second.cells).toEqual(first.cells);
 	});
 });
 
