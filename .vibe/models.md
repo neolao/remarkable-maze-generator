@@ -68,6 +68,7 @@ Defined in: `packages/core/src/maze.ts`
 | type | MazeType | optional, defaults to `"rectangle"`, see ADR 022 |
 | algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; rejected if combined with `type: "rectangle-crossing"` and anything other than `"growing-tree"`, see ADR 033 |
 | pathLength | PathLengthTarget | optional; when set, triggers the multi-candidate seed search described under `PathLengthTarget` instead of a single-seed generation, see ADR 046 |
+| pathLengthCandidateCount | number | optional; overrides `PATH_LENGTH_MAX_ATTEMPTS` (10) as the number of candidates tried when `pathLength` is set — integer 1 to `MAX_PATH_LENGTH_CANDIDATE_COUNT` (50), rejected otherwise or when set without `pathLength`, see ADR 047 |
 Defined in: `packages/core/src/maze.ts`
 
 ## MazePosition
@@ -154,6 +155,7 @@ Defined in: `packages/core/src/remarkable-upload.ts`
 | algorithm | string | optional, `"growing-tree"`, `"kruskal"`, `"wilson"`, or `"aldous-broder"`, defaults to `"growing-tree"` (see ADR 033) |
 | solution | string | optional, `"none"`, `"extra-page"`, or `"overlay"`, defaults to `"none"` (see ADR 021) |
 | pathLength | string | optional, `"short"`, `"medium"`, or `"long"`; defaults to unset (no path-length filtering), see ADR 046 |
+| pathLengthCandidateCount | number | optional; forwarded as-is to `core`'s `generateMaze`, which owns its validation (see ADR 047) |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 Defined in: `packages/cli/src/generate.ts`
@@ -178,6 +180,7 @@ Defined in: `packages/cli/src/send.ts`
 | algorithm | string | optional raw form field value, defaults to `"growing-tree"` when blank, validated via `core`'s `isValidMazeAlgorithm` (see ADR 033) |
 | solution | string | optional raw form field value, defaults to `"none"` when blank, validated via `core`'s `isValidSolutionMode` (see ADR 021; backlog item 019) |
 | pathLength | string | optional raw form field value; left unset when blank (no default), validated via `core`'s `isValidPathLengthTarget` (see ADR 046) |
+| pathLengthCandidateCount | string | optional raw form field value; left unset when blank, rejected if set without `pathLength` or outside 1–`MAX_PATH_LENGTH_CANDIDATE_COUNT` (see ADR 047) |
 Defined in: `packages/web/src/maze-form-validation.ts`
 
 ## MazeFormValue (web)
@@ -190,6 +193,7 @@ Defined in: `packages/web/src/maze-form-validation.ts`
 | algorithm | MazeAlgorithm | resolved, always set |
 | solution | SolutionDisplayMode | resolved, always set |
 | pathLength | PathLengthTarget | optional; only set when the form field wasn't blank — no default, unlike the other fields (see ADR 046) |
+| pathLengthCandidateCount | number | optional; only set when the form field wasn't blank, parsed to an integer (see ADR 047) |
 Defined in: `packages/web/src/maze-form-validation.ts`
 
 ## MazeFormValidationResult (web)
@@ -208,6 +212,7 @@ Defined in: `packages/web/src/maze-form-validation.ts`
 | showSolution | boolean | "Show solution on preview" checkbox state |
 | folder | string | raw "reMarkable folder" field value, `""` when left blank (see ADR 043) |
 | pathLength | string | raw "Path length" field value, `""` when left at "None" (see ADR 046) |
+| pathLengthCandidateCount | string | raw "Candidate mazes to compare" field value, `""` when left blank (see ADR 047) |
 Round-tripped through a single cookie (`serializeFormPreferences`/`parseFormPreferences`); parsing rejects any value with a missing or wrong-typed field, returning `null` rather than a partial object (see ADR 042).
 Defined in: `packages/web/src/form-preferences.ts`
 
@@ -228,6 +233,7 @@ Defined in: `packages/web/src/server.ts`
 | algorithm | string | optional, `"growing-tree"`, `"kruskal"`, `"wilson"`, or `"aldous-broder"`, defaults to `"growing-tree"` (see ADR 033) |
 | solution | string | optional, `"none"`, `"extra-page"`, or `"overlay"`, defaults to `"none"` (see ADR 021) |
 | pathLength | string | optional, `"short"`, `"medium"`, or `"long"`; defaults to unset (no path-length filtering), see ADR 046 |
+| pathLengthCandidateCount | number | optional; forwarded as-is to `runGenerate`/`core`'s `generateMaze` (see ADR 047) |
 | output | string | optional, defaults to `./maze.pdf` (resolved against `cwd`) |
 | cwd | string | optional, injectable for testing; defaults to `process.cwd()` |
 | visibleName | string | optional, defaults to `rectangle-<width>x<height>-<seed>` (see ADR 014) |

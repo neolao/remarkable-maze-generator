@@ -8,6 +8,7 @@ export interface MazeFormPreferences {
 	showSolution: boolean;
 	folder: string;
 	pathLength: string;
+	pathLengthCandidateCount: string;
 }
 
 export const FORM_PREFERENCES_COOKIE_NAME = "maze-form-preferences";
@@ -27,7 +28,8 @@ function isMazeFormPreferences(value: unknown): value is MazeFormPreferences {
 		typeof candidate.solution === "string" &&
 		typeof candidate.showSolution === "boolean" &&
 		typeof candidate.folder === "string" &&
-		typeof candidate.pathLength === "string"
+		typeof candidate.pathLength === "string" &&
+		typeof candidate.pathLengthCandidateCount === "string"
 	);
 }
 

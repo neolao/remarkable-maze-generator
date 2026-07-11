@@ -13,6 +13,7 @@ export type {
 	PathLengthTarget,
 } from "./maze.js";
 export {
+	MAX_PATH_LENGTH_CANDIDATE_COUNT,
 	MAZE_ALGORITHMS,
 	MAZE_TYPES,
 	PATH_LENGTH_MAX_ATTEMPTS,

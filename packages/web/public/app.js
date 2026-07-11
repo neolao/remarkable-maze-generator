@@ -11,6 +11,7 @@ const SOLUTION_MODES = ["none", "extra-page", "overlay"];
 const DEFAULT_SOLUTION_MODE = "none";
 
 const PATH_LENGTH_TARGETS = ["short", "medium", "long"];
+const MAX_PATH_LENGTH_CANDIDATE_COUNT = 50;
 
 const FORM_PREFERENCES_COOKIE_NAME = "maze-form-preferences";
 const FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -28,7 +29,8 @@ function isMazeFormPreferences(value) {
 		typeof value.solution === "string" &&
 		typeof value.showSolution === "boolean" &&
 		typeof value.folder === "string" &&
-		typeof value.pathLength === "string"
+		typeof value.pathLength === "string" &&
+		typeof value.pathLengthCandidateCount === "string"
 	);
 }
 
@@ -76,6 +78,7 @@ function validateMazeFormInput({
 	algorithm,
 	solution,
 	pathLength,
+	pathLengthCandidateCount,
 }) {
 	const parsePositiveInteger = (raw, fieldLabel) => {
 		if (raw.trim() === "" || !/^-?\d+$/.test(raw.trim())) {
@@ -149,6 +152,33 @@ function validateMazeFormInput({
 		};
 	}
 
+	// Unlike pathLength, this option has no meaning on its own: it only makes
+	// sense alongside a pathLength target (see ADR 047).
+	const resolvedPathLengthCandidateCount = pathLengthCandidateCount?.trim();
+	let candidateCountValue;
+	if (resolvedPathLengthCandidateCount) {
+		if (resolvedPathLength === undefined) {
+			return {
+				valid: false,
+				error:
+					'Candidate count can only be used together with a "Path length" target',
+			};
+		}
+		if (!/^-?\d+$/.test(resolvedPathLengthCandidateCount)) {
+			return { valid: false, error: "Candidate count must be a whole number" };
+		}
+		candidateCountValue = Number.parseInt(resolvedPathLengthCandidateCount, 10);
+		if (
+			candidateCountValue <= 0 ||
+			candidateCountValue > MAX_PATH_LENGTH_CANDIDATE_COUNT
+		) {
+			return {
+				valid: false,
+				error: `Candidate count must be between 1 and ${MAX_PATH_LENGTH_CANDIDATE_COUNT}`,
+			};
+		}
+	}
+
 	return {
 		valid: true,
 		value: {
@@ -159,6 +189,7 @@ function validateMazeFormInput({
 			algorithm: resolvedAlgorithm,
 			solution: resolvedSolution,
 			pathLength: resolvedPathLength,
+			pathLengthCandidateCount: candidateCountValue,
 		},
 	};
 }
@@ -173,6 +204,9 @@ function initMazeForm() {
 	);
 	const downloadLink = document.getElementById("download-link");
 	const pathLengthSelect = document.getElementById("path-length");
+	const pathLengthCandidatesInput = document.getElementById(
+		"path-length-candidates",
+	);
 	const remarkableFolderField = document.getElementById(
 		"remarkable-folder-field",
 	);
@@ -199,6 +233,7 @@ function initMazeForm() {
 				showSolution: form["show-solution"].checked,
 				folder: remarkableFolderInput.value.trim(),
 				pathLength: pathLengthSelect.value,
+				pathLengthCandidateCount: pathLengthCandidatesInput.value,
 			}),
 			FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS,
 		);
@@ -217,6 +252,8 @@ function initMazeForm() {
 		form["show-solution"].checked = storedPreferences.showSolution;
 		remarkableFolderInput.value = storedPreferences.folder;
 		pathLengthSelect.value = storedPreferences.pathLength;
+		pathLengthCandidatesInput.value =
+			storedPreferences.pathLengthCandidateCount;
 	}
 
 	const hidePreview = () => {
@@ -315,6 +352,7 @@ function initMazeForm() {
 			algorithm: form["maze-algorithm"].value,
 			solution: form["solution-mode"].value,
 			pathLength: pathLengthSelect.value,
+			pathLengthCandidateCount: pathLengthCandidatesInput.value,
 		});
 
 		if (!result.valid) {
@@ -353,14 +391,16 @@ function initMazeForm() {
 		// reMarkable identical to what is shown in the preview.
 		const seed = Number(previewResponse.headers.get("x-maze-seed"));
 		mazeSeedElement.textContent = `Seed: ${seed}`;
-		// pathLength has already done its job resolving `seed` above (see
-		// ADR 046) — dropping it here keeps the PDF download and the
-		// reMarkable upload pinned to that exact seed instead of re-running
-		// the candidate search from it as a new base.
+		// pathLength (and pathLengthCandidateCount, which requires it) has
+		// already done its job resolving `seed` above (see ADR 046) —
+		// dropping both here keeps the PDF download and the reMarkable
+		// upload pinned to that exact seed instead of re-running the
+		// candidate search from it as a new base.
 		const seededRequestBody = JSON.stringify({
 			...result.value,
 			seed,
 			pathLength: undefined,
+			pathLengthCandidateCount: undefined,
 			showSolution: form["show-solution"].checked,
 		});
 		const seededRequestInit = {

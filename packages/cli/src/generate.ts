@@ -28,6 +28,7 @@ export interface GenerateOptions {
 	algorithm?: string;
 	solution?: string;
 	pathLength?: string;
+	pathLengthCandidateCount?: number;
 	output?: string;
 	cwd?: string;
 }
@@ -73,6 +74,7 @@ export async function runGenerate(
 		type: options.type as MazeType | undefined,
 		algorithm: options.algorithm as MazeAlgorithm | undefined,
 		pathLength: options.pathLength as PathLengthTarget | undefined,
+		pathLengthCandidateCount: options.pathLengthCandidateCount,
 	});
 	const pdfBytes = await renderMazeToPdf(maze, {
 		solution: options.solution as SolutionDisplayMode | undefined,

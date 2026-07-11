@@ -10,6 +10,7 @@ export interface GenerateAndSendOptions {
 	algorithm?: string;
 	solution?: string;
 	pathLength?: string;
+	pathLengthCandidateCount?: number;
 	output?: string;
 	cwd?: string;
 	visibleName?: string;
@@ -59,6 +60,7 @@ export async function runGenerateAndSend(
 		algorithm: options.algorithm,
 		solution: options.solution,
 		pathLength: options.pathLength,
+		pathLengthCandidateCount: options.pathLengthCandidateCount,
 		output: options.output,
 		cwd: options.cwd,
 	});

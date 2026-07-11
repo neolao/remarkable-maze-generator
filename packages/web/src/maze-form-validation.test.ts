@@ -331,4 +331,90 @@ describe("validateMazeFormInput", () => {
 			error: expect.stringMatching(/extra-long/),
 		});
 	});
+
+	it("leaves pathLengthCandidateCount unset when not provided, behaving exactly as before", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			pathLength: "long",
+		});
+
+		expect(result.valid).toBe(true);
+		expect(
+			result.valid && result.value.pathLengthCandidateCount,
+		).toBeUndefined();
+	});
+
+	it("accepts a valid pathLengthCandidateCount alongside a pathLength target", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			pathLength: "long",
+			pathLengthCandidateCount: "5",
+		});
+
+		expect(result.valid).toBe(true);
+		expect(result.valid && result.value.pathLengthCandidateCount).toBe(5);
+	});
+
+	it("rejects pathLengthCandidateCount set without a pathLength target", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			pathLengthCandidateCount: "5",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/candidate count/i),
+		});
+	});
+
+	it("rejects a non-integer pathLengthCandidateCount with a clear message", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			pathLength: "long",
+			pathLengthCandidateCount: "abc",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/candidate count/i),
+		});
+	});
+
+	it("rejects a zero pathLengthCandidateCount with a clear message", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			pathLength: "long",
+			pathLengthCandidateCount: "0",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/candidate count/i),
+		});
+	});
+
+	it("rejects a pathLengthCandidateCount above the maximum allowed", () => {
+		const result = validateMazeFormInput({
+			width: "10",
+			height: "8",
+			difficulty: "3",
+			pathLength: "long",
+			pathLengthCandidateCount: "51",
+		});
+
+		expect(result).toEqual({
+			valid: false,
+			error: expect.stringMatching(/candidate count/i),
+		});
+	});
 });

@@ -3,6 +3,7 @@ import { totalNodeCount as totalCircleNodeCount } from "./circle-maze/cells.js";
 import { countReachableNodes as countCircleReachableNodes } from "./circle-maze/test-helpers.js";
 import { solveMaze } from "./maze-solver.js";
 import {
+	MAX_PATH_LENGTH_CANDIDATE_COUNT,
 	MAZE_ALGORITHMS,
 	MAZE_TYPES,
 	PATH_LENGTH_MAX_ATTEMPTS,
@@ -1050,5 +1051,98 @@ describe("generateMaze - pathLength option", () => {
 
 		expect(result.type).toBe("circle");
 		expect(solveMaze(result).length).toBeGreaterThan(0);
+	});
+});
+
+describe("generateMaze - pathLengthCandidateCount option", () => {
+	it("defaults to PATH_LENGTH_MAX_ATTEMPTS candidates when not set", () => {
+		const withDefault = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 100,
+			pathLength: "long",
+		});
+		const withExplicitDefault = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 100,
+			pathLength: "long",
+			pathLengthCandidateCount: PATH_LENGTH_MAX_ATTEMPTS,
+		});
+
+		expect(withDefault).toEqual(withExplicitDefault);
+	});
+
+	it("only tries as many candidate seeds as requested, matching a plain single-seed generation when set to 1", () => {
+		const maze = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 1,
+			pathLength: "long",
+			pathLengthCandidateCount: 1,
+		});
+		const singleCandidate = generateMaze({ width: 8, height: 6, seed: 1 });
+
+		expect(maze.seed).toBe(1);
+		expect(maze.cells).toEqual(singleCandidate.cells);
+	});
+
+	it("accepts the maximum allowed candidate count", () => {
+		const maze = generateMaze({
+			width: 6,
+			height: 6,
+			seed: 9,
+			pathLength: "short",
+			pathLengthCandidateCount: MAX_PATH_LENGTH_CANDIDATE_COUNT,
+		});
+
+		expect(solveMaze(maze).length).toBeGreaterThan(0);
+	});
+
+	it("rejects a candidate count above the maximum allowed", () => {
+		expect(() =>
+			generateMaze({
+				width: 6,
+				height: 6,
+				seed: 9,
+				pathLength: "short",
+				pathLengthCandidateCount: MAX_PATH_LENGTH_CANDIDATE_COUNT + 1,
+			}),
+		).toThrow();
+	});
+
+	it("rejects a zero candidate count", () => {
+		expect(() =>
+			generateMaze({
+				width: 6,
+				height: 6,
+				seed: 9,
+				pathLength: "short",
+				pathLengthCandidateCount: 0,
+			}),
+		).toThrow();
+	});
+
+	it("rejects a non-integer candidate count", () => {
+		expect(() =>
+			generateMaze({
+				width: 6,
+				height: 6,
+				seed: 9,
+				pathLength: "short",
+				pathLengthCandidateCount: 2.5,
+			}),
+		).toThrow();
+	});
+
+	it("rejects a candidate count set without a pathLength target", () => {
+		expect(() =>
+			generateMaze({
+				width: 6,
+				height: 6,
+				seed: 9,
+				pathLengthCandidateCount: 3,
+			}),
+		).toThrow();
 	});
 });

@@ -1,4 +1,5 @@
 import {
+	MAX_PATH_LENGTH_CANDIDATE_COUNT,
 	type MazeAlgorithm,
 	type MazeType,
 	type PathLengthTarget,
@@ -21,6 +22,7 @@ export interface MazeFormInput {
 	algorithm?: string;
 	solution?: string;
 	pathLength?: string;
+	pathLengthCandidateCount?: string;
 }
 
 export interface MazeFormValue {
@@ -31,6 +33,7 @@ export interface MazeFormValue {
 	algorithm: MazeAlgorithm;
 	solution: SolutionDisplayMode;
 	pathLength?: PathLengthTarget;
+	pathLengthCandidateCount?: number;
 }
 
 export type MazeFormValidationResult =
@@ -109,6 +112,35 @@ function parsePathLength(
 	return trimmed;
 }
 
+// Unlike pathLength, this option has no meaning on its own: it only makes
+// sense alongside a pathLength target (see ADR 047).
+function parsePathLengthCandidateCount(
+	raw: string | undefined,
+	pathLength: PathLengthTarget | undefined,
+): number | undefined {
+	const trimmed = raw?.trim();
+	if (!trimmed) return undefined;
+
+	if (pathLength === undefined) {
+		throw new Error(
+			'Candidate count can only be used together with a "Path length" target',
+		);
+	}
+
+	if (!/^-?\d+$/.test(trimmed)) {
+		throw new Error("Candidate count must be a whole number");
+	}
+
+	const value = Number.parseInt(trimmed, 10);
+	if (value <= 0 || value > MAX_PATH_LENGTH_CANDIDATE_COUNT) {
+		throw new Error(
+			`Candidate count must be between 1 and ${MAX_PATH_LENGTH_CANDIDATE_COUNT}`,
+		);
+	}
+
+	return value;
+}
+
 export function validateMazeFormInput(
 	input: MazeFormInput,
 ): MazeFormValidationResult {
@@ -120,6 +152,10 @@ export function validateMazeFormInput(
 		const algorithm = parseMazeAlgorithm(input.algorithm);
 		const solution = parseSolutionMode(input.solution);
 		const pathLength = parsePathLength(input.pathLength);
+		const pathLengthCandidateCount = parsePathLengthCandidateCount(
+			input.pathLengthCandidateCount,
+			pathLength,
+		);
 
 		return {
 			valid: true,
@@ -131,6 +167,7 @@ export function validateMazeFormInput(
 				algorithm,
 				solution,
 				pathLength,
+				pathLengthCandidateCount,
 			},
 		};
 	} catch (error) {

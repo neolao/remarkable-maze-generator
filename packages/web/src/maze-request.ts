@@ -30,11 +30,21 @@ export interface GenerateMazeRequestBody {
 	algorithm?: string;
 	solution?: string;
 	pathLength?: string;
+	pathLengthCandidateCount?: number;
 	showSolution?: boolean;
 }
 
 export function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {
-	const { width, height, seed, difficulty, type, algorithm, pathLength } = body;
+	const {
+		width,
+		height,
+		seed,
+		difficulty,
+		type,
+		algorithm,
+		pathLength,
+		pathLengthCandidateCount,
+	} = body;
 	return generateMaze({
 		width: width as number,
 		height: height as number,
@@ -43,5 +53,6 @@ export function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {
 		type: type as MazeType | undefined,
 		algorithm: algorithm as MazeAlgorithm | undefined,
 		pathLength: pathLength as PathLengthTarget | undefined,
+		pathLengthCandidateCount,
 	});
 }

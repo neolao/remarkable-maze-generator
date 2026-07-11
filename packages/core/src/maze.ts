@@ -85,8 +85,14 @@ export function invalidPathLengthTargetMessage(value: string): string {
 
 // Bounds the number of candidate generations tried when `pathLength` is set
 // (see ADR 046), trading match quality for a predictable worst-case
-// generation time.
+// generation time. Used as the default when `pathLengthCandidateCount` is
+// not provided.
 export const PATH_LENGTH_MAX_ATTEMPTS = 10;
+
+// Upper bound on a user-supplied `pathLengthCandidateCount` (see ADR 047):
+// each candidate is a full generation + solve pass, so an unbounded value
+// would let a single request turn into an unpredictably long-running loop.
+export const MAX_PATH_LENGTH_CANDIDATE_COUNT = 50;
 
 export interface Maze {
 	width: number;
@@ -117,6 +123,7 @@ export interface GenerateMazeOptions {
 	type?: MazeType;
 	algorithm?: MazeAlgorithm;
 	pathLength?: PathLengthTarget;
+	pathLengthCandidateCount?: number;
 }
 
 const MIN_DIFFICULTY = 1;
@@ -168,6 +175,29 @@ function validateAlgorithm(algorithm: MazeAlgorithm): void {
 function validatePathLengthTarget(pathLength: PathLengthTarget): void {
 	if (!isValidPathLengthTarget(pathLength)) {
 		throw new Error(invalidPathLengthTargetMessage(pathLength));
+	}
+}
+
+function validatePathLengthCandidateCount(
+	pathLength: PathLengthTarget | undefined,
+	candidateCount: number | undefined,
+): void {
+	if (candidateCount === undefined) return;
+
+	if (pathLength === undefined) {
+		throw new Error(
+			'"pathLengthCandidateCount" can only be used together with a "pathLength" target',
+		);
+	}
+
+	if (
+		!Number.isInteger(candidateCount) ||
+		candidateCount <= 0 ||
+		candidateCount > MAX_PATH_LENGTH_CANDIDATE_COUNT
+	) {
+		throw new Error(
+			`Path length candidate count must be an integer between 1 and ${MAX_PATH_LENGTH_CANDIDATE_COUNT}, got pathLengthCandidateCount=${candidateCount}`,
+		);
 	}
 }
 
@@ -312,12 +342,14 @@ export function generateMaze({
 	type = DEFAULT_MAZE_TYPE,
 	algorithm = DEFAULT_MAZE_ALGORITHM,
 	pathLength,
+	pathLengthCandidateCount,
 }: GenerateMazeOptions): Maze {
 	validateDimensions(width, height);
 	validateDifficulty(difficulty);
 	validateType(type);
 	validateAlgorithm(algorithm);
 	validateTypeAlgorithmCompatibility(type, algorithm);
+	validatePathLengthCandidateCount(pathLength, pathLengthCandidateCount);
 
 	if (pathLength === undefined) {
 		return generateMazeCandidate({
@@ -333,7 +365,7 @@ export function generateMaze({
 	validatePathLengthTarget(pathLength);
 
 	const candidates = Array.from(
-		{ length: PATH_LENGTH_MAX_ATTEMPTS },
+		{ length: pathLengthCandidateCount ?? PATH_LENGTH_MAX_ATTEMPTS },
 		(_, attempt) =>
 			generateMazeCandidate({
 				width,

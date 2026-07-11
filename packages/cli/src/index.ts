@@ -40,6 +40,10 @@ program
 		"--path-length <target>",
 		"request a shorter or longer solution path: short, medium, or long (defaults to unset, no path-length filtering)",
 	)
+	.option(
+		"--path-length-candidates <number>",
+		"number of candidate mazes to generate and compare when --path-length is set (defaults to 10, max 50)",
+	)
 	.action(
 		async (opts: {
 			width: string;
@@ -50,6 +54,7 @@ program
 			algorithm?: string;
 			solution?: string;
 			pathLength?: string;
+			pathLengthCandidates?: string;
 			output?: string;
 		}) => {
 			try {
@@ -63,6 +68,13 @@ program
 					opts.difficulty === undefined
 						? undefined
 						: parseIntegerOption(opts.difficulty, "--difficulty");
+				const pathLengthCandidateCount =
+					opts.pathLengthCandidates === undefined
+						? undefined
+						: parseIntegerOption(
+								opts.pathLengthCandidates,
+								"--path-length-candidates",
+							);
 
 				const { outputPath } = await runGenerate({
 					width,
@@ -73,6 +85,7 @@ program
 					algorithm: opts.algorithm,
 					solution: opts.solution,
 					pathLength: opts.pathLength,
+					pathLengthCandidateCount,
 					output: opts.output,
 				});
 				console.log(`Maze written to ${outputPath}`);
@@ -150,6 +163,10 @@ program
 		"--path-length <target>",
 		"request a shorter or longer solution path: short, medium, or long (defaults to unset, no path-length filtering)",
 	)
+	.option(
+		"--path-length-candidates <number>",
+		"number of candidate mazes to generate and compare when --path-length is set (defaults to 10, max 50)",
+	)
 	.action(
 		async (opts: {
 			width: string;
@@ -163,6 +180,7 @@ program
 			algorithm?: string;
 			solution?: string;
 			pathLength?: string;
+			pathLengthCandidates?: string;
 		}) => {
 			try {
 				const width = parseIntegerOption(opts.width, "--width");
@@ -175,6 +193,13 @@ program
 					opts.difficulty === undefined
 						? undefined
 						: parseIntegerOption(opts.difficulty, "--difficulty");
+				const pathLengthCandidateCount =
+					opts.pathLengthCandidates === undefined
+						? undefined
+						: parseIntegerOption(
+								opts.pathLengthCandidates,
+								"--path-length-candidates",
+							);
 
 				const { outputPath, visibleName } = await runGenerateAndSend({
 					width,
@@ -185,6 +210,7 @@ program
 					algorithm: opts.algorithm,
 					solution: opts.solution,
 					pathLength: opts.pathLength,
+					pathLengthCandidateCount,
 					output: opts.output,
 					visibleName: opts.visibleName,
 					folder: opts.folder,

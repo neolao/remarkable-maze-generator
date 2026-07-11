@@ -395,4 +395,55 @@ describe("runGenerate", () => {
 			}),
 		).rejects.toThrow(/extra-long/);
 	});
+
+	it("forwards the pathLengthCandidateCount option, producing a different maze than the default candidate count", async () => {
+		const withDefault = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 1,
+			pathLength: "long",
+			output: join(workDir, "default-candidates.pdf"),
+			cwd: workDir,
+		});
+		const withOneCandidate = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 1,
+			pathLength: "long",
+			pathLengthCandidateCount: 1,
+			output: join(workDir, "one-candidate.pdf"),
+			cwd: workDir,
+		});
+
+		const [defaultBytes, oneCandidateBytes] = await Promise.all([
+			readFile(withDefault.outputPath),
+			readFile(withOneCandidate.outputPath),
+		]);
+		expect(oneCandidateBytes).not.toEqual(defaultBytes);
+	});
+
+	it("rejects a pathLengthCandidateCount set without a pathLength target", async () => {
+		await expect(
+			runGenerate({
+				width: 5,
+				height: 5,
+				seed: 1,
+				pathLengthCandidateCount: 3,
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/pathLengthCandidateCount/);
+	});
+
+	it("rejects a non-positive pathLengthCandidateCount with a clear error", async () => {
+		await expect(
+			runGenerate({
+				width: 5,
+				height: 5,
+				seed: 1,
+				pathLength: "long",
+				pathLengthCandidateCount: 0,
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/candidate count/i);
+	});
 });

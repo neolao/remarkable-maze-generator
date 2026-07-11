@@ -262,6 +262,65 @@ describe("POST /api/mazes/generate", () => {
 			error: expect.stringMatching(/extra-long/),
 		});
 	});
+
+	it("accepts a pathLengthCandidateCount, producing a different maze than the default candidate count", async () => {
+		const app = buildServer();
+
+		const withDefault = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 8, height: 6, seed: 1, pathLength: "long" },
+		});
+		const withOneCandidate = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 1,
+				pathLength: "long",
+				pathLengthCandidateCount: 1,
+			},
+		});
+
+		expect(withOneCandidate.statusCode).toBe(200);
+		expect(withOneCandidate.rawPayload).not.toEqual(withDefault.rawPayload);
+	});
+
+	it("returns 400 with a clear message when pathLengthCandidateCount is set without a pathLength target", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 5, height: 5, pathLengthCandidateCount: 3 },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/pathLengthCandidateCount/),
+		});
+	});
+
+	it("returns 400 with a clear message when pathLengthCandidateCount is not a positive integer", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 5,
+				height: 5,
+				pathLength: "long",
+				pathLengthCandidateCount: 0,
+			},
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/candidate count/i),
+		});
+	});
 });
 
 describe("POST /api/mazes/preview", () => {
@@ -418,6 +477,45 @@ describe("POST /api/mazes/preview", () => {
 		expect(response.statusCode).toBe(400);
 		expect(response.json()).toEqual({
 			error: expect.stringMatching(/extra-long/),
+		});
+	});
+
+	it("accepts a pathLengthCandidateCount on the preview endpoint too", async () => {
+		const app = buildServer();
+
+		const withDefault = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 8, height: 6, seed: 1, pathLength: "long" },
+		});
+		const withOneCandidate = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 1,
+				pathLength: "long",
+				pathLengthCandidateCount: 1,
+			},
+		});
+
+		expect(withOneCandidate.statusCode).toBe(200);
+		expect(withOneCandidate.body).not.toBe(withDefault.body);
+	});
+
+	it("returns 400 with a clear message when pathLengthCandidateCount is set without a pathLength target on the preview endpoint", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 5, height: 5, pathLengthCandidateCount: 3 },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({
+			error: expect.stringMatching(/pathLengthCandidateCount/),
 		});
 	});
 

@@ -358,6 +358,62 @@ describe("runGenerateAndSend", () => {
 		expect(longBytes).not.toEqual(withoutBytes);
 	});
 
+	it("forwards the pathLengthCandidateCount option to maze generation", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		const withDefault = await runGenerateAndSend({
+			width: 8,
+			height: 6,
+			seed: 1,
+			pathLength: "long",
+			output: join(workDir, "default-candidates.pdf"),
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+		const withOneCandidate = await runGenerateAndSend({
+			width: 8,
+			height: 6,
+			seed: 1,
+			pathLength: "long",
+			pathLengthCandidateCount: 1,
+			output: join(workDir, "one-candidate.pdf"),
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+
+		const [defaultBytes, oneCandidateBytes] = await Promise.all([
+			readFile(withDefault.outputPath),
+			readFile(withOneCandidate.outputPath),
+		]);
+		expect(oneCandidateBytes).not.toEqual(defaultBytes);
+	});
+
+	it("rejects a pathLengthCandidateCount set without a pathLength target before attempting to authenticate or upload", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		await expect(
+			runGenerateAndSend({
+				width: 5,
+				height: 5,
+				seed: 1,
+				pathLengthCandidateCount: 3,
+				cwd: workDir,
+				credentialsPath,
+				promptPairingCode: vi.fn(),
+			}),
+		).rejects.toThrow(/pathLengthCandidateCount/);
+		expect(authenticateMock).not.toHaveBeenCalled();
+		expect(uploadPdfMock).not.toHaveBeenCalled();
+	});
+
 	it("rejects an invalid pathLength value before attempting to authenticate or upload", async () => {
 		const fakeSession = { uploadPdf: vi.fn() };
 		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
