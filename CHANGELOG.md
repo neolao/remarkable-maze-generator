@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The web app can now be built and run as a Docker container, with a ready-to-use `docker-compose.yml`, so it can be self-hosted (e.g. on a Synology NAS) instead of run locally; paired reMarkable Cloud credentials persist across container restarts via a mounted volume
+
 ## [0.9.0] - 2026-07-11
 
 ### Added

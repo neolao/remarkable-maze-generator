@@ -28,6 +28,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - The web configuration form remembers your last-used settings (width, height, difficulty, maze type, algorithm, solution mode, the solution preview checkbox, path length, and the reMarkable target folder) and pre-fills them automatically on your next visit
 - Request a shorter or longer maze solution path (short, medium, or long) from the command line or the web page; the generator tries several random seeds and keeps the maze that best matches the request
 - Control how many candidate mazes are generated and compared when requesting a shorter or longer solution path, trading generation time for a closer match, from the command line or the web page
+- Build and run the web app as a Docker container, with a ready-to-use `docker-compose.yml`, so it can be self-hosted (e.g. on a Synology NAS) instead of run locally, with paired reMarkable Cloud credentials persisting across container restarts
 <!-- vibe:end:features -->
 
 <!-- vibe:begin:install -->
@@ -129,9 +130,20 @@ Check code style:
 ```bash
 npm run lint
 ```
+
+### Docker
+
+Build and run the web app in a container:
+
+```bash
+docker compose up -d --build
+```
+
+See [docs/deployment.md](docs/deployment.md) for environment variables, the credentials volume, and Synology NAS-specific steps.
 <!-- vibe:end:usage -->
 
 <!-- vibe:begin:docs-index -->
 - [docs/architecture.md](docs/architecture.md) — overview of how the project is organized
 - [docs/configuration.md](docs/configuration.md) — environment variables the web server reads (host, port)
+- [docs/deployment.md](docs/deployment.md) — running the web app in Docker, including on a Synology NAS
 <!-- vibe:end:docs-index -->

@@ -1,0 +1,15 @@
+services:
+  web:
+    build: .
+    image: remarkable-maze-generator-web
+    ports:
+      - "3001:3001"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+    volumes:
+      - maze-credentials:/home/node/.config/remarkable-maze-generator
+    restart: unless-stopped
+
+volumes:
+  maze-credentials:
