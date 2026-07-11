@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 ---
 # Synology NAS Docker Deployment
 
