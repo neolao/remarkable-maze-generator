@@ -20,7 +20,7 @@ COPY --from=build /app ./
 RUN npm prune --omit=dev
 
 RUN mkdir -p /home/node/.config/remarkable-maze-generator \
-	&& chown -R node:node /home/node/.config
+	&& chown -R node:node /home/node/.config /app
 
 USER node
 EXPOSE 4367

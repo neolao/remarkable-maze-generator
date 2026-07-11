@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The web server's default port is now `4367` instead of `3001` (used when the `PORT` environment variable is not set; also updated in the provided `docker-compose.yml`)
 
+### Fixed
+
+- Fixed the Docker image failing to start with a misleading "Cannot find module" error when the source files it was built from had restrictive permissions (e.g. not world-readable, as can happen depending on how the repository was copied onto the host); the application's files inside the image are now always readable by the non-root user the container runs as, regardless of the source permissions on the build machine
+
 ## [0.10.0] - 2026-07-11
 
 ### Added
