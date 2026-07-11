@@ -18,7 +18,7 @@ export interface BuildServerOptions {
 	credentialsPath?: string;
 }
 
-const DEFAULT_PORT = 3001;
+const DEFAULT_PORT = 4367;
 const DEFAULT_HOST = "0.0.0.0";
 
 export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {

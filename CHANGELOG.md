@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The web server's default port is now `4367` instead of `3001` (used when the `PORT` environment variable is not set; also updated in the provided `docker-compose.yml`)
+
 ## [0.10.0] - 2026-07-11
 
 ### Added

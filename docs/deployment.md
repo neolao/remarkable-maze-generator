@@ -16,7 +16,7 @@ From the repository root:
 docker compose up -d --build
 ```
 
-This builds the image (`Dockerfile` at the repository root) and starts the container, listening on port 3001 by default. Open `http://<host>:3001` in a browser.
+This builds the image (`Dockerfile` at the repository root) and starts the container, listening on port 4367 by default. Open `http://<host>:4367` in a browser.
 
 To rebuild after a code change:
 
@@ -29,9 +29,9 @@ docker compose up -d --build
 | Variable | Purpose | Default |
 |---|---|---|
 | `HOST` | Address the web server listens on inside the container | `0.0.0.0` (every network interface) |
-| `PORT` | Port the web server listens on inside the container | `3001` |
+| `PORT` | Port the web server listens on inside the container | `4367` |
 
-Set these under `environment:` in `docker-compose.yml` if you need to change them; the port the app is reachable on from outside the container is controlled by the `ports:` mapping instead (`"<host-port>:3001"`).
+Set these under `environment:` in `docker-compose.yml` if you need to change them; the port the app is reachable on from outside the container is controlled by the `ports:` mapping instead (`"<host-port>:4367"`).
 
 ## Persisting reMarkable Cloud credentials
 
@@ -42,5 +42,5 @@ Once paired, reMarkable Cloud credentials are stored inside the container at a f
 1. Copy the project (or just `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and the `packages/`/root files it references) onto the NAS, or clone the repository there.
 2. Open **Container Manager** (or **Docker** on older DSM versions) on the NAS.
 3. Use the **Project** feature and point it at the folder containing `docker-compose.yml` — Container Manager reads it directly, builds the image, creates the named volume, and starts the container the same way `docker compose up -d --build` would.
-4. Once running, the web UI is reachable at `http://<nas-ip>:3001` (adjust the `ports:` mapping in `docker-compose.yml` first if port 3001 is already used on the NAS).
+4. Once running, the web UI is reachable at `http://<nas-ip>:4367` (adjust the `ports:` mapping in `docker-compose.yml` first if port 4367 is already used on the NAS).
 5. Pair the app with your reMarkable Cloud account once, from the web UI — the credentials persist in the `maze-credentials` volume across NAS reboots and container restarts.

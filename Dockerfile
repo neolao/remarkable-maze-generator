@@ -23,5 +23,5 @@ RUN mkdir -p /home/node/.config/remarkable-maze-generator \
 	&& chown -R node:node /home/node/.config
 
 USER node
-EXPOSE 3001
+EXPOSE 4367
 CMD ["node", "packages/web/dist/server.js"]

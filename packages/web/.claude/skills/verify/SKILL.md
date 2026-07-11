@@ -13,7 +13,7 @@ curl -s http://127.0.0.1:3002/api/version
 curl -s -X POST http://127.0.0.1:3002/api/mazes/preview -H "content-type: application/json" -d '{"width":5,"height":5,"difficulty":1}'
 ```
 
-Using a scratch `PORT` (distinct from the app's real default, 3001) avoids
+Using a scratch `PORT` (distinct from the app's real default, 4367) avoids
 clashing with a dev server the maintainer may already have running.
 
 Never point at the real `DEFAULT_CREDENTIALS_PATH`

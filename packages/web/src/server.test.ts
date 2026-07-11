@@ -24,21 +24,21 @@ describe("web server", () => {
 });
 
 describe("resolvePort", () => {
-	it("returns 3001 when PORT is not set", () => {
-		expect(resolvePort({})).toBe(3001);
+	it("returns 4367 when PORT is not set", () => {
+		expect(resolvePort({})).toBe(4367);
 	});
 
 	it("returns the PORT env variable as a number when set to a valid value", () => {
 		expect(resolvePort({ PORT: "8080" })).toBe(8080);
 	});
 
-	it("falls back to 3001 when PORT is not a valid integer", () => {
-		expect(resolvePort({ PORT: "not-a-number" })).toBe(3001);
+	it("falls back to 4367 when PORT is not a valid integer", () => {
+		expect(resolvePort({ PORT: "not-a-number" })).toBe(4367);
 	});
 
-	it("falls back to 3001 when PORT is zero or negative", () => {
-		expect(resolvePort({ PORT: "0" })).toBe(3001);
-		expect(resolvePort({ PORT: "-1" })).toBe(3001);
+	it("falls back to 4367 when PORT is zero or negative", () => {
+		expect(resolvePort({ PORT: "0" })).toBe(4367);
+		expect(resolvePort({ PORT: "-1" })).toBe(4367);
 	});
 });
 
