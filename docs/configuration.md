@@ -6,7 +6,7 @@ The web server reads its network settings from environment variables. All are op
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `HOST` | Address the web server listens on | `127.0.0.1` (localhost only) |
+| `HOST` | Address the web server listens on | `0.0.0.0` (every network interface) |
 | `PORT` | Port the web server listens on | `3001` |
 
-By default the server only accepts connections from the local machine, since it has no authentication layer of its own — anyone who can reach it can generate mazes and, once paired, send them to the associated reMarkable Cloud account. Set `HOST=0.0.0.0` (or a specific network address) only if you understand and accept that trade-off, for example behind a firewall or a reverse proxy that adds authentication.
+By default the server accepts connections from any device on the local network, since it has no authentication layer of its own — anyone who can reach it can generate mazes and, once paired, send them to the associated reMarkable Cloud account. Set `HOST=127.0.0.1` to restrict it to the local machine only, or a specific network address, if you don't trust your local network or don't need remote access.

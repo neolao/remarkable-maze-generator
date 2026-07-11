@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-11
+
 ### Added
 
 - Users can now request a shorter or longer maze solution path via a new "Path length" option (none, short, medium, or long), available both on the web configuration form and as a new `--path-length` option on the command line's `generate` and `generate-and-send` commands; the generator tries several random seeds and keeps the maze that best matches the requested length
@@ -128,7 +130,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
 
-[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.5.0...v0.6.0
