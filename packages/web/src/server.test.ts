@@ -12,6 +12,15 @@ describe("web server", () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual({ core: corePkg.version });
 	});
+
+	it("does not instruct browsers to upgrade http subresource requests to https, since the server has no TLS listener", async () => {
+		const app = buildServer();
+		const response = await app.inject({ method: "GET", url: "/" });
+
+		expect(response.headers["content-security-policy"]).not.toContain(
+			"upgrade-insecure-requests",
+		);
+	});
 });
 
 describe("resolvePort", () => {
@@ -34,11 +43,11 @@ describe("resolvePort", () => {
 });
 
 describe("resolveHost", () => {
-	it("returns 127.0.0.1 when HOST is not set", () => {
-		expect(resolveHost({})).toBe("127.0.0.1");
+	it("returns 0.0.0.0 when HOST is not set", () => {
+		expect(resolveHost({})).toBe("0.0.0.0");
 	});
 
 	it("returns the HOST env variable when set", () => {
-		expect(resolveHost({ HOST: "0.0.0.0" })).toBe("0.0.0.0");
+		expect(resolveHost({ HOST: "127.0.0.1" })).toBe("127.0.0.1");
 	});
 });

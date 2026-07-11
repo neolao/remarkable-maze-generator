@@ -19,7 +19,7 @@ export interface BuildServerOptions {
 }
 
 const DEFAULT_PORT = 3001;
-const DEFAULT_HOST = "127.0.0.1";
+const DEFAULT_HOST = "0.0.0.0";
 
 export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
 	const raw = env.PORT;
@@ -47,6 +47,7 @@ export function buildServer(options: BuildServerOptions = {}) {
 				defaultSrc: ["'self'"],
 				scriptSrc: ["'self'"],
 				imgSrc: ["'self'", "data:"],
+				upgradeInsecureRequests: null,
 			},
 		},
 	});

@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Users can now request a shorter or longer maze solution path via a new "Path length" option (none, short, medium, or long), available both on the web configuration form and as a new `--path-length` option on the command line's `generate` and `generate-and-send` commands; the generator tries several random seeds and keeps the maze that best matches the requested length
 - Users can now control how many candidate mazes are tried and compared when a "Path length" target is set, trading generation time for a closer match, via a new "Candidate mazes to compare" field on the web configuration form and a new `--path-length-candidates` option on the command line (defaults to 10 when left unset, capped at 50)
 
+### Changed
+
+- The web server now binds to `0.0.0.0` by default again instead of `127.0.0.1`, so it can be reached from other devices on the local network without setting the `HOST` environment variable
+
+### Fixed
+
+- Fixed the web server instructing browsers to upgrade insecure HTTP subresource requests to HTTPS, which broke the page's styling when the server was accessed on a non-localhost host with no TLS listener configured
+
 ## [0.8.0] - 2026-07-10
 
 ### Changed
