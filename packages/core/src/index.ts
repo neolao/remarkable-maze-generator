@@ -45,11 +45,11 @@ export { renderMazeToSvg } from "./rendering/maze-svg.js";
 export type {
 	CredentialStore,
 	RemarkableCredentials,
-} from "./remarkable-credential-store.js";
+} from "./infrastructure/remarkable/remarkable-credential-store.js";
 export type {
 	RemarkableAuthOptions,
 	RemarkableSession,
-} from "./remarkable-auth.js";
-export { authenticate } from "./remarkable-auth.js";
-export type { UploadPdfOptions } from "./remarkable-upload.js";
-export { uploadPdf } from "./remarkable-upload.js";
+} from "./infrastructure/remarkable/remarkable-auth.js";
+export { authenticate } from "./infrastructure/remarkable/remarkable-auth.js";
+export type { UploadPdfOptions } from "./infrastructure/remarkable/remarkable-upload.js";
+export { uploadPdf } from "./infrastructure/remarkable/remarkable-upload.js";
