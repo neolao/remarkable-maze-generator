@@ -1,4 +1,4 @@
-import type { Cell } from "../maze.js";
+import type { Cell } from "../maze-domain.js";
 import { DIRECTIONS, createGrid, createSeededRandom } from "./shared.js";
 
 export interface GenerateAldousBroderMazeOptions {

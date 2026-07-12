@@ -2,7 +2,7 @@ import {
 	findCircleSolutionBranchPoints,
 	solveCircleMaze,
 } from "./circle-maze/solve.js";
-import type { Maze, MazeType } from "./maze.js";
+import type { Maze, MazeType } from "./maze-domain.js";
 
 export interface MazePosition {
 	x: number;

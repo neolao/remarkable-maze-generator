@@ -1,4 +1,4 @@
-import type { Maze, MazeCrossing } from "./maze.js";
+import type { Maze, MazeCrossing } from "./maze-domain.js";
 
 export interface LineSegment {
 	x1: number;

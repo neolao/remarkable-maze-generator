@@ -1,4 +1,4 @@
-import type { Cell } from "../maze.js";
+import type { Cell } from "../maze-domain.js";
 
 export function countReachableCells(cells: Cell[][]): number {
 	const visited = new Set<string>();

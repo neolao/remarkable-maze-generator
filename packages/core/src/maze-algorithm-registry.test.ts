@@ -11,7 +11,7 @@ import { generateAldousBroderMaze } from "./maze-algorithms/aldous-broder.js";
 import { generateGrowingTreeMaze } from "./maze-algorithms/growing-tree.js";
 import { generateKruskalMaze } from "./maze-algorithms/kruskal.js";
 import { generateWilsonMaze } from "./maze-algorithms/wilson.js";
-import { MAZE_ALGORITHMS } from "./maze.js";
+import { MAZE_ALGORITHMS } from "./maze-domain.js";
 
 describe("generateRectangularCells", () => {
 	it.each(MAZE_ALGORITHMS)(

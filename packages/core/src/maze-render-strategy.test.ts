@@ -5,6 +5,7 @@ import {
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
 } from "./circle-maze/render.js";
+import { MAZE_TYPES } from "./maze-domain.js";
 import {
 	computeCellCenter,
 	computeTubeSegments,
@@ -12,7 +13,7 @@ import {
 } from "./maze-layout.js";
 import { getMazeRenderStrategy } from "./maze-render-strategy.js";
 import { solveMaze } from "./maze-solver.js";
-import { MAZE_TYPES, generateMaze } from "./maze.js";
+import { generateMaze } from "./maze.js";
 
 describe("getMazeRenderStrategy", () => {
 	it.each(MAZE_TYPES)(

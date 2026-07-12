@@ -1,9 +1,9 @@
+import type { Maze } from "./maze-domain.js";
 import { isArcSegment } from "./maze-layout.js";
 import type { TubeSegment } from "./maze-layout.js";
 import { getMazeRenderStrategy } from "./maze-render-strategy.js";
 import { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
 import type { MazePosition } from "./maze-solver.js";
-import type { Maze } from "./maze.js";
 
 const DEFAULT_CELL_SIZE_PX = 20;
 const STROKE_WIDTH_PX = 2;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Maze } from "./maze-domain.js";
 import {
 	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
@@ -8,7 +9,6 @@ import {
 	isArcSegment,
 } from "./maze-layout.js";
 import { generateMaze } from "./maze.js";
-import type { Maze } from "./maze.js";
 
 function buildFullyWalledMaze(width: number, height: number): Maze {
 	return {

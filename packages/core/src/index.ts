@@ -11,21 +11,21 @@ export type {
 	MazeCrossing,
 	MazeType,
 	PathLengthTarget,
-} from "./maze.js";
+} from "./maze-domain.js";
 export {
 	MAX_PATH_LENGTH_CANDIDATE_COUNT,
 	MAZE_ALGORITHMS,
 	MAZE_TYPES,
 	PATH_LENGTH_MAX_ATTEMPTS,
 	PATH_LENGTH_TARGETS,
-	generateMaze,
 	invalidMazeAlgorithmMessage,
 	invalidMazeTypeMessage,
 	invalidPathLengthTargetMessage,
 	isValidMazeAlgorithm,
 	isValidMazeType,
 	isValidPathLengthTarget,
-} from "./maze.js";
+} from "./maze-domain.js";
+export { generateMaze } from "./maze.js";
 export type { MazePosition } from "./maze-solver.js";
 export { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
 export type {

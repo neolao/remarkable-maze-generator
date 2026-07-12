@@ -1,4 +1,4 @@
-import type { Cell, CellWalls } from "../maze.js";
+import type { Cell, CellWalls } from "../maze-domain.js";
 
 export interface Direction {
 	dx: number;

@@ -3,9 +3,10 @@ import {
 	findCircleSolutionBranchPoints,
 	solveCircleMaze,
 } from "./circle-maze/solve.js";
+import type { Cell, Maze } from "./maze-domain.js";
+import { MAZE_TYPES } from "./maze-domain.js";
 import { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
-import { MAZE_TYPES, generateMaze } from "./maze.js";
-import type { Cell, Maze } from "./maze.js";
+import { generateMaze } from "./maze.js";
 
 function buildFullyWalledMaze(width: number, height: number): Maze {
 	const cells: Cell[][] = Array.from({ length: height }, () =>

@@ -4,6 +4,7 @@ import {
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
 } from "./circle-maze/render.js";
+import type { Maze, MazeType } from "./maze-domain.js";
 import type { TubeSegment } from "./maze-layout.js";
 import {
 	computeCellCenter,
@@ -11,7 +12,6 @@ import {
 	computeWallSegments,
 } from "./maze-layout.js";
 import type { MazePosition } from "./maze-solver.js";
-import type { Maze, MazeType } from "./maze.js";
 
 export interface MazeRenderStrategy {
 	logicalSize(maze: Maze): { width: number; height: number };

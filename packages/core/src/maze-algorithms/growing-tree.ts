@@ -1,4 +1,4 @@
-import type { Cell, CellWalls, MazeCrossing } from "../maze.js";
+import type { Cell, CellWalls, MazeCrossing } from "../maze-domain.js";
 import { createGrid, createSeededRandom } from "./shared.js";
 
 const MIN_DIFFICULTY = 1;

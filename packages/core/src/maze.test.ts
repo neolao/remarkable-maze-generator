@@ -1,21 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { totalNodeCount as totalCircleNodeCount } from "./circle-maze/cells.js";
 import { countReachableNodes as countCircleReachableNodes } from "./circle-maze/test-helpers.js";
-import { solveMaze } from "./maze-solver.js";
 import {
 	MAX_PATH_LENGTH_CANDIDATE_COUNT,
 	MAZE_ALGORITHMS,
-	MAZE_TYPES,
 	PATH_LENGTH_MAX_ATTEMPTS,
-	PATH_LENGTH_TARGETS,
-	generateMaze,
-	invalidMazeAlgorithmMessage,
-	invalidMazeTypeMessage,
-	invalidPathLengthTargetMessage,
-	isValidMazeAlgorithm,
-	isValidMazeType,
-	isValidPathLengthTarget,
-} from "./maze.js";
+} from "./maze-domain.js";
+import { solveMaze } from "./maze-solver.js";
+import { generateMaze } from "./maze.js";
 
 function countReachableCells(maze: ReturnType<typeof generateMaze>): number {
 	const visited = new Set<string>();
@@ -396,26 +388,6 @@ describe("generateMaze - dead-end branch length", () => {
 	});
 });
 
-describe("MAZE_TYPES / isValidMazeType / invalidMazeTypeMessage", () => {
-	it("lists rectangle, rectangle-crossing and circle as the valid maze types", () => {
-		expect(MAZE_TYPES).toEqual(["rectangle", "rectangle-crossing", "circle"]);
-	});
-
-	it.each(MAZE_TYPES)("accepts %s as a valid maze type", (type) => {
-		expect(isValidMazeType(type)).toBe(true);
-	});
-
-	it("rejects an unknown maze type", () => {
-		expect(isValidMazeType("hexagon")).toBe(false);
-	});
-
-	it("describes the allowed values in the invalid maze type message", () => {
-		expect(invalidMazeTypeMessage("hexagon")).toBe(
-			'Invalid maze type "hexagon", expected one of: rectangle, rectangle-crossing, circle',
-		);
-	});
-});
-
 describe("generateMaze - type option", () => {
 	it("defaults to the rectangle type when not specified, with no crossings", () => {
 		const maze = generateMaze({ width: 5, height: 5, seed: 1 });
@@ -546,34 +518,6 @@ describe("generateMaze - type option", () => {
 		});
 
 		expect(second.crossings).toEqual(first.crossings);
-	});
-});
-
-describe("MAZE_ALGORITHMS / isValidMazeAlgorithm / invalidMazeAlgorithmMessage", () => {
-	it("lists growing-tree, kruskal, wilson and aldous-broder as the valid maze algorithms", () => {
-		expect(MAZE_ALGORITHMS).toEqual([
-			"growing-tree",
-			"kruskal",
-			"wilson",
-			"aldous-broder",
-		]);
-	});
-
-	it.each(MAZE_ALGORITHMS)(
-		"accepts %s as a valid maze algorithm",
-		(algorithm) => {
-			expect(isValidMazeAlgorithm(algorithm)).toBe(true);
-		},
-	);
-
-	it("rejects an unknown maze algorithm", () => {
-		expect(isValidMazeAlgorithm("prim")).toBe(false);
-	});
-
-	it("describes the allowed values in the invalid maze algorithm message", () => {
-		expect(invalidMazeAlgorithmMessage("prim")).toBe(
-			'Invalid maze algorithm "prim", expected one of: growing-tree, kruskal, wilson, aldous-broder',
-		);
 	});
 });
 
@@ -877,29 +821,6 @@ describe("generateMaze - circle type", () => {
 		});
 
 		expect(second.circleCells).toEqual(first.circleCells);
-	});
-});
-
-describe("PATH_LENGTH_TARGETS / isValidPathLengthTarget / invalidPathLengthTargetMessage", () => {
-	it("lists short, medium and long as the valid path length targets", () => {
-		expect(PATH_LENGTH_TARGETS).toEqual(["short", "medium", "long"]);
-	});
-
-	it.each(PATH_LENGTH_TARGETS)(
-		"accepts %s as a valid path length target",
-		(target) => {
-			expect(isValidPathLengthTarget(target)).toBe(true);
-		},
-	);
-
-	it("rejects an unknown path length target", () => {
-		expect(isValidPathLengthTarget("extra-long")).toBe(false);
-	});
-
-	it("describes the allowed values in the invalid path length target message", () => {
-		expect(invalidPathLengthTargetMessage("extra-long")).toBe(
-			'Invalid path length target "extra-long", expected one of: short, medium, long',
-		);
 	});
 });
 

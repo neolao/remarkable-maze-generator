@@ -7,7 +7,7 @@ import { generateAldousBroderMaze } from "./maze-algorithms/aldous-broder.js";
 import { generateGrowingTreeMaze } from "./maze-algorithms/growing-tree.js";
 import { generateKruskalMaze } from "./maze-algorithms/kruskal.js";
 import { generateWilsonMaze } from "./maze-algorithms/wilson.js";
-import type { Cell, MazeAlgorithm, MazeCrossing } from "./maze.js";
+import type { Cell, MazeAlgorithm, MazeCrossing } from "./maze-domain.js";
 
 export interface GenerateRectangularCellsOptions {
 	width: number;

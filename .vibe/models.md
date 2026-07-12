@@ -14,19 +14,19 @@
 | circleSectorCounts | number[] | optional; only set for `type: "circle"` — the number of sectors in each ring, ring 0 (innermost) first, see ADR 037 |
 | circleCells | CircleCell[][] | optional; only set for `type: "circle"` — `circleCells[ring][sector]`, a variable number of sectors per ring so it doesn't fit the rectangular `cells` grid above, see ADR 037 |
 | pathLength | PathLengthTarget | optional; only set when a path-length target was requested — the category that was matched, not itself a generation parameter (see ADR 046) |
-Defined in: `packages/core/src/maze.ts`
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## MazeType
 String literal union: `"rectangle" | "rectangle-crossing" | "circle"`. `"circle"` is a real growing-sector topology entirely separate from the rectangular grid (ADR 037, superseding ADR 034's polar transposition of the rectangular grid). See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022, ADR 037).
-Defined in: `packages/core/src/maze.ts`
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## MazeAlgorithm
 String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); all 4 algorithms support `type: "circle"` too, reimplemented against its growing-sector graph (see ADR 037). See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
-Defined in: `packages/core/src/maze.ts`
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## PathLengthTarget
 String literal union: `"short" | "medium" | "long"`. When passed to `generateMaze()`, up to `PATH_LENGTH_MAX_ATTEMPTS` (10) candidate mazes are generated from incrementing seeds (`seed`, `seed + 1`, …) and the one whose solution length (via `solveMaze()`) best matches the target is returned — shortest/longest for `"short"`/`"long"`, closest to the (lower) median for `"medium"`; ties keep the earliest-generated candidate. Leaving it unset performs a single-seed generation, unchanged from before. See `PATH_LENGTH_TARGETS`, `isValidPathLengthTarget()`, `invalidPathLengthTargetMessage()` (ADR 046).
-Defined in: `packages/core/src/maze.ts`
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## CircleCell
 | Field | Type | Notes |
@@ -41,13 +41,13 @@ Defined in: `packages/core/src/circle-maze/cells.ts` (see ADR 037)
 | x | number | column index of the crossing cell |
 | y | number | row index of the crossing cell |
 | underAxis | `"vertical" \| "horizontal"` | which axis was the pre-existing passage that got tunneled under — a rendering hint only; both axes are equally real and walkable, see ADR 024 |
-Defined in: `packages/core/src/maze.ts` — never the entrance or exit cell, see ADR 024 (supersedes the decorative-only design of ADR 022)
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050) — never the entrance or exit cell, see ADR 024 (supersedes the decorative-only design of ADR 022)
 
 ## Cell
 | Field | Type | Notes |
 |---|---|---|
 | walls | CellWalls | which of the 4 sides are walled off |
-Defined in: `packages/core/src/maze.ts`
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## CellWalls
 | Field | Type | Notes |
@@ -56,7 +56,7 @@ Defined in: `packages/core/src/maze.ts`
 | south | boolean | wall present on the south side |
 | east | boolean | wall present on the east side |
 | west | boolean | wall present on the west side |
-Defined in: `packages/core/src/maze.ts`
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## GenerateMazeOptions
 | Field | Type | Notes |
@@ -69,7 +69,7 @@ Defined in: `packages/core/src/maze.ts`
 | algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; rejected if combined with `type: "rectangle-crossing"` and anything other than `"growing-tree"`, see ADR 033 |
 | pathLength | PathLengthTarget | optional; when set, triggers the multi-candidate seed search described under `PathLengthTarget` instead of a single-seed generation, see ADR 046 |
 | pathLengthCandidateCount | number | optional; overrides `PATH_LENGTH_MAX_ATTEMPTS` (10) as the number of candidates tried when `pathLength` is set — integer 1 to `MAX_PATH_LENGTH_CANDIDATE_COUNT` (50), rejected otherwise or when set without `pathLength`, see ADR 047 |
-Defined in: `packages/core/src/maze.ts`
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## MazePosition
 | Field | Type | Notes |

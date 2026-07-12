@@ -1,0 +1,15 @@
+---
+date: 2026-07-12
+status: accepted
+---
+# Extract maze domain entities and validation into a dedicated module
+
+**Context:** `packages/core/src/maze.ts` mixed domain concepts (`Maze`, `Cell`, `CellWalls`, `MazePosition`-adjacent types, `MazeType`, `MazeAlgorithm`, `PathLengthTarget`, and their validation rules) with generation-orchestration logic (`generateMaze`, candidate generation, path-length candidate selection). `maze-algorithm-registry.ts`, `maze-algorithms/*`, and the rendering modules only ever needed the type definitions, yet imported them from `maze.ts`, which itself imports `maze-algorithm-registry.ts` — a type-only import cycle. `CLAUDE.md` flags DDD review as inactive because there is no explicit domain layer.
+
+**Decision:** Move all domain types (`Cell`, `CellWalls`, `MazeCrossing`, `MazeType`, `MazeAlgorithm`, `PathLengthTarget`, `Maze`, `GenerateMazeOptions`), domain constants (`MAZE_TYPES`, `MAZE_ALGORITHMS`, `PATH_LENGTH_TARGETS`, difficulty/dimension bounds, path-length attempt/candidate caps), and validation functions (dimension bounds, difficulty range, type/algorithm validity, type/algorithm compatibility, path-length target/candidate-count validation) into a new `packages/core/src/maze-domain.ts` module with zero *runtime* imports from generation, rendering, or reMarkable Cloud code. `maze.ts` keeps only generation orchestration (`generateMaze`, candidate generation, path-length candidate selection) and imports its domain vocabulary from `maze-domain.ts`. Every consumer that only needed types (`maze-algorithm-registry.ts`, `maze-algorithms/*`, `maze-solver.ts`, `maze-layout.ts`, `maze-pdf.ts`, `maze-svg.ts`, `maze-render-strategy.ts`) now imports directly from `maze-domain.ts` instead of `maze.ts`, which also removes the prior type-only import cycle through `maze.ts` → `maze-algorithm-registry.ts` → `maze.ts`. The package's public API (`index.ts` exports consumed by `cli`/`web`) is unchanged.
+
+One exception: `maze-domain.ts` keeps a `import type { CircleCell }` from `circle-maze/cells.js`, needed only to describe the shape of `Maze.circleCells`. `CircleCell` is a minimal structural type (not generation logic), the import is type-only (erased at build, no runtime edge), and moving it would mean relocating part of the circle-maze data model out of its own module tree — out of scope for this item. The automated boundary check (see below) treats this one type-only import as an allowed exception and fails on anything else from `circle-maze/`.
+
+**Reason:** Establishes the domain boundary that later items (isolating rendering and the reMarkable Cloud client as adapters — see backlog items 048/049) will depend on. Breaking the import cycle is a direct, testable consequence of the boundary being real rather than aspirational.
+
+**Rejected alternatives:** A `domain/` subdirectory with one file per concept (`domain/maze.ts`, `domain/path-length.ts`, …) was considered but rejected as premature — the domain surface is small enough (one file, ~150 lines) that splitting it further would add navigation overhead without a matching benefit; can be revisited if the domain module grows substantially.

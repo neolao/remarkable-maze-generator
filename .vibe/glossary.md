@@ -2,12 +2,12 @@
 
 ## Maze
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `Maze`, `generateMaze()` in `packages/core/src/maze.ts`
+**Code:** `Maze` in `packages/core/src/maze-domain.ts`, `generateMaze()` in `packages/core/src/maze.ts` (see ADR 050)
 **Do not confuse with:** —
 
 ## Cell
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `Cell`, `CellWalls` in `packages/core/src/maze.ts`
+**Code:** `Cell`, `CellWalls` in `packages/core/src/maze-domain.ts` (see ADR 050)
 **Do not confuse with:** —
 
 ## Entrance
@@ -27,12 +27,12 @@
 
 ## Difficulty
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `difficulty` field of `GenerateMazeOptions`, integer 1–5, in `packages/core/src/maze.ts` (see ADR 015)
+**Code:** `difficulty` field of `GenerateMazeOptions`, integer 1–5, in `packages/core/src/maze-domain.ts` (see ADR 015, ADR 050)
 **Do not confuse with:** —
 
 ## Maze type
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `MazeType`, `MAZE_TYPES`, `type` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 022, ADR 037)
+**Code:** `MazeType`, `MAZE_TYPES`, `type` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze-domain.ts` (see ADR 022, ADR 037, ADR 050)
 **Do not confuse with:** Difficulty
 
 ## Branch point
@@ -42,17 +42,17 @@
 
 ## Bridge crossing
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `MazeCrossing`, `crossings` field of `Maze`, `computeCrossingBridgeSegments()` / `computePathSegments()` in `packages/core/src/maze.ts` / `maze-layout.ts` (see ADR 022 and ADR 023)
+**Code:** `MazeCrossing` in `packages/core/src/maze-domain.ts`, `crossings` field of `Maze`, `computeCrossingBridgeSegments()` / `computePathSegments()` in `maze-layout.ts` (see ADR 022, ADR 023, ADR 050)
 **Do not confuse with:** —
 
 ## Generation algorithm
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `MazeAlgorithm`, `MAZE_ALGORITHMS`, `algorithm` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 033); each algorithm implemented in its own module under `packages/core/src/maze-algorithms/`
+**Code:** `MazeAlgorithm`, `MAZE_ALGORITHMS`, `algorithm` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze-domain.ts` (see ADR 033, ADR 050); each algorithm implemented in its own module under `packages/core/src/maze-algorithms/`
 **Do not confuse with:** Maze type, Difficulty
 
 ## Path length target
 **Definition:** [what this concept means in the domain — fill in]
-**Code:** `PathLengthTarget`, `PATH_LENGTH_TARGETS`, `pathLength` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze.ts` (see ADR 046)
+**Code:** `PathLengthTarget`, `PATH_LENGTH_TARGETS`, `pathLength` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze-domain.ts` (see ADR 046, ADR 050)
 **Do not confuse with:** Difficulty (difficulty tunes branch-point density during generation; path length target instead selects, after the fact, among several full generations, whichever one's solution length best matches)
 
 ## Ring
