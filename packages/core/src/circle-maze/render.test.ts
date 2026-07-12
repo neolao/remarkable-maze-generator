@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
 	isArcSegment,
 } from "../rendering/maze-layout.js";
@@ -407,13 +408,18 @@ describe("computeCircleCellCenter", () => {
 	});
 });
 
-// computeCircleTubeSegments was redesigned around per-edge Cartesian
-// channels instead of a per-cell polar hub (see ADR 055 follow-up): every
-// open connection (tangential or radial) is its own constant-width channel
-// directly between the two cells' real centers, so channel width is a
-// structural guarantee rather than something that can drift out of sync
-// between two rings of different resolution.
+// computeCircleTubeSegments models each cell as a small polar "hub" (an
+// inset window in local radius/angle space) plus an "arm" reaching to the
+// cell boundary for each open side, a flat cap otherwise — the same shape
+// the rectangular tube renderer uses, generalized to a topology where
+// neighboring cells aren't all the same size (see ADR 056 follow-up). The
+// hub's angular half-width is derived from the physical radius rather than
+// the ring's own angular step, so a door's physical (Cartesian) size stays
+// consistent regardless of how far out it sits or how many sectors its own
+// ring happens to have.
 describe("computeCircleTubeSegments", () => {
+	const h = TUBE_HALF_WIDTH_RATIO;
+
 	it("throws when cells do not match the sector counts", () => {
 		const sectorCounts = computeCircleSectorCounts(4, 3);
 		const maze = buildFullyWalledCircleMaze(sectorCounts);
@@ -444,7 +450,7 @@ describe("computeCircleTubeSegments", () => {
 		}
 	});
 
-	it("draws a tangential channel as two concentric arcs exactly 2×half-width apart in radius, regardless of the ring's own sector count", () => {
+	it("sizes an open side's hub arcs at exactly midRadius ± half-width, regardless of the ring's own sector count", () => {
 		const sectorCounts = [6];
 		const cells = createCircleGrid(sectorCounts);
 		carveEdge(
@@ -463,80 +469,142 @@ describe("computeCircleTubeSegments", () => {
 
 		const hasRadiusNear = (radius: number) =>
 			arcRadii.some((r) => Math.abs(r - radius) < 1e-9);
-		expect(hasRadiusNear(midRadius - TUBE_HALF_WIDTH_RATIO)).toBe(true);
-		expect(hasRadiusNear(midRadius + TUBE_HALF_WIDTH_RATIO)).toBe(true);
+		expect(hasRadiusNear(midRadius - h)).toBe(true);
+		expect(hasRadiusNear(midRadius + h)).toBe(true);
 	});
 
-	it("draws a radial channel as two lines a constant perpendicular distance apart, even when the child sits at a different angle than its parent", () => {
-		// Growth ratio 2 (ring 0 has 2 sectors, ring 1 has 4): the open child
-		// (ring 1, sector 0) is NOT at the same angle as its parent (ring 0,
-		// sector 0) — a straight center-to-center offset must still produce an
-		// exact constant-width channel despite the diagonal.
-		const sectorCounts = [2, 4];
+	// Regression test for the original bug (see ADR 055 follow-up): sizing a
+	// door's angular half-width from the ring's own angular step let a door's
+	// *physical* width balloon within a same-sector-count band, since the
+	// angular step stays flat while the radius (and so the arc length it
+	// carves out) keeps growing ring by ring. Deriving the half-width from
+	// the physical radius instead keeps the door's physical width within a
+	// tight, bounded range no matter how deep in the maze it sits.
+	it("keeps an outward door's physical width within a tight bounded range across many rings of the same sector count", () => {
+		const measureDoorWidth = (parentRing: number): number => {
+			const sectorCounts = Array(parentRing + 2).fill(6);
+			const cells = createCircleGrid(sectorCounts);
+			carveEdge(
+				cells,
+				sectorCounts,
+				{ ring: parentRing, sector: 0 },
+				{ ring: parentRing + 1, sector: 0 },
+			);
+			const maze = { sectorCounts, cells };
+
+			const childCenter = computeCircleCellCenter(maze, {
+				ring: parentRing + 1,
+				sector: 0,
+			});
+			const boundaryRadius = parentRing + 1 + computeHubRadius(6);
+
+			const segments = computeCircleTubeSegments(maze);
+			const matchingPoints = segments
+				.filter((segment) => !isArcSegment(segment))
+				.flatMap((segment) => [
+					{ x: segment.x1, y: segment.y1 },
+					{ x: segment.x2, y: segment.y2 },
+				])
+				.filter(
+					(point) =>
+						Math.hypot(point.x - childCenter.x, point.y - childCenter.y) < 1.0,
+				)
+				.filter((point) => {
+					const diameter = computeCircleMazeDiameter(maze);
+					const center = diameter / 2;
+					const radius = Math.hypot(point.x - center, point.y - center);
+					return Math.abs(radius - boundaryRadius) < 1e-6;
+				});
+			// The parent's own outward arm and the child's own inward arm each
+			// contribute a line ending at the exact same two boundary points —
+			// deduplicate down to those 2 distinct points before measuring width.
+			const boundaryPoints = matchingPoints.filter(
+				(point, index) =>
+					matchingPoints.findIndex(
+						(other) =>
+							Math.abs(other.x - point.x) < 1e-9 &&
+							Math.abs(other.y - point.y) < 1e-9,
+					) === index,
+			);
+
+			expect(boundaryPoints).toHaveLength(2);
+			const [a, b] = boundaryPoints;
+			return Math.hypot(a.x - b.x, a.y - b.y);
+		};
+
+		const widths = [0, 2, 4, 6, 8].map(measureDoorWidth);
+
+		// The width asymptotically approaches 2h as the ring grows (the
+		// boundary radius gets proportionally closer to the hub's own
+		// mid-radius), but even at ring 0 — where that approximation is
+		// loosest — it stays well within a bounded fraction of 2h, unlike the
+		// old angleStep-based sizing (which could drift up to ~4.5x within a
+		// same-sector-count band).
+		for (const width of widths) {
+			expect(width).toBeGreaterThan(1.5 * h);
+			expect(width).toBeLessThan(2 * h);
+		}
+		expect(Math.max(...widths) / Math.min(...widths)).toBeLessThan(1.4);
+	});
+
+	// Cell (ring 0, sector 2) is open only clockwise (a dead-end analog): its
+	// inner-start and outer-start corners sit between two sides in the same
+	// state (both closed: inward/ccw) and (both open... no: outward/ccw both
+	// false) respectively, so those are the "real" corners that get rounded;
+	// inner-end and outer-end sit between an open side (cw) and a closed one
+	// (inward/outward), so they stay sharp and collinear.
+	it("rounds only the hub corners whose two adjacent sides share the same open/closed state", () => {
+		const sectorCounts = [4, 4];
 		const cells = createCircleGrid(sectorCounts);
 		carveEdge(
 			cells,
 			sectorCounts,
-			{ ring: 0, sector: 0 },
-			{ ring: 1, sector: 0 },
+			{ ring: 0, sector: 2 },
+			{ ring: 0, sector: 3 },
 		);
 		const maze = { sectorCounts, cells };
 
-		const innerCenter = computeCircleCellCenter(maze, { ring: 0, sector: 0 });
-		const outerCenter = computeCircleCellCenter(maze, { ring: 1, sector: 0 });
-		const expectedMidpoint = {
-			x: (innerCenter.x + outerCenter.x) / 2,
-			y: (innerCenter.y + outerCenter.y) / 2,
-		};
+		const cellCenter = computeCircleCellCenter(maze, { ring: 0, sector: 2 });
+		const segments = computeCircleTubeSegments(maze).filter(
+			(segment) =>
+				Math.hypot(segment.x1 - cellCenter.x, segment.y1 - cellCenter.y) <
+					0.6 &&
+				Math.hypot(segment.x2 - cellCenter.x, segment.y2 - cellCenter.y) < 0.6,
+		);
 
-		const segments = computeCircleTubeSegments(maze);
-		const channelLines = segments
-			.filter((segment) => !isArcSegment(segment))
-			.filter((line) => {
-				const midX = (line.x1 + line.x2) / 2;
-				const midY = (line.y1 + line.y2) / 2;
-				return (
-					Math.hypot(midX - expectedMidpoint.x, midY - expectedMidpoint.y) < 0.5
-				);
-			});
-
-		expect(channelLines.length).toBe(2);
-		const [a, b] = channelLines;
-		// Perpendicular distance from b's first point to the infinite line
-		// through a — computed independently via the cross-product formula,
-		// not by re-deriving the implementation's own offset math.
-		const dx = a.x2 - a.x1;
-		const dy = a.y2 - a.y1;
-		const length = Math.hypot(dx, dy);
-		const distance = Math.abs(dx * (b.y1 - a.y1) - dy * (b.x1 - a.x1)) / length;
-		expect(distance).toBeCloseTo(2 * TUBE_HALF_WIDTH_RATIO, 9);
+		const arcs = segments.filter(isArcSegment);
+		const roundingArcs = arcs.filter(
+			(arc) => Math.abs(arc.radius - TUBE_CORNER_RADIUS_RATIO) < 1e-9,
+		);
+		expect(roundingArcs).toHaveLength(2);
 	});
 
-	it("keeps a crossing node's over axis (tangential here) spanning its full un-gapped angular range, uninterrupted", () => {
+	it("keeps a crossing node's over axis (tangential here) spanning its exact un-gapped angular range, as a single uninterrupted arc", () => {
 		const maze = buildCircleCrossingMaze();
 		const angleStep = (2 * Math.PI) / maze.sectorCounts[1];
 		const hubRadius = computeHubRadius(maze.sectorCounts[0]);
 		const midRadius = 1 + hubRadius + 0.5;
 
 		const segments = computeCircleTubeSegments(maze);
-		for (const radius of [
-			midRadius - TUBE_HALF_WIDTH_RATIO,
-			midRadius + TUBE_HALF_WIDTH_RATIO,
-		]) {
-			const totalAngle = segments
+		for (const radius of [midRadius - h, midRadius + h]) {
+			// The crossing's own tangential channel is drawn as one single arc
+			// spanning its entire own sector, ignoring the hub entirely — unlike
+			// its cw/ccw neighbors, which only reach partway in from the cell
+			// boundary. Its neighbors' own hub arcs and caps also happen to sit
+			// at this same radius, so this looks for the one whole-sector-wide
+			// piece specifically rather than summing every arc at this radius.
+			const arcsAtRadius = segments
 				.filter(isArcSegment)
-				.filter((segment) => Math.abs(segment.radius - radius) < 1e-9)
-				.reduce((sum, segment) => {
-					const chordLength = Math.hypot(
-						segment.x2 - segment.x1,
-						segment.y2 - segment.y1,
-					);
-					return sum + 2 * Math.asin(chordLength / (2 * segment.radius));
-				}, 0);
-			// The crossing's own tangential channel alone spans 2 full sectors
-			// (its ccw neighbor's center to its cw neighbor's center) — a strict
-			// lower bound since other cells sharing this radius also contribute.
-			expect(totalAngle).toBeGreaterThanOrEqual(2 * angleStep - 1e-6);
+				.filter((segment) => Math.abs(segment.radius - radius) < 1e-9);
+			const fullSpanArc = arcsAtRadius.find((segment) => {
+				const chordLength = Math.hypot(
+					segment.x2 - segment.x1,
+					segment.y2 - segment.y1,
+				);
+				const angle = 2 * Math.asin(chordLength / (2 * segment.radius));
+				return Math.abs(angle - angleStep) < 1e-6;
+			});
+			expect(fullSpanArc).toBeDefined();
 		}
 	});
 
@@ -565,72 +633,6 @@ describe("computeCircleTubeSegments", () => {
 		// center — the real physical gap where the tangential (over-axis) tube
 		// passes uninterrupted instead.
 		expect(Math.min(...distancesToCenter)).toBeGreaterThan(0.2);
-	});
-
-	it("draws a small hub joint at every open node, rounding turns instead of leaving a sharp kink", () => {
-		const sectorCounts = [6];
-		const cells = createCircleGrid(sectorCounts);
-		carveEdge(
-			cells,
-			sectorCounts,
-			{ ring: 0, sector: 0 },
-			{ ring: 0, sector: 1 },
-		);
-		const maze = { sectorCounts, cells };
-		const nodeCenter = computeCircleCellCenter(maze, { ring: 0, sector: 0 });
-
-		const segments = computeCircleTubeSegments(maze);
-		const hubArcs = segments
-			.filter(isArcSegment)
-			.filter(
-				(segment) => Math.abs(segment.radius - TUBE_HALF_WIDTH_RATIO) < 1e-9,
-			);
-		// A hub circle's own points sit exactly `TUBE_HALF_WIDTH_RATIO` away from
-		// the node's center — not at the center itself.
-		const surroundsNodeCenter = hubArcs.some((segment) => {
-			const d1 = Math.hypot(
-				segment.x1 - nodeCenter.x,
-				segment.y1 - nodeCenter.y,
-			);
-			const d2 = Math.hypot(
-				segment.x2 - nodeCenter.x,
-				segment.y2 - nodeCenter.y,
-			);
-			return (
-				Math.abs(d1 - TUBE_HALF_WIDTH_RATIO) < 1e-6 &&
-				Math.abs(d2 - TUBE_HALF_WIDTH_RATIO) < 1e-6
-			);
-		});
-
-		expect(surroundsNodeCenter).toBe(true);
-	});
-
-	it("does not draw a hub joint at a crossing node, preserving its visible gap", () => {
-		const maze = buildCircleCrossingMaze();
-		const crossingCenter = computeCircleCellCenter(maze, {
-			ring: 1,
-			sector: 1,
-		});
-
-		const segments = computeCircleTubeSegments(maze);
-		const hubArcs = segments
-			.filter(isArcSegment)
-			.filter(
-				(segment) => Math.abs(segment.radius - TUBE_HALF_WIDTH_RATIO) < 1e-9,
-			);
-		const nearCrossingCenter = hubArcs.some((segment) => {
-			const d1 = Math.hypot(
-				segment.x1 - crossingCenter.x,
-				segment.y1 - crossingCenter.y,
-			);
-			const d2 = Math.hypot(
-				segment.x2 - crossingCenter.x,
-				segment.y2 - crossingCenter.y,
-			);
-			return d1 < 0.5 && d2 < 0.5;
-		});
-
-		expect(nearCrossingCenter).toBe(false);
 	});
 
 	it("draws a stub channel connecting the entrance cell to the hub boundary", () => {

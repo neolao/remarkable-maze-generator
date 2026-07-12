@@ -114,7 +114,7 @@ function buildCrossingLookup(maze: Maze): Map<string, MazeCrossing> {
 	return lookup;
 }
 
-interface Point {
+export interface Point {
 	x: number;
 	y: number;
 }
@@ -134,9 +134,12 @@ function unit(from: Point, to: Point): Point {
  * single isolated corner rendered on its own was not enough to catch a
  * flipped sweep — it only becomes visually obvious once both of a turn's
  * edges are rendered together and the tube either stays a consistent width
- * around the bend or visibly pinches).
+ * around the bend or visibly pinches). Pure Cartesian geometry, correct for
+ * any vertex whose two adjacent edges are genuinely perpendicular — reused
+ * as-is by the circle-crossing tube renderer's own per-cell hub corners
+ * (always radial ⊥ tangential, see ADR 056 follow-up).
  */
-function roundCorner(
+export function roundCorner(
 	vertex: Point,
 	farPoint1: Point,
 	farPoint2: Point,

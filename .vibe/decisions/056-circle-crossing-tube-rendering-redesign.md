@@ -1,6 +1,6 @@
 ---
 date: 2026-07-12
-status: accepted
+status: superseded by 057
 ---
 # circle-crossing tube rendering: per-edge Cartesian channels, not a per-cell polar hub
 
