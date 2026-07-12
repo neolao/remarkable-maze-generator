@@ -50,7 +50,7 @@ h1 {
 
 .form-fields {
 	display: grid;
-	grid-template-columns: repeat(5, 1fr);
+	grid-template-columns: repeat(5, minmax(0, 1fr));
 	gap: 1rem;
 	margin-bottom: 1.25rem;
 }
@@ -62,10 +62,13 @@ h1 {
 	font-size: 0.9rem;
 	font-weight: 600;
 	color: var(--color-text-muted);
+	min-width: 0;
 }
 
 .field input,
 .field select {
+	width: 100%;
+	min-width: 0;
 	font: inherit;
 	font-weight: 400;
 	color: var(--color-text);
@@ -217,7 +220,7 @@ button:disabled {
 
 @media (max-width: 900px) {
 	.form-fields {
-		grid-template-columns: repeat(2, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 

@@ -166,5 +166,29 @@ describe("public maze configuration page", () => {
 
 			expect(hasComfortableTapTarget).toBe(true);
 		});
+
+		it("lets form-fields grid columns shrink below their content's natural size so wide selects cannot blow out the layout on desktop", () => {
+			const formFieldsBlocks = [
+				...css.matchAll(/\.form-fields\s*\{([^}]*)\}/g),
+			];
+			const columnDeclarations = formFieldsBlocks
+				.map((block) => block[1].match(/grid-template-columns:\s*([^;]+);/))
+				.filter((match) => match !== null)
+				.map((match) => match?.[1] ?? "");
+
+			expect(columnDeclarations.length).toBeGreaterThan(0);
+			for (const declaration of columnDeclarations) {
+				const isSingleColumn = declaration.trim() === "1fr";
+				expect(isSingleColumn || declaration.includes("minmax(0,")).toBe(true);
+			}
+		});
+
+		it("makes form inputs and selects fill their grid cell instead of sizing to their own content", () => {
+			const controlBlock = css.match(
+				/\.field input,\s*\n?\s*\.field select\s*\{([^}]*)\}/,
+			);
+			expect(controlBlock).not.toBeNull();
+			expect(controlBlock?.[1]).toMatch(/width:\s*100%/);
+		});
 	});
 });
