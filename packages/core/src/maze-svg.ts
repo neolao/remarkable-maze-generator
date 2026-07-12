@@ -1,16 +1,6 @@
-import {
-	computeCircleCellCenter,
-	computeCircleMazeDiameter,
-	computeCircleMazeSegments,
-	computeCircleSolutionPoints,
-} from "./circle-maze/render.js";
-import {
-	computeCellCenter,
-	computeTubeSegments,
-	computeWallSegments,
-	isArcSegment,
-} from "./maze-layout.js";
+import { isArcSegment } from "./maze-layout.js";
 import type { TubeSegment } from "./maze-layout.js";
+import { getMazeRenderStrategy } from "./maze-render-strategy.js";
 import { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
 import type { MazePosition } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -49,16 +39,7 @@ function renderLines(
 }
 
 function cellCenter(maze: Maze, position: MazePosition, cellSizePx: number) {
-	const unitCenter =
-		maze.type === "circle"
-			? computeCircleCellCenter(
-					{
-						sectorCounts: maze.circleSectorCounts ?? [],
-						cells: maze.circleCells ?? [],
-					},
-					{ ring: position.y, sector: position.x },
-				)
-			: computeCellCenter(position);
+	const unitCenter = getMazeRenderStrategy(maze).cellCenter(maze, position);
 	return {
 		x: unitCenter.x * cellSizePx,
 		y: unitCenter.y * cellSizePx,
@@ -72,19 +53,12 @@ function renderSolutionTrace(
 ): string {
 	// For "circle", a straight line directly between two consecutive cells'
 	// centers looks like a diagonal cutting across the maze whenever they're
-	// on different rings — `computeCircleSolutionPoints` inserts an extra
-	// point at each ring boundary so the trace follows the radius through a
-	// ring transition instead (see ADR 041).
-	const points =
-		maze.type === "circle"
-			? computeCircleSolutionPoints(
-					{
-						sectorCounts: maze.circleSectorCounts ?? [],
-						cells: maze.circleCells ?? [],
-					},
-					path.map((position) => ({ ring: position.y, sector: position.x })),
-				).map((point) => ({ x: point.x * cellSizePx, y: point.y * cellSizePx }))
-			: path.map((position) => cellCenter(maze, position, cellSizePx));
+	// on different rings — the circle strategy's `solutionPoints` inserts an
+	// extra point at each ring boundary so the trace follows the radius
+	// through a ring transition instead (see ADR 041).
+	const points = getMazeRenderStrategy(maze)
+		.solutionPoints(maze, path)
+		.map((point) => ({ x: point.x * cellSizePx, y: point.y * cellSizePx }));
 
 	let markup = "";
 	for (let i = 0; i < points.length - 1; i++) {
@@ -111,43 +85,26 @@ function renderBranchPointMarkers(
 		.join("");
 }
 
-function logicalSvgSize(maze: Maze): { width: number; height: number } {
-	if (maze.type === "circle") {
-		const diameter = computeCircleMazeDiameter({
-			sectorCounts: maze.circleSectorCounts ?? [],
-			cells: maze.circleCells ?? [],
-		});
-		return { width: diameter, height: diameter };
-	}
-	return { width: maze.width, height: maze.height };
-}
-
 export function renderMazeToSvg(
 	maze: Maze,
 	options: RenderMazeToSvgOptions = {},
 ): string {
 	const cellSizePx = options.cellSizePx ?? DEFAULT_CELL_SIZE_PX;
-	const { width: logicalWidth, height: logicalHeight } = logicalSvgSize(maze);
+	const strategy = getMazeRenderStrategy(maze);
+	const { width: logicalWidth, height: logicalHeight } =
+		strategy.logicalSize(maze);
 	const width = logicalWidth * cellSizePx;
 	const height = logicalHeight * cellSizePx;
 
 	// Every line is independent — no fill or stroke-width layering. For
-	// "rectangle-crossing", each corridor is its own two edge lines (see ADR
-	// 026); "circle" draws its ring/sector walls (see ADR 037); the classic
-	// type keeps drawing plain walls.
-	const lines =
-		maze.type === "rectangle-crossing"
-			? renderLines(computeTubeSegments(maze), cellSizePx, "round")
-			: maze.type === "circle"
-				? renderLines(
-						computeCircleMazeSegments({
-							sectorCounts: maze.circleSectorCounts ?? [],
-							cells: maze.circleCells ?? [],
-						}),
-						cellSizePx,
-						"square",
-					)
-				: renderLines(computeWallSegments(maze), cellSizePx, "square");
+	// "rectangle-crossing", each corridor is its own two edge lines with round
+	// caps (see ADR 026); every other type draws plain square-capped walls
+	// ("circle" draws its ring/sector walls, see ADR 037).
+	const lines = renderLines(
+		strategy.segments(maze),
+		cellSizePx,
+		strategy.roundedCaps ? "round" : "square",
+	);
 
 	const solutionMarkup = options.showSolution
 		? renderSolutionTrace(maze, solveMaze(maze), cellSizePx) +

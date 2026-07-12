@@ -1,8 +1,5 @@
-import { generateCircleAldousBroderMaze } from "./aldous-broder.js";
+import { generateCircleCellsForAlgorithm } from "../maze-algorithm-registry.js";
 import type { CircleCell } from "./cells.js";
-import { generateCircleGrowingTreeMaze } from "./growing-tree.js";
-import { generateCircleKruskalMaze } from "./kruskal.js";
-import { generateCircleWilsonMaze } from "./wilson.js";
 
 export type CircleMazeAlgorithm =
 	| "growing-tree"
@@ -31,7 +28,9 @@ export interface CircleMaze {
  * innermost ring starts with `width` sectors, growing outward as needed to
  * keep passages from ballooning tangentially, with `height` rings total.
  * Same 4 selectable algorithms as the rectangular grid, entirely
- * reimplemented against this graph rather than shared with it.
+ * reimplemented against this graph rather than shared with it; the
+ * per-algorithm dispatch itself lives in the shared registry (see ADR 049)
+ * so it stays in sync with the rectangular grid's dispatch.
  */
 export function generateCircleMaze({
 	width,
@@ -40,14 +39,10 @@ export function generateCircleMaze({
 	difficulty = MIN_DIFFICULTY,
 	algorithm = DEFAULT_ALGORITHM,
 }: GenerateCircleMazeOptions): CircleMaze {
-	switch (algorithm) {
-		case "growing-tree":
-			return generateCircleGrowingTreeMaze({ width, height, seed, difficulty });
-		case "kruskal":
-			return generateCircleKruskalMaze({ width, height, seed });
-		case "wilson":
-			return generateCircleWilsonMaze({ width, height, seed });
-		case "aldous-broder":
-			return generateCircleAldousBroderMaze({ width, height, seed });
-	}
+	return generateCircleCellsForAlgorithm(algorithm, {
+		width,
+		height,
+		seed,
+		difficulty,
+	});
 }

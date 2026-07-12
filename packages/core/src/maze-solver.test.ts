@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import {
+	findCircleSolutionBranchPoints,
+	solveCircleMaze,
+} from "./circle-maze/solve.js";
 import { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
-import { generateMaze } from "./maze.js";
+import { MAZE_TYPES, generateMaze } from "./maze.js";
 import type { Cell, Maze } from "./maze.js";
 
 function buildFullyWalledMaze(width: number, height: number): Maze {
@@ -129,6 +133,31 @@ describe("solveMaze", () => {
 		expect(() => solveMaze(maze)).not.toThrow();
 	});
 
+	it("delegates to the circle-maze solver, mapping {ring,sector} to {y,x}", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 8,
+			seed: 7,
+			type: "circle",
+		});
+
+		const expected = solveCircleMaze({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
+
+		expect(solveMaze(maze)).toEqual(expected);
+	});
+
+	it.each(MAZE_TYPES)(
+		"registers a solver strategy for every maze type (%s)",
+		(type) => {
+			const maze = generateMaze({ width: 8, height: 8, seed: 4, type });
+
+			expect(() => solveMaze(maze)).not.toThrow();
+		},
+	);
+
 	it("rejects a route that would require turning between axes at a crossing cell", () => {
 		// Cells addressed as maze.cells[y][x]. The only wall-connected route from
 		// entrance to exit passes through the crossing cell (1,1), entering from
@@ -213,4 +242,40 @@ describe("findSolutionBranchPoints", () => {
 
 		expect(() => findSolutionBranchPoints(maze)).toThrow();
 	});
+
+	it("does not error finding branch points on a generated circle maze", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 8,
+			seed: 7,
+			type: "circle",
+		});
+
+		expect(() => findSolutionBranchPoints(maze)).not.toThrow();
+	});
+
+	it("delegates to the circle-maze branch-point detector, mapping {ring,sector} to {y,x}", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 8,
+			seed: 7,
+			type: "circle",
+		});
+
+		const expected = findCircleSolutionBranchPoints({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
+
+		expect(findSolutionBranchPoints(maze)).toEqual(expected);
+	});
+
+	it.each(MAZE_TYPES)(
+		"registers a solver strategy for every maze type (%s)",
+		(type) => {
+			const maze = generateMaze({ width: 8, height: 8, seed: 4, type });
+
+			expect(() => findSolutionBranchPoints(maze)).not.toThrow();
+		},
+	);
 });

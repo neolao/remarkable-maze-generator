@@ -1,9 +1,6 @@
 import type { CircleCell } from "./circle-maze/cells.js";
 import { generateCircleMaze } from "./circle-maze/generate.js";
-import { generateAldousBroderMaze } from "./maze-algorithms/aldous-broder.js";
-import { generateGrowingTreeMaze } from "./maze-algorithms/growing-tree.js";
-import { generateKruskalMaze } from "./maze-algorithms/kruskal.js";
-import { generateWilsonMaze } from "./maze-algorithms/wilson.js";
+import { generateRectangularCells } from "./maze-algorithm-registry.js";
 import { solveMaze } from "./maze-solver.js";
 
 export interface CellWalls {
@@ -214,35 +211,6 @@ function validateTypeAlgorithmCompatibility(
 	}
 }
 
-interface GenerateCellsOptions {
-	width: number;
-	height: number;
-	seed: number;
-	difficulty: number;
-	allowsCrossings: boolean;
-}
-
-interface GeneratedCells {
-	cells: Cell[][];
-	crossings: MazeCrossing[];
-}
-
-function generateCells(
-	algorithm: MazeAlgorithm,
-	options: GenerateCellsOptions,
-): GeneratedCells {
-	switch (algorithm) {
-		case "growing-tree":
-			return generateGrowingTreeMaze(options);
-		case "kruskal":
-			return { cells: generateKruskalMaze(options).cells, crossings: [] };
-		case "wilson":
-			return { cells: generateWilsonMaze(options).cells, crossings: [] };
-		case "aldous-broder":
-			return { cells: generateAldousBroderMaze(options).cells, crossings: [] };
-	}
-}
-
 interface GenerateCandidateOptions {
 	width: number;
 	height: number;
@@ -283,7 +251,7 @@ function generateMazeCandidate({
 	}
 
 	const allowsCrossings = type === "rectangle-crossing";
-	const { cells, crossings } = generateCells(algorithm, {
+	const { cells, crossings } = generateRectangularCells(algorithm, {
 		width,
 		height,
 		seed,

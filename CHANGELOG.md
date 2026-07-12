@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Internal: how each maze type (classic, tunnel-crossing, circular) is rendered, solved, and generated per algorithm is now centralized in three single lookup tables instead of duplicated conditional checks scattered across the rendering, solving, and generation code — no user-visible change; generated mazes, PDFs, and previews are unaffected
+
 ## [0.10.1] - 2026-07-11
 
 ### Changed

@@ -2,7 +2,7 @@ import {
 	findCircleSolutionBranchPoints,
 	solveCircleMaze,
 } from "./circle-maze/solve.js";
-import type { Maze } from "./maze.js";
+import type { Maze, MazeType } from "./maze.js";
 
 export interface MazePosition {
 	x: number;
@@ -117,14 +117,22 @@ function solvePathNodes(maze: Maze): Node[] {
 	);
 }
 
-export function solveMaze(maze: Maze): MazePosition[] {
-	if (maze.type === "circle") {
-		return solveCircleMaze({
-			sectorCounts: maze.circleSectorCounts ?? [],
-			cells: maze.circleCells ?? [],
-		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
-	}
+function circleLike(maze: Maze) {
+	return {
+		sectorCounts: maze.circleSectorCounts ?? [],
+		cells: maze.circleCells ?? [],
+	};
+}
+
+function solveRectangleFamily(maze: Maze): MazePosition[] {
 	return solvePathNodes(maze).map(({ x, y }) => ({ x, y }));
+}
+
+function solveCircleFamily(maze: Maze): MazePosition[] {
+	return solveCircleMaze(circleLike(maze)).map(({ ring, sector }) => ({
+		x: sector,
+		y: ring,
+	}));
 }
 
 /**
@@ -135,14 +143,7 @@ export function solveMaze(maze: Maze): MazePosition[] {
  * its walls are open: the solver's own axis lock (see ADR 024) already
  * limits it to the entered axis, so the other axis is never a real choice.
  */
-export function findSolutionBranchPoints(maze: Maze): MazePosition[] {
-	if (maze.type === "circle") {
-		return findCircleSolutionBranchPoints({
-			sectorCounts: maze.circleSectorCounts ?? [],
-			cells: maze.circleCells ?? [],
-		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
-	}
-
+function findRectangleFamilyBranchPoints(maze: Maze): MazePosition[] {
 	const nodes = solvePathNodes(maze);
 	const crossingCells = buildCrossingCellSet(maze);
 	const branchPoints: MazePosition[] = [];
@@ -154,4 +155,42 @@ export function findSolutionBranchPoints(maze: Maze): MazePosition[] {
 	}
 
 	return branchPoints;
+}
+
+function findCircleFamilyBranchPoints(maze: Maze): MazePosition[] {
+	return findCircleSolutionBranchPoints(circleLike(maze)).map(
+		({ ring, sector }) => ({ x: sector, y: ring }),
+	);
+}
+
+interface MazeSolverStrategy {
+	solve(maze: Maze): MazePosition[];
+	branchPoints(maze: Maze): MazePosition[];
+}
+
+// The single registration point for how each maze type is solved —
+// replacing the duplicated `maze.type === "circle"` checks that used to
+// live independently in solveMaze and findSolutionBranchPoints (see ADR
+// 049).
+const MAZE_SOLVER_STRATEGIES: Record<MazeType, MazeSolverStrategy> = {
+	rectangle: {
+		solve: solveRectangleFamily,
+		branchPoints: findRectangleFamilyBranchPoints,
+	},
+	"rectangle-crossing": {
+		solve: solveRectangleFamily,
+		branchPoints: findRectangleFamilyBranchPoints,
+	},
+	circle: {
+		solve: solveCircleFamily,
+		branchPoints: findCircleFamilyBranchPoints,
+	},
+};
+
+export function solveMaze(maze: Maze): MazePosition[] {
+	return MAZE_SOLVER_STRATEGIES[maze.type ?? "rectangle"].solve(maze);
+}
+
+export function findSolutionBranchPoints(maze: Maze): MazePosition[] {
+	return MAZE_SOLVER_STRATEGIES[maze.type ?? "rectangle"].branchPoints(maze);
 }

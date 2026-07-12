@@ -6,18 +6,9 @@ import {
 	StandardFonts,
 	rgb,
 } from "pdf-lib";
-import {
-	computeCircleMazeDiameter,
-	computeCircleMazeSegments,
-	computeCircleSolutionPoints,
-} from "./circle-maze/render.js";
 import type { TubeSegment } from "./maze-layout.js";
-import {
-	computeCellCenter,
-	computeTubeSegments,
-	computeWallSegments,
-	isArcSegment,
-} from "./maze-layout.js";
+import { isArcSegment } from "./maze-layout.js";
+import { getMazeRenderStrategy } from "./maze-render-strategy.js";
 import type { MazePosition } from "./maze-solver.js";
 import { solveMaze } from "./maze-solver.js";
 import type { Maze } from "./maze.js";
@@ -62,23 +53,9 @@ interface MazeLayout {
 	topOffset: number;
 }
 
-// The "circle" type lays out its segments in a square bounding box sized by
-// its diameter (see ADR 037), not by `maze.width`/`maze.height` directly —
-// every other type keeps using its cell grid dimensions as before.
-function logicalLayoutSize(maze: Maze): { width: number; height: number } {
-	if (maze.type === "circle") {
-		const diameter = computeCircleMazeDiameter({
-			sectorCounts: maze.circleSectorCounts ?? [],
-			cells: maze.circleCells ?? [],
-		});
-		return { width: diameter, height: diameter };
-	}
-	return { width: maze.width, height: maze.height };
-}
-
 function computeLayout(maze: Maze): MazeLayout {
 	const { width: logicalWidth, height: logicalHeight } =
-		logicalLayoutSize(maze);
+		getMazeRenderStrategy(maze).logicalSize(maze);
 	const drawableWidth = REMARKABLE_2_PAGE_WIDTH_PT - 2 * PAGE_MARGIN_PT;
 	const drawableHeight = REMARKABLE_2_PAGE_HEIGHT_PT - 2 * PAGE_MARGIN_PT;
 	const cellSize = Math.min(
@@ -174,19 +151,12 @@ function drawSolutionPath(
 
 	// For "circle", a straight line directly between two consecutive cells'
 	// centers looks like a diagonal cutting across the maze whenever they're
-	// on different rings — `computeCircleSolutionPoints` inserts an extra
-	// point at each ring boundary so the trace follows the radius through a
-	// ring transition instead (see ADR 041).
-	const points =
-		maze.type === "circle"
-			? computeCircleSolutionPoints(
-					{
-						sectorCounts: maze.circleSectorCounts ?? [],
-						cells: maze.circleCells ?? [],
-					},
-					path.map((position) => ({ ring: position.y, sector: position.x })),
-				).map(toPdfPoint)
-			: path.map((position) => toPdfPoint(computeCellCenter(position)));
+	// on different rings — the circle strategy's `solutionPoints` inserts an
+	// extra point at each ring boundary so the trace follows the radius
+	// through a ring transition instead (see ADR 041).
+	const points = getMazeRenderStrategy(maze)
+		.solutionPoints(maze, path)
+		.map(toPdfPoint);
 
 	for (let i = 0; i < points.length - 1; i++) {
 		page.drawLine({
@@ -223,39 +193,18 @@ function drawParametersLabel(
 }
 
 function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
-	if (maze.type === "rectangle-crossing") {
-		// Every line is independent — no fill or stroke-width layering. Each
-		// corridor is its own two edge lines (see ADR 026).
-		drawMazeSegments(
-			page,
-			computeTubeSegments(maze),
-			layout,
-			STROKE_THICKNESS_PT,
-			STROKE_COLOR,
-			LineCapStyle.Round,
-		);
-	} else if (maze.type === "circle") {
-		drawMazeSegments(
-			page,
-			computeCircleMazeSegments({
-				sectorCounts: maze.circleSectorCounts ?? [],
-				cells: maze.circleCells ?? [],
-			}),
-			layout,
-			STROKE_THICKNESS_PT,
-			STROKE_COLOR,
-			LineCapStyle.Butt,
-		);
-	} else {
-		drawMazeSegments(
-			page,
-			computeWallSegments(maze),
-			layout,
-			STROKE_THICKNESS_PT,
-			STROKE_COLOR,
-			LineCapStyle.Butt,
-		);
-	}
+	// Every line is independent — no fill or stroke-width layering. A
+	// "rectangle-crossing" corridor is its own two edge lines with round caps
+	// (see ADR 026); every other type draws flat-capped walls.
+	const strategy = getMazeRenderStrategy(maze);
+	drawMazeSegments(
+		page,
+		strategy.segments(maze),
+		layout,
+		STROKE_THICKNESS_PT,
+		STROKE_COLOR,
+		strategy.roundedCaps ? LineCapStyle.Round : LineCapStyle.Butt,
+	);
 }
 
 function addMazePages(
