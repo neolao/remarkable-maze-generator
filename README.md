@@ -21,7 +21,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the proj
 - Download the maze PDF generated through the web page with a dedicated download link
 - Send the maze generated through the web page directly to your reMarkable Cloud account, with a guided one-time pairing step if the browser isn't paired yet (the same pairing already used by the CLI also works here); when no name is given, the uploaded file is named after its type and dimensions (e.g. "rectangle 20x15") instead of a seed number
 - Choose a target reMarkable Cloud folder for a maze sent from the web page, or leave it blank to upload to the account root
-- Enjoy a polished, responsive design on the web maze configuration page, readable on both desktop and mobile screens
+- Enjoy a polished, responsive design on the web maze configuration page that adapts smoothly from mobile through tablet to wide desktop screens, including a side-by-side layout on wide screens and comfortable tap targets on mobile
 - Generate a "bridge crossing" maze type, drawn as a real hollow tube where some real, walkable corridors visibly duck underneath one another like a bridge, alongside the classic (thin-wall) maze type — selectable from the command line or the web page, with exactly one solution guaranteed either way
 - Choose the maze generation algorithm — growing tree (the original default), Kruskal, Wilson, or Aldous-Broder — from the command line or the web page; the "bridge crossing" maze type still requires the growing tree algorithm
 - Generate a "circle" maze type, laid out as concentric rings and angular sectors instead of a rectangular grid, selectable from the command line or the web page alongside the rectangle types
