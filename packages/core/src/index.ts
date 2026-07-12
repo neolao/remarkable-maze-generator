@@ -31,7 +31,7 @@ export { findSolutionBranchPoints, solveMaze } from "./maze-solver.js";
 export type {
 	RenderMazeToPdfOptions,
 	SolutionDisplayMode,
-} from "./maze-pdf.js";
+} from "./rendering/maze-pdf.js";
 export {
 	REMARKABLE_2_PAGE_HEIGHT_PT,
 	REMARKABLE_2_PAGE_WIDTH_PT,
@@ -39,9 +39,9 @@ export {
 	invalidSolutionModeMessage,
 	isValidSolutionMode,
 	renderMazeToPdf,
-} from "./maze-pdf.js";
-export type { RenderMazeToSvgOptions } from "./maze-svg.js";
-export { renderMazeToSvg } from "./maze-svg.js";
+} from "./rendering/maze-pdf.js";
+export type { RenderMazeToSvgOptions } from "./rendering/maze-svg.js";
+export { renderMazeToSvg } from "./rendering/maze-svg.js";
 export type {
 	CredentialStore,
 	RemarkableCredentials,

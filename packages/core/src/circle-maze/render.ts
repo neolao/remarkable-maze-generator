@@ -1,4 +1,4 @@
-import type { ArcSegment, TubeSegment } from "../maze-layout.js";
+import type { ArcSegment, TubeSegment } from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
 import { isInwardOpen } from "./cells.js";
 import { computeHubRadius } from "./topology.js";

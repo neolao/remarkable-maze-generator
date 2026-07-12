@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { findSolutionBranchPoints } from "../maze-solver.js";
+import { generateMaze } from "../maze.js";
 import { computeTubeSegments } from "./maze-layout.js";
-import { findSolutionBranchPoints } from "./maze-solver.js";
 import { renderMazeToSvg } from "./maze-svg.js";
-import { generateMaze } from "./maze.js";
 
 function countLineElements(svg: string): number {
 	return (svg.match(/<line /g) || []).length;

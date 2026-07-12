@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Internal: how each maze type (classic, tunnel-crossing, circular) is rendered, solved, and generated per algorithm is now centralized in three single lookup tables instead of duplicated conditional checks scattered across the rendering, solving, and generation code — no user-visible change; generated mazes, PDFs, and previews are unaffected
 - Internal: the maze's core concepts and validation rules (dimensions, difficulty, maze type, algorithm, path length) now live in their own dedicated module, separate from maze generation, rendering, and reMarkable Cloud code — no user-visible change
+- Internal: PDF rendering, SVG preview rendering, and their shared drawing geometry now live in their own dedicated module, separate from the maze's core concepts — no user-visible change; generated mazes, PDFs, and previews are unaffected
 
 ## [0.10.1] - 2026-07-11
 

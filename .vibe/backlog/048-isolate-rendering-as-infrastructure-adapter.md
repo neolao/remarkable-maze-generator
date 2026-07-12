@@ -1,5 +1,5 @@
 ---
-status: todo
+status: in_progress
 depends_on: [047]
 ---
 # Isolate Rendering as Infrastructure Adapter

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isArcSegment } from "../maze-layout.js";
+import { isArcSegment } from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
 import { createCircleGrid } from "./cells.js";
 import { generateCircleMaze } from "./generate.js";

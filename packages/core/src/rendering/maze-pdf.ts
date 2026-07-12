@@ -6,12 +6,12 @@ import {
 	StandardFonts,
 	rgb,
 } from "pdf-lib";
-import type { Maze } from "./maze-domain.js";
+import type { Maze } from "../maze-domain.js";
+import type { MazePosition } from "../maze-solver.js";
+import { solveMaze } from "../maze-solver.js";
 import type { TubeSegment } from "./maze-layout.js";
 import { isArcSegment } from "./maze-layout.js";
 import { getMazeRenderStrategy } from "./maze-render-strategy.js";
-import type { MazePosition } from "./maze-solver.js";
-import { solveMaze } from "./maze-solver.js";
 
 export const REMARKABLE_2_PAGE_WIDTH_PT = (1404 / 226) * 72;
 export const REMARKABLE_2_PAGE_HEIGHT_PT = (1872 / 226) * 72;

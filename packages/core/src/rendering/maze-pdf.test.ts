@@ -1,7 +1,8 @@
 import { inflateSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import type { Maze } from "./maze-domain.js";
+import type { Maze } from "../maze-domain.js";
+import { generateMaze } from "../maze.js";
 import {
 	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
@@ -15,7 +16,6 @@ import {
 	isValidSolutionMode,
 	renderMazeToPdf,
 } from "./maze-pdf.js";
-import { generateMaze } from "./maze.js";
 
 function countStrokedLines(pdfBytes: Uint8Array): number {
 	const text = Buffer.from(pdfBytes).toString("latin1");
