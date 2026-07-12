@@ -513,4 +513,48 @@ describe("computeCircleTubeSegments", () => {
 
 		expect(() => computeCircleTubeSegments(maze)).not.toThrow();
 	});
+
+	it("sizes and positions an outward door to exactly match the open child's own inward door, even when sector counts differ between rings", () => {
+		// ring 0 has 2 sectors, ring 1 has 4 (growth ratio 2, so sector 0's own
+		// angular step is twice ring 1's) — sector 0 of ring 0 has two outward
+		// children (ring 1 sectors 0 and 1), only the first opened.
+		const sectorCounts = [2, 4];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 0 },
+			{ ring: 1, sector: 0 },
+		);
+		const maze = { sectorCounts, cells };
+
+		const hubRadius = computeHubRadius(sectorCounts[0]);
+		const boundaryRadius = 1 + hubRadius;
+		const diameter = computeCircleMazeDiameter(maze);
+		const center = diameter / 2;
+		const radiusOf = (x: number, y: number) =>
+			Math.hypot(x - center, y - center);
+		const isAtBoundary = (r: number) => Math.abs(r - boundaryRadius) < 1e-9;
+
+		const segments = computeCircleTubeSegments(maze);
+		const boundaryPoints = segments
+			.filter((segment) => !isArcSegment(segment))
+			.flatMap((segment) => [
+				{ x: segment.x1, y: segment.y1 },
+				{ x: segment.x2, y: segment.y2 },
+			])
+			.filter((point) => isAtBoundary(radiusOf(point.x, point.y)));
+
+		// The single open door crossing this boundary has exactly 2 edges, each
+		// drawn twice — once as the parent (ring 0)'s outward arm, once as the
+		// child (ring 1)'s inward arm. If the two sides disagreed on the door's
+		// angular position/width (using their own ring's angular step instead of
+		// agreeing on one), these wouldn't coincide and 4 distinct points would
+		// appear instead of 2.
+		expect(boundaryPoints.length).toBe(4);
+		const uniquePoints = new Set(
+			boundaryPoints.map((p) => `${p.x.toFixed(6)},${p.y.toFixed(6)}`),
+		);
+		expect(uniquePoints.size).toBe(2);
+	});
 });

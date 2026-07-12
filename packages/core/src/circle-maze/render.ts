@@ -7,7 +7,7 @@ import {
 } from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
 import { isCcwOpen, isInwardOpen } from "./cells.js";
-import { computeHubRadius } from "./topology.js";
+import { computeHubRadius, outwardChildren } from "./topology.js";
 
 interface CircleMazeLike {
 	sectorCounts: number[];
@@ -239,13 +239,14 @@ function radialLine(
  * cell size) and an angular half-width the same ratio of the cell's own
  * angle span, so the tube stays proportionate whether a ring is narrow or
  * wide — plus an "arm" reaching to the cell boundary for each open side
- * (cw/ccw/inward/outward), a flat cap otherwise. A cell's own "outward" side
- * is only open when at least one of its outward children is open (or, on the
- * outermost ring, at the exit); every open outward child then draws its own
- * matching inward arm at its own angle — a deliberate simplification when a
- * ring splits into several children (see ADR 055): the parent's own single
- * arm may not fan out to meet each child individually, a rare, purely
- * cosmetic case with no effect on validity.
+ * (cw/ccw/inward), a flat cap otherwise. The outward side is the one
+ * exception: since an outward child lives in the next ring, which may have a
+ * different (finer) sector count, its door is sized/positioned from the
+ * *child's own* angle and angular step rather than the parent's own — one
+ * radial line pair per open child, fanning out naturally when the maze
+ * branches — so it always lines up exactly with that same child's own
+ * `inwardSide` instead of silently disagreeing on the door's width where
+ * ring resolution changes (see ADR 055 follow-up).
  *
  * At a crossing node the *over* axis (see ADR 055) is drawn as two full-span
  * arcs/lines across the entire cell, ignoring the hub entirely; the *under*
@@ -316,8 +317,6 @@ function computeCircleCellTubeSegments(
 	const ccwOpen = isCcwOpen(cells, sectorCounts, ring, sector);
 	const inwardOpen =
 		ring === 0 ? isEntrance : isInwardOpen(cells, sectorCounts, ring, sector);
-	const outwardOpen =
-		ring === lastRing ? isExit : cells[ring][sector].outwardOpen.some(Boolean);
 
 	const cwSide = (open: boolean): TubeSegment[] =>
 		open
@@ -343,13 +342,52 @@ function computeCircleCellTubeSegments(
 				]
 			: circleArcSegments(maze, innerHubR, startHubA, endHubA);
 
-	const outwardSide = (open: boolean): TubeSegment[] =>
-		open
-			? [
-					radialLine(maze, startHubA, outerHubR, outerRadius),
-					radialLine(maze, endHubA, outerHubR, outerRadius),
-				]
-			: circleArcSegments(maze, outerHubR, startHubA, endHubA);
+	// The outward side is the one place a cell's own angular resolution isn't
+	// authoritative: an outward child lives in the *next* ring, which may have
+	// a different (finer) sector count. Sizing/positioning this door from the
+	// parent's own angle would silently disagree with the same door as drawn
+	// by the child's own `inwardSide` (using the child's angle) — see the
+	// door-size mismatch this fixes. Deferring to each open child's own angle
+	// keeps both sides in exact agreement, and naturally fans out one door per
+	// open child when the maze branches at this node.
+	const outwardSide = (): TubeSegment[] => {
+		if (ring === lastRing) {
+			return isExit
+				? [
+						radialLine(maze, startHubA, outerHubR, outerRadius),
+						radialLine(maze, endHubA, outerHubR, outerRadius),
+					]
+				: circleArcSegments(maze, outerHubR, startHubA, endHubA);
+		}
+
+		const openChildren = outwardChildren(sectorCounts, ring, sector).filter(
+			(_, index) => cells[ring][sector].outwardOpen[index],
+		);
+
+		if (openChildren.length === 0) {
+			return circleArcSegments(maze, outerHubR, startHubA, endHubA);
+		}
+
+		const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
+		return openChildren.flatMap((child) => {
+			const childMidAngle = (child + 0.5) * childAngleStep;
+			const childHalfAngle = h * childAngleStep;
+			return [
+				radialLine(
+					maze,
+					childMidAngle - childHalfAngle,
+					outerHubR,
+					outerRadius,
+				),
+				radialLine(
+					maze,
+					childMidAngle + childHalfAngle,
+					outerHubR,
+					outerRadius,
+				),
+			];
+		});
+	};
 
 	const crossing = crossingLookup.get(crossingKey(ring, sector));
 	if (crossing) {
@@ -360,7 +398,7 @@ function computeCircleCellTubeSegments(
 				...circleArcSegments(maze, innerHubR, startAngle, endAngle),
 				...circleArcSegments(maze, outerHubR, startAngle, endAngle),
 				...inwardSide(true),
-				...outwardSide(true),
+				...outwardSide(),
 			];
 		}
 		return [
@@ -375,6 +413,6 @@ function computeCircleCellTubeSegments(
 		...cwSide(cwOpen),
 		...ccwSide(ccwOpen),
 		...inwardSide(inwardOpen),
-		...outwardSide(outwardOpen),
+		...outwardSide(),
 	];
 }
