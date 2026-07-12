@@ -360,12 +360,29 @@ function computeCircleCellTubeSegments(
 
 	// The outward side is the one place a cell's own angular resolution isn't
 	// authoritative: an outward child lives in the *next* ring, which may have
-	// a different (finer) sector count. Sizing/positioning this door from the
-	// parent's own angle would silently disagree with the same door as drawn
-	// by the child's own `inwardSide` (using the child's angle) — see ADR 055
-	// follow-up. Deferring to each open child's own angle and radius keeps
-	// both sides in exact agreement, and naturally fans out one door per open
-	// child when the maze branches at this node.
+	// a different (finer) sector count. Sizing/positioning each door from its
+	// own open child's own angle would silently disagree with the same door
+	// as drawn by the child's own `inwardSide` (using the child's angle) —
+	// see ADR 055 follow-up. Deferring to each child's own angle and radius
+	// keeps both sides in exact agreement, and naturally fans out one door
+	// per open child when the maze branches at this node.
+	//
+	// Every child's own angular slot is walked individually — not just the
+	// open ones — each closed child capped across its *own* full slot
+	// (`childStart`/`childEnd`, not this cell's own narrower hub width), and
+	// each open child capped on both margins around its own (narrower) door.
+	// A child's own hub half-width is typically a majority, but not all, of
+	// its own slot's half-width (see ADR 055 follow-up) — both an edge
+	// child's own door position and, even for a centered child, the margin
+	// left over on either side of its own door within its own slot, often
+	// fall outside this cell's own `[startHubA, endHubA]` window. Capping
+	// each child across its own full slot minus its own door — instead of
+	// this cell's narrower hub window — is what actually guarantees a closed
+	// boundary with no gap between this cell's own hub corners, each child's
+	// own door, and every other child's own slot; since `outwardChildren`
+	// always exactly partitions this cell's own `[startAngle, endAngle]`
+	// (see ADR 040), walking every child in order leaves no angular gap
+	// regardless of how their own doors happen to be positioned or sized.
 	const outwardSide = (): TubeSegment[] => {
 		if (ring === lastRing) {
 			return isExit
@@ -376,32 +393,31 @@ function computeCircleCellTubeSegments(
 				: circleArcSegments(maze, outerHubR, startHubA, endHubA);
 		}
 
-		const openChildren = outwardChildren(sectorCounts, ring, sector).filter(
-			(_, index) => cells[ring][sector].outwardOpen[index],
-		);
-
-		if (openChildren.length === 0) {
+		const children = outwardChildren(sectorCounts, ring, sector);
+		if (children.length === 0) {
 			return circleArcSegments(maze, outerHubR, startHubA, endHubA);
 		}
 
 		const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
 		const childMidRadius = ring + 1 + hubRadius + 0.5;
 		const childHalfAngle = h / childMidRadius;
-		return openChildren.flatMap((child) => {
+
+		return children.flatMap((child, index) => {
+			const childStart = child * childAngleStep;
+			const childEnd = (child + 1) * childAngleStep;
+
+			if (!cells[ring][sector].outwardOpen[index]) {
+				return circleArcSegments(maze, outerHubR, childStart, childEnd);
+			}
+
 			const childMidAngle = (child + 0.5) * childAngleStep;
+			const doorStart = childMidAngle - childHalfAngle;
+			const doorEnd = childMidAngle + childHalfAngle;
 			return [
-				radialLine(
-					maze,
-					childMidAngle - childHalfAngle,
-					outerHubR,
-					outerRadius,
-				),
-				radialLine(
-					maze,
-					childMidAngle + childHalfAngle,
-					outerHubR,
-					outerRadius,
-				),
+				...circleArcSegments(maze, outerHubR, childStart, doorStart),
+				radialLine(maze, doorStart, outerHubR, outerRadius),
+				radialLine(maze, doorEnd, outerHubR, outerRadius),
+				...circleArcSegments(maze, outerHubR, doorEnd, childEnd),
 			];
 		});
 	};

@@ -547,24 +547,28 @@ describe("computeCircleTubeSegments", () => {
 		expect(Math.max(...widths) / Math.min(...widths)).toBeLessThan(1.4);
 	});
 
-	// Cell (ring 0, sector 2) is open only clockwise (a dead-end analog): its
+	// Cell (ring 1, sector 2) is open only clockwise (a dead-end analog): its
 	// inner-start and outer-start corners sit between two sides in the same
-	// state (both closed: inward/ccw) and (both open... no: outward/ccw both
-	// false) respectively, so those are the "real" corners that get rounded;
-	// inner-end and outer-end sit between an open side (cw) and a closed one
-	// (inward/outward), so they stay sharp and collinear.
+	// (closed) state — inward/ccw and outward/ccw respectively — so those are
+	// the "real" corners that get rounded; inner-end and outer-end sit
+	// between an open side (cw) and a closed one (inward/outward), so they
+	// stay sharp and collinear. Scoped to the *outermost* ring specifically,
+	// where the outward side still uses this cell's own narrow hub width
+	// (there's no further ring to fan out to) — see the dedicated outward-
+	// closure tests below for the (single-parent-unaffected) inward side and
+	// the (now child-slot-based) outward side of an interior ring.
 	it("rounds only the hub corners whose two adjacent sides share the same open/closed state", () => {
 		const sectorCounts = [4, 4];
 		const cells = createCircleGrid(sectorCounts);
 		carveEdge(
 			cells,
 			sectorCounts,
-			{ ring: 0, sector: 2 },
-			{ ring: 0, sector: 3 },
+			{ ring: 1, sector: 2 },
+			{ ring: 1, sector: 3 },
 		);
 		const maze = { sectorCounts, cells };
 
-		const cellCenter = computeCircleCellCenter(maze, { ring: 0, sector: 2 });
+		const cellCenter = computeCircleCellCenter(maze, { ring: 1, sector: 2 });
 		const segments = computeCircleTubeSegments(maze).filter(
 			(segment) =>
 				Math.hypot(segment.x1 - cellCenter.x, segment.y1 - cellCenter.y) <
@@ -577,6 +581,50 @@ describe("computeCircleTubeSegments", () => {
 			(arc) => Math.abs(arc.radius - TUBE_CORNER_RADIUS_RATIO) < 1e-9,
 		);
 		expect(roundingArcs).toHaveLength(2);
+	});
+
+	// Regression test for a real gap bug: an interior ring's outward side
+	// used to draw *only* the door lines for each open child, with no cap
+	// arc at all connecting them back to this cell's own hub corners or to
+	// its closed siblings — since a child's own door is frequently narrower
+	// than, and not necessarily centered inside, this cell's own narrow hub
+	// window (see ADR 055 follow-up), the result was a tube that visibly
+	// stopped short of closing near almost every ring transition. Growth
+	// ratio 3 here (ring 0 has 3 sectors, ring 1 has 9) makes sector 0's
+	// open child (the middle of its 3 children) still leave real margin on
+	// both sides of its own door within its own slot.
+	it("caps every closed child slot and both margins around an open child's own door, leaving no angular gap at the outward boundary", () => {
+		const sectorCounts = [3, 9];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 0 },
+			{ ring: 1, sector: 1 },
+		);
+		const maze = { sectorCounts, cells };
+
+		const hubRadius = computeHubRadius(3);
+		const outerHubR = hubRadius + 0.5 + h;
+		const childMidRadius = 1 + hubRadius + 0.5;
+		const doorWidth = 2 * (h / childMidRadius);
+
+		const segments = computeCircleTubeSegments(maze);
+		const totalArcAngle = segments
+			.filter(isArcSegment)
+			.filter((segment) => Math.abs(segment.radius - outerHubR) < 1e-9)
+			.reduce((sum, segment) => {
+				const chordLength = Math.hypot(
+					segment.x2 - segment.x1,
+					segment.y2 - segment.y1,
+				);
+				return sum + 2 * Math.asin(chordLength / (2 * segment.radius));
+			}, 0);
+
+		// The whole ring-0 boundary at this radius (a full turn, 3 sectors)
+		// is covered except for exactly the one door's own width — anything
+		// less means an uncapped gap somewhere.
+		expect(totalArcAngle).toBeCloseTo(2 * Math.PI - doorWidth, 6);
 	});
 
 	it("keeps a crossing node's over axis (tangential here) spanning its exact un-gapped angular range, as a single uninterrupted arc", () => {
