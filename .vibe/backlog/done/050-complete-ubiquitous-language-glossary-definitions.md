@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 ---
 # Complete Ubiquitous Language Glossary Definitions
 
