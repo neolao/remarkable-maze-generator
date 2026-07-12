@@ -56,6 +56,28 @@ function parseFormPreferences(rawCookieValue) {
 	return isMazeFormPreferences(decoded) ? decoded : null;
 }
 
+// Mirrors packages/web/src/maze-form-field-visibility.ts; duplicated here
+// because this static page runs unmodified in the browser, with no build
+// step available to import the compiled/tested module. See ADR 053: only
+// growing-tree is compatible with rectangle-crossing, and only growing-tree
+// reads the difficulty knob.
+const FORCED_ALGORITHM_FOR_RECTANGLE_CROSSING = "growing-tree";
+const DIFFICULTY_ALGORITHM = "growing-tree";
+
+function computeMazeFormFieldVisibility({ type, algorithm, pathLength }) {
+	const effectiveAlgorithm =
+		type === "rectangle-crossing"
+			? FORCED_ALGORITHM_FOR_RECTANGLE_CROSSING
+			: algorithm;
+
+	return {
+		showAlgorithm: type !== "rectangle-crossing",
+		showDifficulty: effectiveAlgorithm === DIFFICULTY_ALGORITHM,
+		showPathLengthCandidates: pathLength !== undefined,
+		effectiveAlgorithm,
+	};
+}
+
 function readCookie(name) {
 	const match = document.cookie
 		.split("; ")
@@ -207,6 +229,11 @@ function initMazeForm() {
 	const pathLengthCandidatesInput = document.getElementById(
 		"path-length-candidates",
 	);
+	const difficultyField = document.getElementById("difficulty-field");
+	const algorithmField = document.getElementById("algorithm-field");
+	const pathLengthCandidatesField = document.getElementById(
+		"path-length-candidates-field",
+	);
 	const remarkableFolderField = document.getElementById(
 		"remarkable-folder-field",
 	);
@@ -255,6 +282,26 @@ function initMazeForm() {
 		pathLengthCandidatesInput.value =
 			storedPreferences.pathLengthCandidateCount;
 	}
+
+	const currentFieldVisibility = () =>
+		computeMazeFormFieldVisibility({
+			type: form["maze-type"].value,
+			algorithm: form["maze-algorithm"].value,
+			pathLength: pathLengthSelect.value || undefined,
+		});
+
+	const updateFieldVisibility = () => {
+		const visibility = currentFieldVisibility();
+		algorithmField.style.display = visibility.showAlgorithm ? "" : "none";
+		difficultyField.style.display = visibility.showDifficulty ? "" : "none";
+		pathLengthCandidatesField.style.display =
+			visibility.showPathLengthCandidates ? "" : "none";
+	};
+
+	updateFieldVisibility();
+	form["maze-type"].addEventListener("change", updateFieldVisibility);
+	form["maze-algorithm"].addEventListener("change", updateFieldVisibility);
+	pathLengthSelect.addEventListener("change", updateFieldVisibility);
 
 	const hidePreview = () => {
 		previewElement.style.display = "none";
@@ -344,15 +391,24 @@ function initMazeForm() {
 		event.preventDefault();
 		errorElement.textContent = "";
 
+		// A hidden field's own value stays whatever the user last set (so it
+		// reappears correctly if its dependency becomes met again, see ADR
+		// 053); only the value actually used for validation/generation is
+		// overridden here while the field is hidden.
+		const visibility = currentFieldVisibility();
 		const result = validateMazeFormInput({
 			width: form.width.value,
 			height: form.height.value,
-			difficulty: form.difficulty.value,
+			difficulty: visibility.showDifficulty
+				? form.difficulty.value
+				: String(MIN_DIFFICULTY),
 			type: form["maze-type"].value,
-			algorithm: form["maze-algorithm"].value,
+			algorithm: visibility.effectiveAlgorithm,
 			solution: form["solution-mode"].value,
 			pathLength: pathLengthSelect.value,
-			pathLengthCandidateCount: pathLengthCandidatesInput.value,
+			pathLengthCandidateCount: visibility.showPathLengthCandidates
+				? pathLengthCandidatesInput.value
+				: "",
 		});
 
 		if (!result.valid) {

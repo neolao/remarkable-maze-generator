@@ -21,7 +21,7 @@
               Height
               <input type="number" id="height" name="height" value="10" min="1" step="1" required />
             </label>
-            <label class="field">
+            <label class="field" id="difficulty-field">
               Difficulty (1-5)
               <input type="number" id="difficulty" name="difficulty" value="1" min="1" max="5" step="1" required />
             </label>
@@ -33,7 +33,7 @@
                 <option value="circle">Circle</option>
               </select>
             </label>
-            <label class="field">
+            <label class="field" id="algorithm-field">
               Generation algorithm
               <select id="maze-algorithm" name="maze-algorithm">
                 <option value="growing-tree">Growing tree</option>
@@ -59,7 +59,7 @@
                 <option value="long">Long</option>
               </select>
             </label>
-            <label class="field">
+            <label class="field" id="path-length-candidates-field">
               Candidate mazes to compare
               <input type="number" id="path-length-candidates" name="path-length-candidates" min="1" max="50" step="1" placeholder="10 (default)" />
             </label>

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The web maze configuration form now shows only the fields that are actually relevant given your current choices: the difficulty field is hidden for generation algorithms that don't use it, the generation algorithm field is hidden for maze types that only support one algorithm, and the candidate-count field is hidden until a path length target is chosen — each field appears or disappears instantly as you change related options, without reloading the page
+
 ### Changed
 
 - Internal: how each maze type (classic, tunnel-crossing, circular) is rendered, solved, and generated per algorithm is now centralized in three single lookup tables instead of duplicated conditional checks scattered across the rendering, solving, and generation code — no user-visible change; generated mazes, PDFs, and previews are unaffected
