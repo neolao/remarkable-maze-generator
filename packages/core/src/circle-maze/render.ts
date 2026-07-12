@@ -6,8 +6,8 @@ import {
 	type TubeSegment,
 } from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
-import { isCcwOpen, isInwardOpen } from "./cells.js";
-import { computeHubRadius, outwardChildren } from "./topology.js";
+import { isInwardOpen } from "./cells.js";
+import { computeHubRadius, cwSector, outwardChildren } from "./topology.js";
 
 interface CircleMazeLike {
 	sectorCounts: number[];
@@ -221,198 +221,248 @@ function buildCrossingLookup(
 	return lookup;
 }
 
-function radialLine(
-	maze: CircleMazeLike,
-	angle: number,
-	fromRadius: number,
-	toRadius: number,
-): LineSegment {
-	const from = circlePoint(maze, fromRadius, angle);
-	const to = circlePoint(maze, toRadius, angle);
-	return { x1: from.x, y1: from.y, x2: to.x, y2: to.y };
+// How far a crossing's *under* axis channel stops short of the crossing
+// node's own center, as a fraction of the full node-to-node span — the real
+// gap that reads as "this passage doesn't connect here, it tunnels under"
+// (see ADR 055 follow-up).
+const CROSSING_GAP_FRACTION = 0.35;
+
+function offsetLinePair(
+	from: Point,
+	to: Point,
+	halfWidth: number,
+): [LineSegment, LineSegment] {
+	const dx = to.x - from.x;
+	const dy = to.y - from.y;
+	const length = Math.hypot(dx, dy) || 1;
+	const px = (-dy / length) * halfWidth;
+	const py = (dx / length) * halfWidth;
+	return [
+		{ x1: from.x + px, y1: from.y + py, x2: to.x + px, y2: to.y + py },
+		{ x1: from.x - px, y1: from.y - py, x2: to.x - px, y2: to.y - py },
+	];
+}
+
+function lerp(from: Point, to: Point, fraction: number): Point {
+	return {
+		x: from.x + (to.x - from.x) * fraction,
+		y: from.y + (to.y - from.y) * fraction,
+	};
 }
 
 /**
- * The circle-maze equivalent of `computeTubeSegments` (see ADR 055): each
- * cell's tube is a small hub in local (radius, angle) space — a radial
- * half-width `TUBE_HALF_WIDTH_RATIO` (matching `RADIAL_THICKNESS`'s own unit
- * cell size) and an angular half-width the same ratio of the cell's own
- * angle span, so the tube stays proportionate whether a ring is narrow or
- * wide — plus an "arm" reaching to the cell boundary for each open side
- * (cw/ccw/inward), a flat cap otherwise. The outward side is the one
- * exception: since an outward child lives in the next ring, which may have a
- * different (finer) sector count, its door is sized/positioned from the
- * *child's own* angle and angular step rather than the parent's own — one
- * radial line pair per open child, fanning out naturally when the maze
- * branches — so it always lines up exactly with that same child's own
- * `inwardSide` instead of silently disagreeing on the door's width where
- * ring resolution changes (see ADR 055 follow-up).
+ * Whether `(ring, sector)` is a crossing node whose *under* axis (see ADR
+ * 055) is `axis` — the direction in which its channel(s) must stop short of
+ * its own center, leaving the real gap the *over* axis tunnels through.
+ */
+function needsCrossingGap(
+	crossingLookup: Map<string, CircleMazeCrossing>,
+	ring: number,
+	sector: number,
+	axis: "radial" | "tangential",
+): boolean {
+	const crossing = crossingLookup.get(crossingKey(ring, sector));
+	return crossing !== undefined && crossing.underAxis === axis;
+}
+
+/**
+ * A tangential (cw) channel between two same-ring neighbors, as two
+ * concentric arcs offset `halfWidth` in/out from the ring's own mid-radius —
+ * the exact offset of a circular arc is another circular arc, so this is
+ * always a true constant-width channel, never an approximation (see ADR 055
+ * follow-up). `fromGap`/`toGap` shorten the corresponding end when it lands
+ * on a crossing node's tangential-axis gap.
+ */
+function tangentialChannel(
+	maze: CircleMazeLike,
+	hubRadius: number,
+	ring: number,
+	fromSector: number,
+	fromGap: boolean,
+	toGap: boolean,
+): TubeSegment[] {
+	const halfWidth = TUBE_HALF_WIDTH_RATIO;
+	const angleStep = (2 * Math.PI) / maze.sectorCounts[ring];
+	const midRadius = ring + hubRadius + 0.5;
+	const fromAngle = (fromSector + 0.5) * angleStep;
+	const toAngle = fromAngle + angleStep;
+	const startAngle = fromGap
+		? fromAngle + CROSSING_GAP_FRACTION * angleStep
+		: fromAngle;
+	const endAngle = toGap
+		? toAngle - CROSSING_GAP_FRACTION * angleStep
+		: toAngle;
+
+	return [
+		...circleArcSegments(maze, midRadius - halfWidth, startAngle, endAngle),
+		...circleArcSegments(maze, midRadius + halfWidth, startAngle, endAngle),
+	];
+}
+
+/**
+ * A radial (outward) channel between an inner cell and one of its outer
+ * children, as two Cartesian-parallel lines offset `halfWidth` from the
+ * straight line between their two centers — a true constant-width channel
+ * regardless of whether the child sits at the same angle as its parent (see
+ * ADR 055 follow-up). `fromGap`/`toGap` shorten the corresponding end when it
+ * lands on a crossing node's radial-axis gap.
+ */
+function radialChannel(
+	maze: CircleMazeLike,
+	innerRing: number,
+	innerSector: number,
+	outerSector: number,
+	fromGap: boolean,
+	toGap: boolean,
+): TubeSegment[] {
+	const innerCenter = computeCircleCellCenter(maze, {
+		ring: innerRing,
+		sector: innerSector,
+	});
+	const outerCenter = computeCircleCellCenter(maze, {
+		ring: innerRing + 1,
+		sector: outerSector,
+	});
+	const from = fromGap
+		? lerp(innerCenter, outerCenter, CROSSING_GAP_FRACTION)
+		: innerCenter;
+	const to = toGap
+		? lerp(outerCenter, innerCenter, CROSSING_GAP_FRACTION)
+		: outerCenter;
+
+	return offsetLinePair(from, to, TUBE_HALF_WIDTH_RATIO);
+}
+
+/**
+ * A small constant-radius circle (4 quarter-arcs, pure Cartesian — no
+ * dependency on the maze's own rotation or center) marking a node where two
+ * or more channels meet. Reaching channels straight into a shared point
+ * leaves a visible sharp kink at every turn (two lines crossing at different
+ * tangent angles, never smoothly joined); overlaying this small hub "blob"
+ * hides that kink the same way a real pipe joint would, without needing
+ * per-corner tangent-circle math (see ADR 055 follow-up).
+ */
+function hubCircle(center: Point, radius: number): ArcSegment[] {
+	const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+	const points = angles.map((angle) => ({
+		x: center.x + radius * Math.cos(angle),
+		y: center.y + radius * Math.sin(angle),
+	}));
+	return points.map((from, index) => {
+		const to = points[(index + 1) % points.length];
+		return { x1: from.x, y1: from.y, x2: to.x, y2: to.y, radius, sweep: 1 };
+	});
+}
+
+/**
+ * The circle-maze equivalent of `computeTubeSegments` (see ADR 055,
+ * redesigned per its follow-up): rather than a per-cell polar "hub" whose
+ * angular proportions silently drift out of sync with a neighboring ring's
+ * own resolution, every *open* connection is drawn as its own constant-width
+ * channel directly between the two cells' real centers — a pair of
+ * concentric arcs for a same-ring (tangential) connection, a pair of
+ * Cartesian-parallel lines for a cross-ring (radial) one. Closed sides reuse
+ * `computeCircleMazeSegments`'s already-correct thin-wall geometry outright
+ * (entrance/exit openings, ring-boundary/hub arcs and all), plus a matching
+ * stub channel connecting the entrance/exit cell to the maze's own boundary.
  *
- * At a crossing node the *over* axis (see ADR 055) is drawn as two full-span
- * arcs/lines across the entire cell, ignoring the hub entirely; the *under*
- * axis draws its normal open arms only (hub corner to cell boundary), with
- * no cap connecting them across the hub — the real gap where the over-axis
- * tube passes through.
+ * At a crossing node (see ADR 055), every one of its connections still gets
+ * a channel, but the *under* axis's two channels each stop
+ * `CROSSING_GAP_FRACTION` short of the crossing's own center instead of
+ * reaching it — a real, physical gap — while the *over* axis's channel(s)
+ * reach the center normally, exactly like an ordinary open node, reading as
+ * the tunneled-through passage passing underneath uninterrupted.
  */
 export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 	validateCircleMazeShape(maze);
 
 	const { sectorCounts, cells } = maze;
-	const segments: TubeSegment[] = [];
 	const hubRadius = computeHubRadius(sectorCounts[0]);
 	const lastRing = sectorCounts.length - 1;
 	const crossingLookup = buildCrossingLookup(maze);
+	const segments: TubeSegment[] = [...computeCircleMazeSegments(maze)];
+
+	// Nodes that end up with at least one channel reaching their own center —
+	// every one of these gets a small hub joint at the end, except crossing
+	// nodes (see `hubCircle`), which must stay hub-less so the under-axis gap
+	// carved into their channels stays visible instead of being papered over.
+	const hubNodes = new Set<string>();
+	const markHubNode = (ring: number, sector: number) => {
+		if (!crossingLookup.has(crossingKey(ring, sector))) {
+			hubNodes.add(crossingKey(ring, sector));
+		}
+	};
 
 	for (let ring = 0; ring < sectorCounts.length; ring++) {
-		const angleStep = (2 * Math.PI) / sectorCounts[ring];
-		const innerRadius = ring + hubRadius;
-		const outerRadius = ring + 1 + hubRadius;
-
 		for (let sector = 0; sector < sectorCounts[ring]; sector++) {
-			segments.push(
-				...computeCircleCellTubeSegments(
-					maze,
-					ring,
-					sector,
-					angleStep,
-					innerRadius,
-					outerRadius,
-					hubRadius,
-					lastRing,
-					crossingLookup,
-				),
-			);
+			if (cells[ring][sector].cwOpen) {
+				const neighborSector = cwSector(sectorCounts, ring, sector);
+				segments.push(
+					...tangentialChannel(
+						maze,
+						hubRadius,
+						ring,
+						sector,
+						needsCrossingGap(crossingLookup, ring, sector, "tangential"),
+						needsCrossingGap(
+							crossingLookup,
+							ring,
+							neighborSector,
+							"tangential",
+						),
+					),
+				);
+				markHubNode(ring, sector);
+				markHubNode(ring, neighborSector);
+			}
+
+			outwardChildren(sectorCounts, ring, sector).forEach((child, index) => {
+				if (!cells[ring][sector].outwardOpen[index]) return;
+				segments.push(
+					...radialChannel(
+						maze,
+						ring,
+						sector,
+						child,
+						needsCrossingGap(crossingLookup, ring, sector, "radial"),
+						needsCrossingGap(crossingLookup, ring + 1, child, "radial"),
+					),
+				);
+				markHubNode(ring, sector);
+				markHubNode(ring + 1, child);
+			});
 		}
+	}
+
+	const entranceHubPoint = circlePoint(maze, hubRadius, 0);
+	segments.push(
+		...offsetLinePair(
+			entranceHubPoint,
+			computeCircleCellCenter(maze, { ring: 0, sector: 0 }),
+			TUBE_HALF_WIDTH_RATIO,
+		),
+	);
+	markHubNode(0, 0);
+
+	const exitBoundaryPoint = circlePoint(maze, lastRing + 1 + hubRadius, 0);
+	segments.push(
+		...offsetLinePair(
+			computeCircleCellCenter(maze, { ring: lastRing, sector: 0 }),
+			exitBoundaryPoint,
+			TUBE_HALF_WIDTH_RATIO,
+		),
+	);
+	markHubNode(lastRing, 0);
+
+	for (const key of hubNodes) {
+		const [ring, sector] = key.split(",").map(Number);
+		segments.push(
+			...hubCircle(
+				computeCircleCellCenter(maze, { ring, sector }),
+				TUBE_HALF_WIDTH_RATIO,
+			),
+		);
 	}
 
 	return segments;
-}
-
-function computeCircleCellTubeSegments(
-	maze: CircleMazeLike,
-	ring: number,
-	sector: number,
-	angleStep: number,
-	innerRadius: number,
-	outerRadius: number,
-	hubRadius: number,
-	lastRing: number,
-	crossingLookup: Map<string, CircleMazeCrossing>,
-): TubeSegment[] {
-	const { sectorCounts, cells } = maze;
-	const h = TUBE_HALF_WIDTH_RATIO;
-	const startAngle = sector * angleStep;
-	const endAngle = (sector + 1) * angleStep;
-	const midAngle = (startAngle + endAngle) / 2;
-	const midRadius = ring + hubRadius + 0.5;
-	const innerHubR = midRadius - h;
-	const outerHubR = midRadius + h;
-	const hA = h * angleStep;
-	const startHubA = midAngle - hA;
-	const endHubA = midAngle + hA;
-
-	const isEntrance = ring === 0 && sector === 0;
-	const isExit = ring === lastRing && sector === 0;
-	const cwOpen = cells[ring][sector].cwOpen;
-	const ccwOpen = isCcwOpen(cells, sectorCounts, ring, sector);
-	const inwardOpen =
-		ring === 0 ? isEntrance : isInwardOpen(cells, sectorCounts, ring, sector);
-
-	const cwSide = (open: boolean): TubeSegment[] =>
-		open
-			? [
-					...circleArcSegments(maze, innerHubR, endHubA, endAngle),
-					...circleArcSegments(maze, outerHubR, endHubA, endAngle),
-				]
-			: [radialLine(maze, endHubA, innerHubR, outerHubR)];
-
-	const ccwSide = (open: boolean): TubeSegment[] =>
-		open
-			? [
-					...circleArcSegments(maze, innerHubR, startAngle, startHubA),
-					...circleArcSegments(maze, outerHubR, startAngle, startHubA),
-				]
-			: [radialLine(maze, startHubA, innerHubR, outerHubR)];
-
-	const inwardSide = (open: boolean): TubeSegment[] =>
-		open
-			? [
-					radialLine(maze, startHubA, innerRadius, innerHubR),
-					radialLine(maze, endHubA, innerRadius, innerHubR),
-				]
-			: circleArcSegments(maze, innerHubR, startHubA, endHubA);
-
-	// The outward side is the one place a cell's own angular resolution isn't
-	// authoritative: an outward child lives in the *next* ring, which may have
-	// a different (finer) sector count. Sizing/positioning this door from the
-	// parent's own angle would silently disagree with the same door as drawn
-	// by the child's own `inwardSide` (using the child's angle) — see the
-	// door-size mismatch this fixes. Deferring to each open child's own angle
-	// keeps both sides in exact agreement, and naturally fans out one door per
-	// open child when the maze branches at this node.
-	const outwardSide = (): TubeSegment[] => {
-		if (ring === lastRing) {
-			return isExit
-				? [
-						radialLine(maze, startHubA, outerHubR, outerRadius),
-						radialLine(maze, endHubA, outerHubR, outerRadius),
-					]
-				: circleArcSegments(maze, outerHubR, startHubA, endHubA);
-		}
-
-		const openChildren = outwardChildren(sectorCounts, ring, sector).filter(
-			(_, index) => cells[ring][sector].outwardOpen[index],
-		);
-
-		if (openChildren.length === 0) {
-			return circleArcSegments(maze, outerHubR, startHubA, endHubA);
-		}
-
-		const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
-		return openChildren.flatMap((child) => {
-			const childMidAngle = (child + 0.5) * childAngleStep;
-			const childHalfAngle = h * childAngleStep;
-			return [
-				radialLine(
-					maze,
-					childMidAngle - childHalfAngle,
-					outerHubR,
-					outerRadius,
-				),
-				radialLine(
-					maze,
-					childMidAngle + childHalfAngle,
-					outerHubR,
-					outerRadius,
-				),
-			];
-		});
-	};
-
-	const crossing = crossingLookup.get(crossingKey(ring, sector));
-	if (crossing) {
-		const overAxis = crossing.underAxis === "radial" ? "tangential" : "radial";
-
-		if (overAxis === "tangential") {
-			return [
-				...circleArcSegments(maze, innerHubR, startAngle, endAngle),
-				...circleArcSegments(maze, outerHubR, startAngle, endAngle),
-				...inwardSide(true),
-				...outwardSide(),
-			];
-		}
-		return [
-			radialLine(maze, startHubA, innerRadius, outerRadius),
-			radialLine(maze, endHubA, innerRadius, outerRadius),
-			...cwSide(true),
-			...ccwSide(true),
-		];
-	}
-
-	return [
-		...cwSide(cwOpen),
-		...ccwSide(ccwOpen),
-		...inwardSide(inwardOpen),
-		...outwardSide(),
-	];
 }

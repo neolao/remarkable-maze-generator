@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isArcSegment } from "../rendering/maze-layout.js";
+import {
+	TUBE_HALF_WIDTH_RATIO,
+	isArcSegment,
+} from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
 import { carveEdge, createCircleGrid } from "./cells.js";
 import { generateCircleMaze } from "./generate.js";
@@ -404,6 +407,12 @@ describe("computeCircleCellCenter", () => {
 	});
 });
 
+// computeCircleTubeSegments was redesigned around per-edge Cartesian
+// channels instead of a per-cell polar hub (see ADR 055 follow-up): every
+// open connection (tangential or radial) is its own constant-width channel
+// directly between the two cells' real centers, so channel width is a
+// structural guarantee rather than something that can drift out of sync
+// between two rings of different resolution.
 describe("computeCircleTubeSegments", () => {
 	it("throws when cells do not match the sector counts", () => {
 		const sectorCounts = computeCircleSectorCounts(4, 3);
@@ -435,61 +444,196 @@ describe("computeCircleTubeSegments", () => {
 		}
 	});
 
-	it("draws a crossing node's over axis (tangential) as arcs spanning the full cell width, uninterrupted", () => {
+	it("draws a tangential channel as two concentric arcs exactly 2×half-width apart in radius, regardless of the ring's own sector count", () => {
+		const sectorCounts = [6];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 0 },
+			{ ring: 0, sector: 1 },
+		);
+		const maze = { sectorCounts, cells };
+		const midRadius = computeHubRadius(sectorCounts[0]) + 0.5;
+
+		const segments = computeCircleTubeSegments(maze);
+		const arcRadii = segments
+			.filter(isArcSegment)
+			.map((segment) => segment.radius);
+
+		const hasRadiusNear = (radius: number) =>
+			arcRadii.some((r) => Math.abs(r - radius) < 1e-9);
+		expect(hasRadiusNear(midRadius - TUBE_HALF_WIDTH_RATIO)).toBe(true);
+		expect(hasRadiusNear(midRadius + TUBE_HALF_WIDTH_RATIO)).toBe(true);
+	});
+
+	it("draws a radial channel as two lines a constant perpendicular distance apart, even when the child sits at a different angle than its parent", () => {
+		// Growth ratio 2 (ring 0 has 2 sectors, ring 1 has 4): the open child
+		// (ring 1, sector 0) is NOT at the same angle as its parent (ring 0,
+		// sector 0) — a straight center-to-center offset must still produce an
+		// exact constant-width channel despite the diagonal.
+		const sectorCounts = [2, 4];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 0 },
+			{ ring: 1, sector: 0 },
+		);
+		const maze = { sectorCounts, cells };
+
+		const innerCenter = computeCircleCellCenter(maze, { ring: 0, sector: 0 });
+		const outerCenter = computeCircleCellCenter(maze, { ring: 1, sector: 0 });
+		const expectedMidpoint = {
+			x: (innerCenter.x + outerCenter.x) / 2,
+			y: (innerCenter.y + outerCenter.y) / 2,
+		};
+
+		const segments = computeCircleTubeSegments(maze);
+		const channelLines = segments
+			.filter((segment) => !isArcSegment(segment))
+			.filter((line) => {
+				const midX = (line.x1 + line.x2) / 2;
+				const midY = (line.y1 + line.y2) / 2;
+				return (
+					Math.hypot(midX - expectedMidpoint.x, midY - expectedMidpoint.y) < 0.5
+				);
+			});
+
+		expect(channelLines.length).toBe(2);
+		const [a, b] = channelLines;
+		// Perpendicular distance from b's first point to the infinite line
+		// through a — computed independently via the cross-product formula,
+		// not by re-deriving the implementation's own offset math.
+		const dx = a.x2 - a.x1;
+		const dy = a.y2 - a.y1;
+		const length = Math.hypot(dx, dy);
+		const distance = Math.abs(dx * (b.y1 - a.y1) - dy * (b.x1 - a.x1)) / length;
+		expect(distance).toBeCloseTo(2 * TUBE_HALF_WIDTH_RATIO, 9);
+	});
+
+	it("keeps a crossing node's over axis (tangential here) spanning its full un-gapped angular range, uninterrupted", () => {
 		const maze = buildCircleCrossingMaze();
+		const angleStep = (2 * Math.PI) / maze.sectorCounts[1];
 		const hubRadius = computeHubRadius(maze.sectorCounts[0]);
-		const angleStep = (2 * Math.PI) / maze.sectorCounts[1]; // ring 1
 		const midRadius = 1 + hubRadius + 0.5;
 
 		const segments = computeCircleTubeSegments(maze);
-		const arcsAt = (radius: number) =>
-			segments
+		for (const radius of [
+			midRadius - TUBE_HALF_WIDTH_RATIO,
+			midRadius + TUBE_HALF_WIDTH_RATIO,
+		]) {
+			const totalAngle = segments
 				.filter(isArcSegment)
-				.filter((segment) => Math.abs(segment.radius - radius) < 1e-9);
-
-		for (const radius of [midRadius - 0.35, midRadius + 0.35]) {
-			const arcs = arcsAt(radius);
-			const totalAngle = arcs.reduce((sum, segment) => {
-				const chordLength = Math.hypot(
-					segment.x2 - segment.x1,
-					segment.y2 - segment.y1,
-				);
-				return sum + 2 * Math.asin(chordLength / (2 * segment.radius));
-			}, 0);
-			// The crossing's own cell (sector 1) contributes a full angleStep of
-			// uninterrupted arc at this radius — a strict lower bound since other
-			// cells sharing this radius may also contribute pieces.
-			expect(totalAngle).toBeGreaterThanOrEqual(angleStep - 1e-6);
+				.filter((segment) => Math.abs(segment.radius - radius) < 1e-9)
+				.reduce((sum, segment) => {
+					const chordLength = Math.hypot(
+						segment.x2 - segment.x1,
+						segment.y2 - segment.y1,
+					);
+					return sum + 2 * Math.asin(chordLength / (2 * segment.radius));
+				}, 0);
+			// The crossing's own tangential channel alone spans 2 full sectors
+			// (its ccw neighbor's center to its cw neighbor's center) — a strict
+			// lower bound since other cells sharing this radius also contribute.
+			expect(totalAngle).toBeGreaterThanOrEqual(2 * angleStep - 1e-6);
 		}
 	});
 
-	it("leaves a real gap in a crossing node's under axis (radial), never a segment spanning across the hub", () => {
+	it("leaves a real gap in a crossing node's under axis (radial here), never reaching its own center", () => {
 		const maze = buildCircleCrossingMaze();
-		const hubRadius = computeHubRadius(maze.sectorCounts[0]);
-		const diameter = computeCircleMazeDiameter(maze);
-		const center = diameter / 2;
-		const innerHubR = 1 + hubRadius + 0.5 - 0.35;
-		const outerHubR = 1 + hubRadius + 0.5 + 0.35;
+		const crossingCenter = computeCircleCellCenter(maze, {
+			ring: 1,
+			sector: 1,
+		});
 
 		const segments = computeCircleTubeSegments(maze);
-		// No line segment should span (even partially) the open radius range
-		// strictly between the two hub edges — that gap is exactly where the
-		// tangential (over-axis) tube passes uninterrupted.
-		const crossesTheGap = segments.some((segment) => {
-			if (isArcSegment(segment)) return false;
-			const r1 = Math.hypot(segment.x1 - center, segment.y1 - center);
-			const r2 = Math.hypot(segment.x2 - center, segment.y2 - center);
-			const rMin = Math.min(r1, r2);
-			const rMax = Math.max(r1, r2);
+		const distancesToCenter = segments
+			.filter((segment) => !isArcSegment(segment))
+			.flatMap((segment) => [
+				Math.hypot(
+					segment.x1 - crossingCenter.x,
+					segment.y1 - crossingCenter.y,
+				),
+				Math.hypot(
+					segment.x2 - crossingCenter.x,
+					segment.y2 - crossingCenter.y,
+				),
+			]);
+
+		// Every line segment stops meaningfully short of the crossing's own
+		// center — the real physical gap where the tangential (over-axis) tube
+		// passes uninterrupted instead.
+		expect(Math.min(...distancesToCenter)).toBeGreaterThan(0.2);
+	});
+
+	it("draws a small hub joint at every open node, rounding turns instead of leaving a sharp kink", () => {
+		const sectorCounts = [6];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 0 },
+			{ ring: 0, sector: 1 },
+		);
+		const maze = { sectorCounts, cells };
+		const nodeCenter = computeCircleCellCenter(maze, { ring: 0, sector: 0 });
+
+		const segments = computeCircleTubeSegments(maze);
+		const hubArcs = segments
+			.filter(isArcSegment)
+			.filter(
+				(segment) => Math.abs(segment.radius - TUBE_HALF_WIDTH_RATIO) < 1e-9,
+			);
+		// A hub circle's own points sit exactly `TUBE_HALF_WIDTH_RATIO` away from
+		// the node's center — not at the center itself.
+		const surroundsNodeCenter = hubArcs.some((segment) => {
+			const d1 = Math.hypot(
+				segment.x1 - nodeCenter.x,
+				segment.y1 - nodeCenter.y,
+			);
+			const d2 = Math.hypot(
+				segment.x2 - nodeCenter.x,
+				segment.y2 - nodeCenter.y,
+			);
 			return (
-				rMin < innerHubR - 0.01 && rMax > innerHubR + 0.01 && rMax < outerHubR
+				Math.abs(d1 - TUBE_HALF_WIDTH_RATIO) < 1e-6 &&
+				Math.abs(d2 - TUBE_HALF_WIDTH_RATIO) < 1e-6
 			);
 		});
 
-		expect(crossesTheGap).toBe(false);
+		expect(surroundsNodeCenter).toBe(true);
 	});
 
-	it("opens an inward arm reaching the absolute hub boundary only at the entrance sector", () => {
+	it("does not draw a hub joint at a crossing node, preserving its visible gap", () => {
+		const maze = buildCircleCrossingMaze();
+		const crossingCenter = computeCircleCellCenter(maze, {
+			ring: 1,
+			sector: 1,
+		});
+
+		const segments = computeCircleTubeSegments(maze);
+		const hubArcs = segments
+			.filter(isArcSegment)
+			.filter(
+				(segment) => Math.abs(segment.radius - TUBE_HALF_WIDTH_RATIO) < 1e-9,
+			);
+		const nearCrossingCenter = hubArcs.some((segment) => {
+			const d1 = Math.hypot(
+				segment.x1 - crossingCenter.x,
+				segment.y1 - crossingCenter.y,
+			);
+			const d2 = Math.hypot(
+				segment.x2 - crossingCenter.x,
+				segment.y2 - crossingCenter.y,
+			);
+			return d1 < 0.5 && d2 < 0.5;
+		});
+
+		expect(nearCrossingCenter).toBe(false);
+	});
+
+	it("draws a stub channel connecting the entrance cell to the hub boundary", () => {
 		const sectorCounts = computeCircleSectorCounts(4, 3);
 		const maze = buildFullyWalledCircleMaze(sectorCounts);
 		const hubRadius = computeHubRadius(sectorCounts[0]);
@@ -507,54 +651,33 @@ describe("computeCircleTubeSegments", () => {
 		expect(reachesHubBoundary).toBe(true);
 	});
 
+	it("draws a stub channel connecting the exit cell to the maze's outer boundary", () => {
+		const sectorCounts = computeCircleSectorCounts(4, 3);
+		const maze = buildFullyWalledCircleMaze(sectorCounts);
+		const hubRadius = computeHubRadius(sectorCounts[0]);
+		const lastRing = sectorCounts.length - 1;
+		const outerBoundary = lastRing + 1 + hubRadius;
+		const diameter = computeCircleMazeDiameter(maze);
+		const center = diameter / 2;
+
+		const segments = computeCircleTubeSegments(maze);
+		const reachesOuterBoundary = segments.some((segment) => {
+			if (isArcSegment(segment)) return false;
+			const r1 = Math.hypot(segment.x1 - center, segment.y1 - center);
+			const r2 = Math.hypot(segment.x2 - center, segment.y2 - center);
+			return (
+				Math.abs(r1 - outerBoundary) < 1e-6 ||
+				Math.abs(r2 - outerBoundary) < 1e-6
+			);
+		});
+
+		expect(reachesOuterBoundary).toBe(true);
+	});
+
 	it("does not error for the minimal 1x1 circle-crossing maze", () => {
 		const sectorCounts = computeCircleSectorCounts(1, 1);
 		const maze = buildFullyWalledCircleMaze(sectorCounts);
 
 		expect(() => computeCircleTubeSegments(maze)).not.toThrow();
-	});
-
-	it("sizes and positions an outward door to exactly match the open child's own inward door, even when sector counts differ between rings", () => {
-		// ring 0 has 2 sectors, ring 1 has 4 (growth ratio 2, so sector 0's own
-		// angular step is twice ring 1's) — sector 0 of ring 0 has two outward
-		// children (ring 1 sectors 0 and 1), only the first opened.
-		const sectorCounts = [2, 4];
-		const cells = createCircleGrid(sectorCounts);
-		carveEdge(
-			cells,
-			sectorCounts,
-			{ ring: 0, sector: 0 },
-			{ ring: 1, sector: 0 },
-		);
-		const maze = { sectorCounts, cells };
-
-		const hubRadius = computeHubRadius(sectorCounts[0]);
-		const boundaryRadius = 1 + hubRadius;
-		const diameter = computeCircleMazeDiameter(maze);
-		const center = diameter / 2;
-		const radiusOf = (x: number, y: number) =>
-			Math.hypot(x - center, y - center);
-		const isAtBoundary = (r: number) => Math.abs(r - boundaryRadius) < 1e-9;
-
-		const segments = computeCircleTubeSegments(maze);
-		const boundaryPoints = segments
-			.filter((segment) => !isArcSegment(segment))
-			.flatMap((segment) => [
-				{ x: segment.x1, y: segment.y1 },
-				{ x: segment.x2, y: segment.y2 },
-			])
-			.filter((point) => isAtBoundary(radiusOf(point.x, point.y)));
-
-		// The single open door crossing this boundary has exactly 2 edges, each
-		// drawn twice — once as the parent (ring 0)'s outward arm, once as the
-		// child (ring 1)'s inward arm. If the two sides disagreed on the door's
-		// angular position/width (using their own ring's angular step instead of
-		// agreeing on one), these wouldn't coincide and 4 distinct points would
-		// appear instead of 2.
-		expect(boundaryPoints.length).toBe(4);
-		const uniquePoints = new Set(
-			boundaryPoints.map((p) => `${p.x.toFixed(6)},${p.y.toFixed(6)}`),
-		);
-		expect(uniquePoints.size).toBe(2);
 	});
 });
