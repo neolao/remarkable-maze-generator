@@ -1,4 +1,5 @@
 import { generateCircleCellsForAlgorithm } from "../maze-algorithm-registry.js";
+import type { CircleMazeCrossing } from "../maze-domain.js";
 import type { CircleCell } from "./cells.js";
 
 export type CircleMazeAlgorithm =
@@ -16,11 +17,13 @@ export interface GenerateCircleMazeOptions {
 	seed: number;
 	difficulty?: number;
 	algorithm?: CircleMazeAlgorithm;
+	allowsCrossings?: boolean;
 }
 
 export interface CircleMaze {
 	sectorCounts: number[];
 	cells: CircleCell[][];
+	crossings: CircleMazeCrossing[];
 }
 
 /**
@@ -38,11 +41,13 @@ export function generateCircleMaze({
 	seed,
 	difficulty = MIN_DIFFICULTY,
 	algorithm = DEFAULT_ALGORITHM,
+	allowsCrossings = false,
 }: GenerateCircleMazeOptions): CircleMaze {
 	return generateCircleCellsForAlgorithm(algorithm, {
 		width,
 		height,
 		seed,
 		difficulty,
+		allowsCrossings,
 	});
 }

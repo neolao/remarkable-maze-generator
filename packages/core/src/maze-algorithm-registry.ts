@@ -27,6 +27,7 @@ export interface GenerateCircleAlgorithmOptions {
 	height: number;
 	seed: number;
 	difficulty: number;
+	allowsCrossings: boolean;
 }
 
 interface MazeAlgorithmStrategy {
@@ -43,32 +44,37 @@ const MAZE_ALGORITHM_STRATEGIES: Record<MazeAlgorithm, MazeAlgorithmStrategy> =
 	{
 		"growing-tree": {
 			generateRectangular: generateGrowingTreeMaze,
-			generateCircle: ({ width, height, seed, difficulty }) =>
-				generateCircleGrowingTreeMaze({ width, height, seed, difficulty }),
+			generateCircle: generateCircleGrowingTreeMaze,
 		},
 		kruskal: {
 			generateRectangular: (options) => ({
 				cells: generateKruskalMaze(options).cells,
 				crossings: [],
 			}),
-			generateCircle: ({ width, height, seed }) =>
-				generateCircleKruskalMaze({ width, height, seed }),
+			generateCircle: ({ width, height, seed }) => ({
+				...generateCircleKruskalMaze({ width, height, seed }),
+				crossings: [],
+			}),
 		},
 		wilson: {
 			generateRectangular: (options) => ({
 				cells: generateWilsonMaze(options).cells,
 				crossings: [],
 			}),
-			generateCircle: ({ width, height, seed }) =>
-				generateCircleWilsonMaze({ width, height, seed }),
+			generateCircle: ({ width, height, seed }) => ({
+				...generateCircleWilsonMaze({ width, height, seed }),
+				crossings: [],
+			}),
 		},
 		"aldous-broder": {
 			generateRectangular: (options) => ({
 				cells: generateAldousBroderMaze(options).cells,
 				crossings: [],
 			}),
-			generateCircle: ({ width, height, seed }) =>
-				generateCircleAldousBroderMaze({ width, height, seed }),
+			generateCircle: ({ width, height, seed }) => ({
+				...generateCircleAldousBroderMaze({ width, height, seed }),
+				crossings: [],
+			}),
 		},
 	};
 

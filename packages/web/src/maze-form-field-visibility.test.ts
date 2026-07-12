@@ -57,6 +57,21 @@ describe("computeMazeFormFieldVisibility", () => {
 		});
 	});
 
+	it("hides the algorithm field and forces growing-tree for circle-crossing, even if a different algorithm was previously selected", () => {
+		const result = computeMazeFormFieldVisibility({
+			type: "circle-crossing",
+			algorithm: "wilson",
+			pathLength: undefined,
+		});
+
+		expect(result).toEqual({
+			showAlgorithm: false,
+			showDifficulty: true,
+			showPathLengthCandidates: false,
+			effectiveAlgorithm: "growing-tree",
+		});
+	});
+
 	it("keeps the algorithm field visible and unforced when rectangle-crossing is paired with growing-tree", () => {
 		const result = computeMazeFormFieldVisibility({
 			type: "rectangle",

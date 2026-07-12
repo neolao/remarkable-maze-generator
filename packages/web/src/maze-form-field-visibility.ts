@@ -17,9 +17,13 @@ export interface MazeFormFieldVisibility {
 	effectiveAlgorithm: MazeAlgorithm;
 }
 
-// Only growing-tree can produce a rectangle-crossing maze (core rejects any
-// other combination) — see ADR 022/033/053.
-const FORCED_ALGORITHM_FOR_RECTANGLE_CROSSING: MazeAlgorithm = "growing-tree";
+// Only growing-tree can produce a bridge-crossing maze, rectangle or circle
+// (core rejects any other combination) — see ADR 022/033/053/055.
+const FORCED_ALGORITHM_FOR_CROSSING_TYPES: MazeAlgorithm = "growing-tree";
+const CROSSING_MAZE_TYPES: MazeType[] = [
+	"rectangle-crossing",
+	"circle-crossing",
+];
 
 // Only growing-tree reads the difficulty knob — see maze-algorithms/growing-tree.ts and ADR 053.
 const DIFFICULTY_ALGORITHM: MazeAlgorithm = "growing-tree";
@@ -27,13 +31,13 @@ const DIFFICULTY_ALGORITHM: MazeAlgorithm = "growing-tree";
 export function computeMazeFormFieldVisibility(
 	input: MazeFormFieldVisibilityInput,
 ): MazeFormFieldVisibility {
-	const effectiveAlgorithm: MazeAlgorithm =
-		input.type === "rectangle-crossing"
-			? FORCED_ALGORITHM_FOR_RECTANGLE_CROSSING
-			: input.algorithm;
+	const isCrossingType = CROSSING_MAZE_TYPES.includes(input.type);
+	const effectiveAlgorithm: MazeAlgorithm = isCrossingType
+		? FORCED_ALGORITHM_FOR_CROSSING_TYPES
+		: input.algorithm;
 
 	return {
-		showAlgorithm: input.type !== "rectangle-crossing",
+		showAlgorithm: !isCrossingType,
 		showDifficulty: effectiveAlgorithm === DIFFICULTY_ALGORITHM,
 		showPathLengthCandidates: input.pathLength !== undefined,
 		effectiveAlgorithm,

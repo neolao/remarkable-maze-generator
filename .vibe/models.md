@@ -6,22 +6,23 @@
 | width | number | grid width in cells — for `type: "circle"`, the number of angular sectors in the innermost ring |
 | height | number | grid height in cells — for `type: "circle"`, the number of concentric rings |
 | cells | Cell[][] | rows (`cells[y][x]`), one entry per grid cell; empty (`[]`) for `type: "circle"`, which carries its cell data in `circleCells` instead (see below and ADR 037) |
-| type | MazeType | optional; `"rectangle"` (default), `"rectangle-crossing"`, or `"circle"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016, ADR 022, and ADR 037 |
+| type | MazeType | optional; `"rectangle"` (default), `"rectangle-crossing"`, `"circle"`, or `"circle-crossing"`, set by `generateMaze()`, absent on hand-built mazes, see ADR 016, ADR 022, ADR 037, and ADR 055 |
 | seed | number | optional; the resolved seed used to generate this maze, see ADR 016 |
 | difficulty | number | optional; the resolved difficulty (1–5) used to generate this maze, see ADR 016 |
 | algorithm | MazeAlgorithm | optional; the resolved generation algorithm used for this maze, defaults to `"growing-tree"`, see ADR 033 |
 | crossings | MazeCrossing[] | optional; cells where a corridor tunnels through another's straight passage, only populated for `type: "rectangle-crossing"` — both axes are real, walkable connections, see ADR 024 |
-| circleSectorCounts | number[] | optional; only set for `type: "circle"` — the number of sectors in each ring, ring 0 (innermost) first, see ADR 037 |
-| circleCells | CircleCell[][] | optional; only set for `type: "circle"` — `circleCells[ring][sector]`, a variable number of sectors per ring so it doesn't fit the rectangular `cells` grid above, see ADR 037 |
+| circleSectorCounts | number[] | optional; only set for `type: "circle"`/`"circle-crossing"` — the number of sectors in each ring, ring 0 (innermost) first, see ADR 037 |
+| circleCells | CircleCell[][] | optional; only set for `type: "circle"`/`"circle-crossing"` — `circleCells[ring][sector]`, a variable number of sectors per ring so it doesn't fit the rectangular `cells` grid above, see ADR 037 |
+| circleCrossings | CircleMazeCrossing[] | optional; the `circle-crossing` equivalent of `crossings` above — ring/sector nodes where a corridor tunnels through another's straight passage, only populated for `type: "circle-crossing"`, see ADR 055 |
 | pathLength | PathLengthTarget | optional; only set when a path-length target was requested — the category that was matched, not itself a generation parameter (see ADR 046) |
 Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## MazeType
-String literal union: `"rectangle" | "rectangle-crossing" | "circle"`. `"circle"` is a real growing-sector topology entirely separate from the rectangular grid (ADR 037, superseding ADR 034's polar transposition of the rectangular grid). See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022, ADR 037).
+String literal union: `"rectangle" | "rectangle-crossing" | "circle" | "circle-crossing"`. `"circle"`/`"circle-crossing"` are a real growing-sector topology entirely separate from the rectangular grid (ADR 037, superseding ADR 034's polar transposition of the rectangular grid); `"circle-crossing"` additionally carries tube-style bridge crossings, the polar equivalent of `"rectangle-crossing"` (ADR 055). See `MAZE_TYPES`, `isValidMazeType()`, `invalidMazeTypeMessage()` (ADR 022, ADR 037, ADR 055).
 Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## MazeAlgorithm
-String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"` (bridge crossings are carved as part of its own traversal); all 4 algorithms support `type: "circle"` too, reimplemented against its growing-sector graph (see ADR 037). See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
+String literal union: `"growing-tree" | "kruskal" | "wilson" | "aldous-broder"`. `"growing-tree"` is the default and the only one supporting `type: "rectangle-crossing"`/`"circle-crossing"` (bridge crossings are carved as part of its own traversal); all 4 algorithms support `type: "circle"` too, reimplemented against its growing-sector graph (see ADR 037). See `MAZE_ALGORITHMS`, `isValidMazeAlgorithm()`, `invalidMazeAlgorithmMessage()` (ADR 033).
 Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 
 ## PathLengthTarget
@@ -42,6 +43,14 @@ Defined in: `packages/core/src/circle-maze/cells.ts` (see ADR 037)
 | y | number | row index of the crossing cell |
 | underAxis | `"vertical" \| "horizontal"` | which axis was the pre-existing passage that got tunneled under — a rendering hint only; both axes are equally real and walkable, see ADR 024 |
 Defined in: `packages/core/src/maze-domain.ts` (see ADR 050) — never the entrance or exit cell, see ADR 024 (supersedes the decorative-only design of ADR 022)
+
+## CircleMazeCrossing
+| Field | Type | Notes |
+|---|---|---|
+| ring | number | ring index of the crossing node |
+| sector | number | sector index of the crossing node |
+| underAxis | `"radial" \| "tangential"` | which axis was the pre-existing passage that got tunneled under — a rendering hint only; both axes are equally real and walkable, see ADR 055 |
+Defined in: `packages/core/src/maze-domain.ts` (see ADR 050) — the `circle-crossing` equivalent of `MazeCrossing`; never the entrance or exit node (see ADR 055)
 
 ## Cell
 | Field | Type | Notes |
@@ -66,7 +75,7 @@ Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
 | seed | number | same seed reproduces the same maze |
 | difficulty | number | optional integer 1–5, defaults to 1 (easiest); controls branch-point density, see ADR 015 |
 | type | MazeType | optional, defaults to `"rectangle"`, see ADR 022 |
-| algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; rejected if combined with `type: "rectangle-crossing"` and anything other than `"growing-tree"`, see ADR 033 |
+| algorithm | MazeAlgorithm | optional, defaults to `"growing-tree"`; rejected if combined with `type: "rectangle-crossing"`/`"circle-crossing"` and anything other than `"growing-tree"`, see ADR 033, ADR 055 |
 | pathLength | PathLengthTarget | optional; when set, triggers the multi-candidate seed search described under `PathLengthTarget` instead of a single-seed generation, see ADR 046 |
 | pathLengthCandidateCount | number | optional; overrides `PATH_LENGTH_MAX_ATTEMPTS` (10) as the number of candidates tried when `pathLength` is set — integer 1 to `MAX_PATH_LENGTH_CANDIDATE_COUNT` (50), rejected otherwise or when set without `pathLength`, see ADR 047 |
 Defined in: `packages/core/src/maze-domain.ts` (see ADR 050)
@@ -151,7 +160,7 @@ Defined in: `packages/core/src/remarkable-upload.ts`
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
 | difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
-| type | string | optional, `"rectangle"`, `"rectangle-crossing"`, or `"circle"`, defaults to `"rectangle"` (see ADR 022, ADR 037) |
+| type | string | optional, `"rectangle"`, `"rectangle-crossing"`, `"circle"`, or `"circle-crossing"`, defaults to `"rectangle"` (see ADR 022, ADR 037, ADR 055) |
 | algorithm | string | optional, `"growing-tree"`, `"kruskal"`, `"wilson"`, or `"aldous-broder"`, defaults to `"growing-tree"` (see ADR 033) |
 | solution | string | optional, `"none"`, `"extra-page"`, or `"overlay"`, defaults to `"none"` (see ADR 021) |
 | pathLength | string | optional, `"short"`, `"medium"`, or `"long"`; defaults to unset (no path-length filtering), see ADR 046 |
@@ -229,7 +238,7 @@ Defined in: `packages/web/src/server.ts`
 | height | number | maze height in cells |
 | seed | number | optional, defaults to a random value |
 | difficulty | number | optional integer 1–5, defaults to 1 (see ADR 015) |
-| type | string | optional, `"rectangle"`, `"rectangle-crossing"`, or `"circle"`, defaults to `"rectangle"` (see ADR 022, ADR 037) |
+| type | string | optional, `"rectangle"`, `"rectangle-crossing"`, `"circle"`, or `"circle-crossing"`, defaults to `"rectangle"` (see ADR 022, ADR 037, ADR 055) |
 | algorithm | string | optional, `"growing-tree"`, `"kruskal"`, `"wilson"`, or `"aldous-broder"`, defaults to `"growing-tree"` (see ADR 033) |
 | solution | string | optional, `"none"`, `"extra-page"`, or `"overlay"`, defaults to `"none"` (see ADR 021) |
 | pathLength | string | optional, `"short"`, `"medium"`, or `"long"`; defaults to unset (no path-length filtering), see ADR 046 |

@@ -296,6 +296,33 @@ describe("renderMazeToPdf", () => {
 		expect(maze.crossings).toEqual([]);
 		await expect(renderMazeToPdf(maze)).resolves.toBeInstanceOf(Uint8Array);
 	});
+
+	it("draws a circle-crossing maze as independent tube edge strokes on the polar layout", async () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		expect(maze.circleCrossings?.length ?? 0).toBeGreaterThan(0);
+
+		const pdfBytes = await renderMazeToPdf(maze);
+
+		const strokedLines = countStrokedLines(pdfBytes);
+		expect(strokedLines).toBeGreaterThan(0);
+	});
+
+	it("does not error rendering a 1x1 circle-crossing maze, which has no room for a crossing", async () => {
+		const maze = generateMaze({
+			width: 1,
+			height: 1,
+			seed: 1,
+			type: "circle-crossing",
+		});
+
+		expect(maze.circleCrossings).toEqual([]);
+		await expect(renderMazeToPdf(maze)).resolves.toBeInstanceOf(Uint8Array);
+	});
 });
 
 describe("isValidSolutionMode", () => {

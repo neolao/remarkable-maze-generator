@@ -26,7 +26,7 @@ program
 	.option("--output <path>", "output PDF file path (defaults to ./maze.pdf)")
 	.option(
 		"--type <type>",
-		"maze type: rectangle, rectangle-crossing, or circle (defaults to rectangle)",
+		"maze type: rectangle, rectangle-crossing, circle, or circle-crossing (defaults to rectangle)",
 	)
 	.option(
 		"--algorithm <algorithm>",
@@ -149,7 +149,7 @@ program
 	)
 	.option(
 		"--type <type>",
-		"maze type: rectangle, rectangle-crossing, or circle (defaults to rectangle)",
+		"maze type: rectangle, rectangle-crossing, circle, or circle-crossing (defaults to rectangle)",
 	)
 	.option(
 		"--algorithm <algorithm>",

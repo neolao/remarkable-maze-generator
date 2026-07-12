@@ -31,8 +31,8 @@
 **Do not confuse with:** —
 
 ## Maze type
-**Definition:** The shape and rendering family of a Maze's cell topology: `rectangle` (a classic square grid with thin single-line walls), `rectangle-crossing` (the same square grid, but drawn as hollow tube-shaped corridors and able to carry Bridge crossings), or `circle` (a growing-sector ring topology with no rectangular grid underneath at all, solved and rendered by its own dedicated code).
-**Code:** `MazeType`, `MAZE_TYPES`, `type` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze-domain.ts` (see ADR 022, ADR 037, ADR 050)
+**Definition:** The shape and rendering family of a Maze's cell topology: `rectangle` (a classic square grid with thin single-line walls), `rectangle-crossing` (the same square grid, but drawn as hollow tube-shaped corridors and able to carry Bridge crossings), `circle` (a growing-sector ring topology with no rectangular grid underneath at all, solved and rendered by its own dedicated code), or `circle-crossing` (the circle topology drawn as hollow tube-shaped corridors and able to carry Bridge crossings — the polar equivalent of `rectangle-crossing`).
+**Code:** `MazeType`, `MAZE_TYPES`, `type` field of `Maze` / `GenerateMazeOptions`, in `packages/core/src/maze-domain.ts` (see ADR 022, ADR 037, ADR 050, ADR 055)
 **Do not confuse with:** Difficulty
 
 ## Branch point
@@ -41,8 +41,8 @@
 **Do not confuse with:** Bridge crossing (a bridge-crossing cell is never itself a branch point, since the solver's axis lock removes the alternative direction — see ADR 024 and ADR 028)
 
 ## Bridge crossing
-**Definition:** A cell in a `rectangle-crossing` maze where two independent, real, walkable passages tunnel through each other without connecting — one axis is the pre-existing straight passage being tunneled under (recorded as the crossing's `underAxis`, purely a rendering hint), the other is the new passage carved through it. Both axes stay genuine spanning-tree edges, so the maze keeps its single-solution guarantee; only the `growing-tree` algorithm can produce them.
-**Code:** `MazeCrossing` in `packages/core/src/maze-domain.ts`, `crossings` field of `Maze`, `computeCrossingBridgeSegments()` / `computePathSegments()` in `packages/core/src/rendering/maze-layout.ts` (see ADR 022, ADR 023, ADR 050, ADR 051)
+**Definition:** A cell (or ring/sector node) in a `rectangle-crossing`/`circle-crossing` maze where two independent, real, walkable passages tunnel through each other without connecting — one axis is the pre-existing straight passage being tunneled under (recorded as the crossing's `underAxis`, purely a rendering hint), the other is the new passage carved through it. Both axes stay genuine spanning-tree edges, so the maze keeps its single-solution guarantee; only the `growing-tree` algorithm can produce them.
+**Code:** `MazeCrossing` (rectangular: axis `"vertical" | "horizontal"`, position `x`/`y`) and `CircleMazeCrossing` (circular: axis `"radial" | "tangential"`, position `ring`/`sector`) in `packages/core/src/maze-domain.ts`, `crossings`/`circleCrossings` fields of `Maze`, `computeCrossingBridgeSegments()` / `computePathSegments()` in `packages/core/src/rendering/maze-layout.ts`, `computeCircleTubeSegments()` in `packages/core/src/circle-maze/render.ts` (see ADR 022, ADR 023, ADR 050, ADR 051, ADR 055)
 **Do not confuse with:** —
 
 ## Generation algorithm

@@ -108,4 +108,35 @@ describe("generateCircleMaze", () => {
 
 		expect(maze.sectorCounts).toEqual(computeCircleSectorCounts(8, 6));
 	});
+
+	it("does not produce crossings by default", () => {
+		const maze = generateCircleMaze({ width: 10, height: 10, seed: 3 });
+
+		expect(maze.crossings).toEqual([]);
+	});
+
+	it("produces at least one crossing when allowsCrossings is true, on a maze large enough to contain one", () => {
+		const maze = generateCircleMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			allowsCrossings: true,
+		});
+
+		expect(maze.crossings.length).toBeGreaterThan(0);
+	});
+
+	it("still produces a spanning tree plus one extra edge per crossing (reachability unaffected)", () => {
+		const maze = generateCircleMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			allowsCrossings: true,
+		});
+		expect(maze.crossings.length).toBeGreaterThan(0);
+
+		const totalNodes = totalNodeCount(maze.sectorCounts);
+		expect(countReachableNodes(maze)).toBe(totalNodes);
+		expect(countOpenEdges(maze)).toBe(totalNodes - 1 + maze.crossings.length);
+	});
 });

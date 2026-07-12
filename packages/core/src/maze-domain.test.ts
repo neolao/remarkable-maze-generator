@@ -22,8 +22,13 @@ import {
 } from "./maze-domain.js";
 
 describe("MAZE_TYPES / isValidMazeType / invalidMazeTypeMessage", () => {
-	it("lists rectangle, rectangle-crossing and circle as the valid maze types", () => {
-		expect(MAZE_TYPES).toEqual(["rectangle", "rectangle-crossing", "circle"]);
+	it("lists rectangle, rectangle-crossing, circle and circle-crossing as the valid maze types", () => {
+		expect(MAZE_TYPES).toEqual([
+			"rectangle",
+			"rectangle-crossing",
+			"circle",
+			"circle-crossing",
+		]);
 	});
 
 	it.each(MAZE_TYPES)("accepts %s as a valid maze type", (type) => {
@@ -36,7 +41,7 @@ describe("MAZE_TYPES / isValidMazeType / invalidMazeTypeMessage", () => {
 
 	it("describes the allowed values in the invalid maze type message", () => {
 		expect(invalidMazeTypeMessage("hexagon")).toBe(
-			'Invalid maze type "hexagon", expected one of: rectangle, rectangle-crossing, circle',
+			'Invalid maze type "hexagon", expected one of: rectangle, rectangle-crossing, circle, circle-crossing',
 		);
 	});
 });
@@ -165,6 +170,21 @@ describe("validateTypeAlgorithmCompatibility", () => {
 	it("accepts rectangle-crossing combined with growing-tree", () => {
 		expect(() =>
 			validateTypeAlgorithmCompatibility("rectangle-crossing", "growing-tree"),
+		).not.toThrow();
+	});
+
+	it.each(["kruskal", "wilson", "aldous-broder"] as const)(
+		"rejects circle-crossing combined with %s",
+		(algorithm) => {
+			expect(() =>
+				validateTypeAlgorithmCompatibility("circle-crossing", algorithm),
+			).toThrow(/circle-crossing.*growing-tree/);
+		},
+	);
+
+	it("accepts circle-crossing combined with growing-tree", () => {
+		expect(() =>
+			validateTypeAlgorithmCompatibility("circle-crossing", "growing-tree"),
 		).not.toThrow();
 	});
 

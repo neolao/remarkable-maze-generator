@@ -263,6 +263,44 @@ describe("runGenerate", () => {
 		expect(circleBytes).not.toEqual(rectangleBytes);
 	});
 
+	it("forwards the circle-crossing type, producing a maze with bridge crossings on the polar layout", async () => {
+		const circle = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle",
+			output: join(workDir, "circle.pdf"),
+			cwd: workDir,
+		});
+		const crossing = await runGenerate({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle-crossing",
+			output: join(workDir, "circle-crossing.pdf"),
+			cwd: workDir,
+		});
+
+		const [circleBytes, crossingBytes] = await Promise.all([
+			readFile(circle.outputPath),
+			readFile(crossing.outputPath),
+		]);
+		expect(crossingBytes).not.toEqual(circleBytes);
+	});
+
+	it("rejects the circle-crossing type combined with a non-growing-tree algorithm", async () => {
+		await expect(
+			runGenerate({
+				width: 10,
+				height: 10,
+				seed: 1,
+				type: "circle-crossing",
+				algorithm: "kruskal",
+				cwd: workDir,
+			}),
+		).rejects.toThrow(/circle-crossing.*growing-tree/);
+	});
+
 	it("defaults to the growing-tree algorithm when the algorithm option is omitted", async () => {
 		const withoutAlgorithm = await runGenerate({
 			width: 8,

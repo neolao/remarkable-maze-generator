@@ -95,6 +95,33 @@ describe("renderMazeToSvg", () => {
 		expect(countLineElements(svg)).toBe(computeTubeSegments(maze).length);
 	});
 
+	it("renders a circle-crossing maze as rounded-cap tube edge lines on the polar layout", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		expect(maze.circleCrossings?.length ?? 0).toBeGreaterThan(0);
+
+		const svg = renderMazeToSvg(maze);
+
+		expect(countLineElements(svg) + countPathElements(svg)).toBeGreaterThan(0);
+		expect(svg).toContain('stroke-linecap="round"');
+	});
+
+	it("renders a circle-crossing maze too small for any crossing without error", () => {
+		const maze = generateMaze({
+			width: 1,
+			height: 1,
+			seed: 1,
+			type: "circle-crossing",
+		});
+
+		expect(maze.circleCrossings).toEqual([]);
+		expect(() => renderMazeToSvg(maze)).not.toThrow();
+	});
+
 	it("does not draw a solution trace or branch markers when showSolution is left disabled", () => {
 		const maze = generateMaze({ width: 8, height: 8, seed: 4, difficulty: 5 });
 

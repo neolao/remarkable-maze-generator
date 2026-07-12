@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- A new "circle-crossing" maze type combines the circular maze layout with thick, curvy bridge crossings — two passages that tunnel through each other without connecting — available from the CLI (`--type circle-crossing`) and the web form, restricted to the growing-tree generation algorithm just like its rectangular counterpart
 - The web maze configuration form now shows only the fields that are actually relevant given your current choices: the difficulty field is hidden for generation algorithms that don't use it, the generation algorithm field is hidden for maze types that only support one algorithm, and the candidate-count field is hidden until a path length target is chosen — each field appears or disappears instantly as you change related options, without reloading the page
 - The web page now adapts its layout across the full range of screen sizes: on wide desktop screens the form and the maze preview are shown side by side instead of a narrow centered column, tablet-width screens get a smoother intermediate layout instead of jumping straight from the desktop form to the single-column mobile one, and all buttons, inputs, and dropdowns now have a more comfortable minimum size for tapping on mobile
 

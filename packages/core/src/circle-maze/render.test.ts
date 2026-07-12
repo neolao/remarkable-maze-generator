@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { isArcSegment } from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
-import { createCircleGrid } from "./cells.js";
+import { carveEdge, createCircleGrid } from "./cells.js";
 import { generateCircleMaze } from "./generate.js";
 import {
 	computeCircleCellCenter,
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
+	computeCircleTubeSegments,
 } from "./render.js";
 import { computeCircleSectorCounts, computeHubRadius } from "./topology.js";
 
@@ -16,6 +17,70 @@ function buildFullyWalledCircleMaze(sectorCounts: number[]): {
 	cells: CircleCell[][];
 } {
 	return { sectorCounts, cells: createCircleGrid(sectorCounts) };
+}
+
+// Same hand-built 3-ring, 3-sector-per-ring crossing maze as
+// circle-maze/solve.test.ts's buildCircleCrossingMaze (see ADR 055): a
+// crossing sits at (ring 1, sector 1), its "under" (pre-existing) axis
+// radial, its "over" (tunneled) axis tangential.
+function buildCircleCrossingMaze() {
+	const sectorCounts = [3, 3, 3];
+	const cells = createCircleGrid(sectorCounts);
+
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 0, sector: 0 },
+		{ ring: 1, sector: 0 },
+	);
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 1, sector: 0 },
+		{ ring: 1, sector: 1 },
+	);
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 0, sector: 1 },
+		{ ring: 1, sector: 1 },
+	);
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 1, sector: 1 },
+		{ ring: 2, sector: 1 },
+	);
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 1, sector: 1 },
+		{ ring: 1, sector: 2 },
+	);
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 1, sector: 2 },
+		{ ring: 2, sector: 2 },
+	);
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 2, sector: 2 },
+		{ ring: 2, sector: 1 },
+	);
+	carveEdge(
+		cells,
+		sectorCounts,
+		{ ring: 2, sector: 1 },
+		{ ring: 2, sector: 0 },
+	);
+
+	return {
+		sectorCounts,
+		cells,
+		crossings: [{ ring: 1, sector: 1, underAxis: "radial" as const }],
+	};
 }
 
 describe("computeCircleMazeDiameter", () => {
@@ -336,5 +401,116 @@ describe("computeCircleCellCenter", () => {
 		expect(Math.hypot(first.x - second.x, first.y - second.y)).toBeGreaterThan(
 			0.5,
 		);
+	});
+});
+
+describe("computeCircleTubeSegments", () => {
+	it("throws when cells do not match the sector counts", () => {
+		const sectorCounts = computeCircleSectorCounts(4, 3);
+		const maze = buildFullyWalledCircleMaze(sectorCounts);
+		maze.cells.pop();
+
+		expect(() => computeCircleTubeSegments(maze)).toThrow();
+	});
+
+	it("produces a non-empty list of finite-coordinate segments for a generated circle-crossing maze", () => {
+		const maze = generateCircleMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			allowsCrossings: true,
+		});
+		expect(maze.crossings.length).toBeGreaterThan(0);
+
+		const segments = computeCircleTubeSegments(maze);
+		expect(segments.length).toBeGreaterThan(0);
+		for (const segment of segments) {
+			expect(Number.isFinite(segment.x1)).toBe(true);
+			expect(Number.isFinite(segment.y1)).toBe(true);
+			expect(Number.isFinite(segment.x2)).toBe(true);
+			expect(Number.isFinite(segment.y2)).toBe(true);
+			if (isArcSegment(segment)) {
+				expect(segment.radius).toBeGreaterThan(0);
+			}
+		}
+	});
+
+	it("draws a crossing node's over axis (tangential) as arcs spanning the full cell width, uninterrupted", () => {
+		const maze = buildCircleCrossingMaze();
+		const hubRadius = computeHubRadius(maze.sectorCounts[0]);
+		const angleStep = (2 * Math.PI) / maze.sectorCounts[1]; // ring 1
+		const midRadius = 1 + hubRadius + 0.5;
+
+		const segments = computeCircleTubeSegments(maze);
+		const arcsAt = (radius: number) =>
+			segments
+				.filter(isArcSegment)
+				.filter((segment) => Math.abs(segment.radius - radius) < 1e-9);
+
+		for (const radius of [midRadius - 0.35, midRadius + 0.35]) {
+			const arcs = arcsAt(radius);
+			const totalAngle = arcs.reduce((sum, segment) => {
+				const chordLength = Math.hypot(
+					segment.x2 - segment.x1,
+					segment.y2 - segment.y1,
+				);
+				return sum + 2 * Math.asin(chordLength / (2 * segment.radius));
+			}, 0);
+			// The crossing's own cell (sector 1) contributes a full angleStep of
+			// uninterrupted arc at this radius — a strict lower bound since other
+			// cells sharing this radius may also contribute pieces.
+			expect(totalAngle).toBeGreaterThanOrEqual(angleStep - 1e-6);
+		}
+	});
+
+	it("leaves a real gap in a crossing node's under axis (radial), never a segment spanning across the hub", () => {
+		const maze = buildCircleCrossingMaze();
+		const hubRadius = computeHubRadius(maze.sectorCounts[0]);
+		const diameter = computeCircleMazeDiameter(maze);
+		const center = diameter / 2;
+		const innerHubR = 1 + hubRadius + 0.5 - 0.35;
+		const outerHubR = 1 + hubRadius + 0.5 + 0.35;
+
+		const segments = computeCircleTubeSegments(maze);
+		// No line segment should span (even partially) the open radius range
+		// strictly between the two hub edges — that gap is exactly where the
+		// tangential (over-axis) tube passes uninterrupted.
+		const crossesTheGap = segments.some((segment) => {
+			if (isArcSegment(segment)) return false;
+			const r1 = Math.hypot(segment.x1 - center, segment.y1 - center);
+			const r2 = Math.hypot(segment.x2 - center, segment.y2 - center);
+			const rMin = Math.min(r1, r2);
+			const rMax = Math.max(r1, r2);
+			return (
+				rMin < innerHubR - 0.01 && rMax > innerHubR + 0.01 && rMax < outerHubR
+			);
+		});
+
+		expect(crossesTheGap).toBe(false);
+	});
+
+	it("opens an inward arm reaching the absolute hub boundary only at the entrance sector", () => {
+		const sectorCounts = computeCircleSectorCounts(4, 3);
+		const maze = buildFullyWalledCircleMaze(sectorCounts);
+		const hubRadius = computeHubRadius(sectorCounts[0]);
+		const diameter = computeCircleMazeDiameter(maze);
+		const center = diameter / 2;
+
+		const segments = computeCircleTubeSegments(maze);
+		const reachesHubBoundary = segments.some((segment) => {
+			if (isArcSegment(segment)) return false;
+			const r1 = Math.hypot(segment.x1 - center, segment.y1 - center);
+			const r2 = Math.hypot(segment.x2 - center, segment.y2 - center);
+			return Math.abs(r1 - hubRadius) < 1e-6 || Math.abs(r2 - hubRadius) < 1e-6;
+		});
+
+		expect(reachesHubBoundary).toBe(true);
+	});
+
+	it("does not error for the minimal 1x1 circle-crossing maze", () => {
+		const sectorCounts = computeCircleSectorCounts(1, 1);
+		const maze = buildFullyWalledCircleMaze(sectorCounts);
+
+		expect(() => computeCircleTubeSegments(maze)).not.toThrow();
 	});
 });

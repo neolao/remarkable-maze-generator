@@ -3,6 +3,7 @@ import {
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
+	computeCircleTubeSegments,
 } from "../circle-maze/render.js";
 import type { Maze, MazeType } from "../maze-domain.js";
 import type { MazePosition } from "../maze-solver.js";
@@ -25,6 +26,7 @@ function circleLike(maze: Maze) {
 	return {
 		sectorCounts: maze.circleSectorCounts ?? [],
 		cells: maze.circleCells ?? [],
+		crossings: maze.circleCrossings ?? [],
 	};
 }
 
@@ -62,6 +64,12 @@ const circleStrategy: MazeRenderStrategy = {
 		),
 };
 
+const circleCrossingStrategy: MazeRenderStrategy = {
+	...circleStrategy,
+	segments: (maze) => computeCircleTubeSegments(circleLike(maze)),
+	roundedCaps: true,
+};
+
 // The single registration point for how each maze type is laid out and
 // drawn — replacing the duplicated `maze.type === "circle"` /
 // `"rectangle-crossing"` branches that used to live independently in
@@ -70,6 +78,7 @@ const MAZE_RENDER_STRATEGIES: Record<MazeType, MazeRenderStrategy> = {
 	rectangle: rectangleStrategy,
 	"rectangle-crossing": rectangleCrossingStrategy,
 	circle: circleStrategy,
+	"circle-crossing": circleCrossingStrategy,
 };
 
 export function getMazeRenderStrategy(maze: Maze): MazeRenderStrategy {

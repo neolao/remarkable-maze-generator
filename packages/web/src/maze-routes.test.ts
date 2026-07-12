@@ -162,6 +162,24 @@ describe("POST /api/mazes/generate", () => {
 		expect(response.headers["content-type"]).toBe("application/pdf");
 	});
 
+	it("accepts the circle-crossing maze type", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 10,
+				height: 10,
+				seed: 3,
+				type: "circle-crossing",
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.headers["content-type"]).toBe("application/pdf");
+	});
+
 	it("returns 400 with a clear message when the maze type is invalid", async () => {
 		const app = buildServer();
 
@@ -445,6 +463,25 @@ describe("POST /api/mazes/preview", () => {
 		expect(crossingResponse.statusCode).toBe(200);
 		expect(crossingResponse.body.startsWith("<svg")).toBe(true);
 		expect(crossingResponse.body).not.toBe(rectangleResponse.body);
+	});
+
+	it("accepts the circle-crossing maze type and renders it distinctly from the classic circle type", async () => {
+		const app = buildServer();
+
+		const circleResponse = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 12, height: 12, seed: 3, type: "circle" },
+		});
+		const crossingResponse = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: { width: 12, height: 12, seed: 3, type: "circle-crossing" },
+		});
+
+		expect(crossingResponse.statusCode).toBe(200);
+		expect(crossingResponse.body.startsWith("<svg")).toBe(true);
+		expect(crossingResponse.body).not.toBe(circleResponse.body);
 	});
 
 	it("accepts the long pathLength target on the preview endpoint too", async () => {

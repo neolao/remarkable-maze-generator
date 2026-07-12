@@ -22,12 +22,28 @@ export interface MazeCrossing {
 	underAxis: "vertical" | "horizontal";
 }
 
-export type MazeType = "rectangle" | "rectangle-crossing" | "circle";
+/**
+ * The `circle` topology's equivalent of `MazeCrossing` (see ADR 055): a
+ * tangential (cw/ccw) passage tunneled through a radial (inward/outward) one,
+ * or vice versa, at a given ring/sector node.
+ */
+export interface CircleMazeCrossing {
+	ring: number;
+	sector: number;
+	underAxis: "radial" | "tangential";
+}
+
+export type MazeType =
+	| "rectangle"
+	| "rectangle-crossing"
+	| "circle"
+	| "circle-crossing";
 
 export const MAZE_TYPES: MazeType[] = [
 	"rectangle",
 	"rectangle-crossing",
 	"circle",
+	"circle-crossing",
 ];
 
 export function isValidMazeType(value: string): value is MazeType {
@@ -106,6 +122,12 @@ export interface Maze {
 	 */
 	circleSectorCounts?: number[];
 	circleCells?: CircleCell[][];
+	/**
+	 * Bridge crossings for `type: "circle-crossing"` (see ADR 055) — the
+	 * `circle` topology's equivalent of `crossings` above. Empty/unset for
+	 * every other type.
+	 */
+	circleCrossings?: CircleMazeCrossing[];
 	pathLength?: PathLengthTarget;
 }
 
@@ -196,14 +218,20 @@ export function validatePathLengthCandidateCount(
 }
 
 // Bridge crossings are carved as part of the growing-tree traversal itself
-// (see ADR 024) — no other algorithm knows how to produce them (see ADR 033).
+// (see ADR 024, and ADR 055 for the circle-crossing equivalent) — no other
+// algorithm knows how to produce them (see ADR 033).
+const CROSSING_MAZE_TYPES: MazeType[] = [
+	"rectangle-crossing",
+	"circle-crossing",
+];
+
 export function validateTypeAlgorithmCompatibility(
 	type: MazeType,
 	algorithm: MazeAlgorithm,
 ): void {
-	if (type === "rectangle-crossing" && algorithm !== "growing-tree") {
+	if (CROSSING_MAZE_TYPES.includes(type) && algorithm !== "growing-tree") {
 		throw new Error(
-			`Maze type "rectangle-crossing" is only supported by the "growing-tree" algorithm, got algorithm="${algorithm}"`,
+			`Maze type "${type}" is only supported by the "growing-tree" algorithm, got algorithm="${algorithm}"`,
 		);
 	}
 }

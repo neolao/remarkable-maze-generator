@@ -120,13 +120,20 @@ describe("generateCircleCellsForAlgorithm", () => {
 					height: 4,
 					seed: 1,
 					difficulty: 1,
+					allowsCrossings: false,
 				}),
 			).not.toThrow();
 		},
 	);
 
-	it("delegates to generateCircleGrowingTreeMaze for the growing-tree algorithm", () => {
-		const options = { width: 6, height: 4, seed: 9, difficulty: 4 };
+	it("delegates to generateCircleGrowingTreeMaze for the growing-tree algorithm, crossings included", () => {
+		const options = {
+			width: 6,
+			height: 4,
+			seed: 9,
+			difficulty: 4,
+			allowsCrossings: true,
+		};
 		const expected = generateCircleGrowingTreeMaze(options);
 
 		expect(generateCircleCellsForAlgorithm("growing-tree", options)).toEqual(
@@ -134,38 +141,56 @@ describe("generateCircleCellsForAlgorithm", () => {
 		);
 	});
 
-	it("delegates to generateCircleKruskalMaze for the kruskal algorithm", () => {
-		const options = { width: 6, height: 4, seed: 9, difficulty: 1 };
+	it("delegates to generateCircleKruskalMaze for the kruskal algorithm, with no crossings", () => {
+		const options = {
+			width: 6,
+			height: 4,
+			seed: 9,
+			difficulty: 1,
+			allowsCrossings: false,
+		};
 		const expected = generateCircleKruskalMaze({
 			width: 6,
 			height: 4,
 			seed: 9,
 		});
 
-		expect(generateCircleCellsForAlgorithm("kruskal", options)).toEqual(
-			expected,
-		);
+		const result = generateCircleCellsForAlgorithm("kruskal", options);
+
+		expect(result).toEqual({ ...expected, crossings: [] });
 	});
 
-	it("delegates to generateCircleWilsonMaze for the wilson algorithm", () => {
-		const options = { width: 6, height: 4, seed: 9, difficulty: 1 };
+	it("delegates to generateCircleWilsonMaze for the wilson algorithm, with no crossings", () => {
+		const options = {
+			width: 6,
+			height: 4,
+			seed: 9,
+			difficulty: 1,
+			allowsCrossings: false,
+		};
 		const expected = generateCircleWilsonMaze({ width: 6, height: 4, seed: 9 });
 
-		expect(generateCircleCellsForAlgorithm("wilson", options)).toEqual(
-			expected,
-		);
+		const result = generateCircleCellsForAlgorithm("wilson", options);
+
+		expect(result).toEqual({ ...expected, crossings: [] });
 	});
 
-	it("delegates to generateCircleAldousBroderMaze for the aldous-broder algorithm", () => {
-		const options = { width: 6, height: 4, seed: 9, difficulty: 1 };
+	it("delegates to generateCircleAldousBroderMaze for the aldous-broder algorithm, with no crossings", () => {
+		const options = {
+			width: 6,
+			height: 4,
+			seed: 9,
+			difficulty: 1,
+			allowsCrossings: false,
+		};
 		const expected = generateCircleAldousBroderMaze({
 			width: 6,
 			height: 4,
 			seed: 9,
 		});
 
-		expect(generateCircleCellsForAlgorithm("aldous-broder", options)).toEqual(
-			expected,
-		);
+		const result = generateCircleCellsForAlgorithm("aldous-broder", options);
+
+		expect(result).toEqual({ ...expected, crossings: [] });
 	});
 });

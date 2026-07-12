@@ -37,13 +37,19 @@ function generateMazeCandidate({
 	type,
 	algorithm,
 }: GenerateCandidateOptions): Maze {
-	if (type === "circle") {
-		const { sectorCounts, cells: circleCells } = generateCircleMaze({
+	if (type === "circle" || type === "circle-crossing") {
+		const allowsCircleCrossings = type === "circle-crossing";
+		const {
+			sectorCounts,
+			cells: circleCells,
+			crossings: circleCrossings,
+		} = generateCircleMaze({
 			width,
 			height,
 			seed,
 			difficulty,
 			algorithm,
+			allowsCrossings: allowsCircleCrossings,
 		});
 
 		return {
@@ -56,6 +62,7 @@ function generateMazeCandidate({
 			algorithm,
 			circleSectorCounts: sectorCounts,
 			circleCells,
+			circleCrossings: allowsCircleCrossings ? circleCrossings : undefined,
 		};
 	}
 

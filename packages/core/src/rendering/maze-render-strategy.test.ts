@@ -4,6 +4,7 @@ import {
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
+	computeCircleTubeSegments,
 } from "../circle-maze/render.js";
 import { MAZE_TYPES } from "../maze-domain.js";
 import { solveMaze } from "../maze-solver.js";
@@ -87,6 +88,34 @@ describe("getMazeRenderStrategy", () => {
 		expect(strategy.roundedCaps).toBe(false);
 		expect(strategy.segments(maze)).toEqual(
 			computeCircleMazeSegments(circleLike),
+		);
+		expect(strategy.cellCenter(maze, { x: 0, y: 1 })).toEqual(
+			computeCircleCellCenter(circleLike, { ring: 1, sector: 0 }),
+		);
+	});
+
+	it("resolves the circle-crossing strategy: rounded caps, circle tube segments, diameter-based size", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		const strategy = getMazeRenderStrategy(maze);
+		const circleLike = {
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+			crossings: maze.circleCrossings ?? [],
+		};
+		const expectedDiameter = computeCircleMazeDiameter(circleLike);
+
+		expect(strategy.logicalSize(maze)).toEqual({
+			width: expectedDiameter,
+			height: expectedDiameter,
+		});
+		expect(strategy.roundedCaps).toBe(true);
+		expect(strategy.segments(maze)).toEqual(
+			computeCircleTubeSegments(circleLike),
 		);
 		expect(strategy.cellCenter(maze, { x: 0, y: 1 })).toEqual(
 			computeCircleCellCenter(circleLike, { ring: 1, sector: 0 }),

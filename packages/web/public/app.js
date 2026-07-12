@@ -1,7 +1,12 @@
 const MIN_DIFFICULTY = 1;
 const MAX_DIFFICULTY = 5;
 
-const MAZE_TYPES = ["rectangle", "rectangle-crossing", "circle"];
+const MAZE_TYPES = [
+	"rectangle",
+	"rectangle-crossing",
+	"circle",
+	"circle-crossing",
+];
 const DEFAULT_MAZE_TYPE = "rectangle";
 
 const MAZE_ALGORITHMS = ["growing-tree", "kruskal", "wilson", "aldous-broder"];
@@ -58,20 +63,21 @@ function parseFormPreferences(rawCookieValue) {
 
 // Mirrors packages/web/src/maze-form-field-visibility.ts; duplicated here
 // because this static page runs unmodified in the browser, with no build
-// step available to import the compiled/tested module. See ADR 053: only
-// growing-tree is compatible with rectangle-crossing, and only growing-tree
-// reads the difficulty knob.
-const FORCED_ALGORITHM_FOR_RECTANGLE_CROSSING = "growing-tree";
+// step available to import the compiled/tested module. See ADR 053/055: only
+// growing-tree is compatible with a bridge-crossing type (rectangle or
+// circle), and only growing-tree reads the difficulty knob.
+const FORCED_ALGORITHM_FOR_CROSSING_TYPES = "growing-tree";
+const CROSSING_MAZE_TYPES = ["rectangle-crossing", "circle-crossing"];
 const DIFFICULTY_ALGORITHM = "growing-tree";
 
 function computeMazeFormFieldVisibility({ type, algorithm, pathLength }) {
-	const effectiveAlgorithm =
-		type === "rectangle-crossing"
-			? FORCED_ALGORITHM_FOR_RECTANGLE_CROSSING
-			: algorithm;
+	const isCrossingType = CROSSING_MAZE_TYPES.includes(type);
+	const effectiveAlgorithm = isCrossingType
+		? FORCED_ALGORITHM_FOR_CROSSING_TYPES
+		: algorithm;
 
 	return {
-		showAlgorithm: type !== "rectangle-crossing",
+		showAlgorithm: !isCrossingType,
 		showDifficulty: effectiveAlgorithm === DIFFICULTY_ALGORITHM,
 		showPathLengthCandidates: pathLength !== undefined,
 		effectiveAlgorithm,

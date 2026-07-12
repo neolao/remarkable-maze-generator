@@ -121,6 +121,7 @@ function circleLike(maze: Maze) {
 	return {
 		sectorCounts: maze.circleSectorCounts ?? [],
 		cells: maze.circleCells ?? [],
+		crossings: maze.circleCrossings ?? [],
 	};
 }
 
@@ -182,6 +183,10 @@ const MAZE_SOLVER_STRATEGIES: Record<MazeType, MazeSolverStrategy> = {
 		branchPoints: findRectangleFamilyBranchPoints,
 	},
 	circle: {
+		solve: solveCircleFamily,
+		branchPoints: findCircleFamilyBranchPoints,
+	},
+	"circle-crossing": {
 		solve: solveCircleFamily,
 		branchPoints: findCircleFamilyBranchPoints,
 	},

@@ -159,6 +159,48 @@ describe("solveMaze", () => {
 		},
 	);
 
+	it("delegates to the circle-maze solver for circle-crossing, mapping {ring,sector} to {y,x}", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 8,
+			seed: 7,
+			type: "circle-crossing",
+		});
+
+		const expected = solveCircleMaze({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+			crossings: maze.circleCrossings ?? [],
+		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
+
+		expect(solveMaze(maze)).toEqual(expected);
+	});
+
+	it("never turns between the two axes of a circle-crossing bridge node", () => {
+		const maze = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		expect(maze.circleCrossings?.length ?? 0).toBeGreaterThan(0);
+		const crossingKeys = new Set(
+			(maze.circleCrossings ?? []).map((c) => `${c.sector},${c.ring}`),
+		);
+
+		const path = solveMaze(maze);
+
+		for (let i = 1; i < path.length - 1; i++) {
+			if (!crossingKeys.has(`${path[i].x},${path[i].y}`)) continue;
+
+			const incomingAxis =
+				path[i - 1].y !== path[i].y ? "radial" : "tangential";
+			const outgoingAxis =
+				path[i + 1].y !== path[i].y ? "radial" : "tangential";
+			expect(outgoingAxis).toBe(incomingAxis);
+		}
+	});
+
 	it("rejects a route that would require turning between axes at a crossing cell", () => {
 		// Cells addressed as maze.cells[y][x]. The only wall-connected route from
 		// entrance to exit passes through the crossing cell (1,1), entering from
@@ -269,6 +311,42 @@ describe("findSolutionBranchPoints", () => {
 		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
 
 		expect(findSolutionBranchPoints(maze)).toEqual(expected);
+	});
+
+	it("delegates to the circle-maze branch-point detector for circle-crossing, mapping {ring,sector} to {y,x}", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 8,
+			seed: 7,
+			type: "circle-crossing",
+		});
+
+		const expected = findCircleSolutionBranchPoints({
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+			crossings: maze.circleCrossings ?? [],
+		}).map(({ ring, sector }) => ({ x: sector, y: ring }));
+
+		expect(findSolutionBranchPoints(maze)).toEqual(expected);
+	});
+
+	it("never flags a circle-crossing bridge node as a branch point", () => {
+		const maze = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		expect(maze.circleCrossings?.length ?? 0).toBeGreaterThan(0);
+
+		const branchPoints = findSolutionBranchPoints(maze);
+
+		for (const crossing of maze.circleCrossings ?? []) {
+			expect(branchPoints).not.toContainEqual({
+				x: crossing.sector,
+				y: crossing.ring,
+			});
+		}
 	});
 
 	it.each(MAZE_TYPES)(

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { totalNodeCount as totalCircleNodeCount } from "./circle-maze/cells.js";
+import {
+	isCcwOpen,
+	isInwardOpen,
+	neighborsOf,
+	openOutwardChildren,
+	totalNodeCount as totalCircleNodeCount,
+} from "./circle-maze/cells.js";
 import { countReachableNodes as countCircleReachableNodes } from "./circle-maze/test-helpers.js";
+import { ccwSector, cwSector, inwardParent } from "./circle-maze/topology.js";
 import {
 	MAX_PATH_LENGTH_CANDIDATE_COUNT,
 	MAZE_ALGORITHMS,
@@ -89,6 +96,90 @@ function findCellsReachableByATraceablePath(
 	}
 
 	return reachableCells;
+}
+
+// The circle-maze equivalent of findCellsReachableByATraceablePath above (see
+// ADR 055): traces an actual step-by-step path over the ring/sector graph,
+// respecting the same never-turn-at-a-crossing rule, using "tangential"
+// (cw/ccw) and "radial" (inward/outward) in place of "horizontal"/"vertical".
+function findCircleNodesReachableByATraceablePath(
+	maze: ReturnType<typeof generateMaze>,
+): Set<string> {
+	type Axis = "" | "radial" | "tangential";
+	interface Node {
+		ring: number;
+		sector: number;
+		axis: Axis;
+	}
+
+	const sectorCounts = maze.circleSectorCounts ?? [];
+	const cells = maze.circleCells ?? [];
+	const isCrossing = (ring: number, sector: number) =>
+		(maze.circleCrossings ?? []).some(
+			(crossing) => crossing.ring === ring && crossing.sector === sector,
+		);
+
+	const reachableNodes = new Set<string>(["0,0"]);
+	const visitedNodes = new Set<string>(["0,0,"]);
+	const queue: Node[] = [{ ring: 0, sector: 0, axis: "" }];
+
+	while (queue.length > 0) {
+		const node = queue.shift();
+		if (!node) break;
+		const nodeIsCrossing = isCrossing(node.ring, node.sector);
+
+		const tryMove = (
+			ring: number,
+			sector: number,
+			open: boolean,
+			axis: "radial" | "tangential",
+		) => {
+			if (!open) return;
+			if (nodeIsCrossing && node.axis !== "" && axis !== node.axis) return;
+
+			const nextAxis: Axis = isCrossing(ring, sector) ? axis : "";
+			const key = `${ring},${sector},${nextAxis}`;
+			if (visitedNodes.has(key)) return;
+
+			visitedNodes.add(key);
+			reachableNodes.add(`${ring},${sector}`);
+			queue.push({ ring, sector, axis: nextAxis });
+		};
+
+		tryMove(
+			node.ring,
+			cwSector(sectorCounts, node.ring, node.sector),
+			cells[node.ring][node.sector].cwOpen,
+			"tangential",
+		);
+		tryMove(
+			node.ring,
+			ccwSector(sectorCounts, node.ring, node.sector),
+			isCcwOpen(cells, sectorCounts, node.ring, node.sector),
+			"tangential",
+		);
+
+		const parent = inwardParent(sectorCounts, node.ring, node.sector);
+		if (parent !== null) {
+			tryMove(
+				node.ring - 1,
+				parent,
+				isInwardOpen(cells, sectorCounts, node.ring, node.sector),
+				"radial",
+			);
+		}
+
+		for (const child of openOutwardChildren(
+			cells,
+			sectorCounts,
+			node.ring,
+			node.sector,
+		)) {
+			tryMove(node.ring + 1, child, true, "radial");
+		}
+	}
+
+	return reachableNodes;
 }
 
 const DEGREE_DIRECTIONS = [
@@ -821,6 +912,180 @@ describe("generateMaze - circle type", () => {
 		});
 
 		expect(second.circleCells).toEqual(first.circleCells);
+	});
+});
+
+describe("generateMaze - circle-crossing type", () => {
+	it("records the circle-crossing type on the returned maze, with an empty rectangular cells grid", () => {
+		const maze = generateMaze({
+			width: 8,
+			height: 6,
+			seed: 1,
+			type: "circle-crossing",
+		});
+
+		expect(maze.type).toBe("circle-crossing");
+		expect(maze.cells).toEqual([]);
+	});
+
+	it("rejects circle-crossing combined with a non-growing-tree algorithm", () => {
+		for (const algorithm of ["kruskal", "wilson", "aldous-broder"] as const) {
+			expect(() =>
+				generateMaze({
+					width: 8,
+					height: 6,
+					seed: 1,
+					type: "circle-crossing",
+					algorithm,
+				}),
+			).toThrow(/circle-crossing.*growing-tree/);
+		}
+	});
+
+	it("records at least one crossing for a circle-crossing maze of a reasonable size", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			type: "circle-crossing",
+		});
+
+		expect(maze.type).toBe("circle-crossing");
+		expect(maze.circleCrossings?.length ?? 0).toBeGreaterThan(0);
+	});
+
+	it("produces no crossings for a maze too small to contain one", () => {
+		const maze = generateMaze({
+			width: 1,
+			height: 1,
+			seed: 1,
+			type: "circle-crossing",
+		});
+
+		expect(maze.circleCrossings).toEqual([]);
+	});
+
+	it("never marks the entrance or exit node as a crossing", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 9,
+			type: "circle-crossing",
+		});
+		const lastRing = (maze.circleSectorCounts?.length ?? 1) - 1;
+
+		for (const crossing of maze.circleCrossings ?? []) {
+			expect(crossing).not.toMatchObject({ ring: 0, sector: 0 });
+			expect(crossing).not.toMatchObject({ ring: lastRing, sector: 0 });
+		}
+	});
+
+	it("opens all connections at each recorded crossing node — both passages are real, walkable connections", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		expect(maze.circleCrossings?.length ?? 0).toBeGreaterThan(0);
+
+		const sectorCounts = maze.circleSectorCounts ?? [];
+		const cells = maze.circleCells ?? [];
+
+		for (const crossing of maze.circleCrossings ?? []) {
+			expect(cells[crossing.ring][crossing.sector].cwOpen).toBe(true);
+			expect(
+				isCcwOpen(cells, sectorCounts, crossing.ring, crossing.sector),
+			).toBe(true);
+			expect(
+				isInwardOpen(cells, sectorCounts, crossing.ring, crossing.sector),
+			).toBe(true);
+			expect(
+				openOutwardChildren(cells, sectorCounts, crossing.ring, crossing.sector)
+					.length,
+			).toBeGreaterThan(0);
+			expect(["radial", "tangential"]).toContain(crossing.underAxis);
+		}
+	});
+
+	it("keeps every node reachable from the entrance for a circle-crossing maze", () => {
+		const maze = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle-crossing",
+		});
+
+		expect(
+			countCircleReachableNodes({
+				sectorCounts: maze.circleSectorCounts ?? [],
+				cells: maze.circleCells ?? [],
+			}),
+		).toBe(totalCircleNodeCount(maze.circleSectorCounts ?? []));
+	});
+
+	it("never places two crossings next to each other, avoiding a repeating ladder pattern", () => {
+		const maze = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 11,
+			type: "circle-crossing",
+		});
+		const crossings = maze.circleCrossings ?? [];
+		expect(crossings.length).toBeGreaterThan(0);
+
+		const sectorCounts = maze.circleSectorCounts ?? [];
+		for (const a of crossings) {
+			const neighbors = neighborsOf(sectorCounts, a.ring, a.sector);
+			for (const b of crossings) {
+				if (a === b) continue;
+				expect(
+					neighbors.some((n) => n.ring === b.ring && n.sector === b.sector),
+				).toBe(false);
+			}
+		}
+	});
+
+	it("can trace an actual path from the entrance to every single node, never turning at a crossing (circle-crossing type)", () => {
+		const maze = generateMaze({
+			width: 12,
+			height: 12,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		expect(maze.circleCrossings?.length ?? 0).toBeGreaterThan(0);
+
+		expect(findCircleNodesReachableByATraceablePath(maze).size).toBe(
+			totalCircleNodeCount(maze.circleSectorCounts ?? []),
+		);
+	});
+
+	it("does not error on a maze with several ring growth jumps (varying sector counts per ring)", () => {
+		expect(() =>
+			generateMaze({
+				width: 4,
+				height: 14,
+				seed: 3,
+				type: "circle-crossing",
+			}),
+		).not.toThrow();
+	});
+
+	it("generates the same crossings for the same seed", () => {
+		const first = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			type: "circle-crossing",
+		});
+		const second = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			type: "circle-crossing",
+		});
+
+		expect(second.circleCrossings).toEqual(first.circleCrossings);
 	});
 });
 
