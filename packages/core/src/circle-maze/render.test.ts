@@ -749,18 +749,23 @@ describe("computeCircleTubeSegments", () => {
 			.filter(
 				(segment) => Math.abs(segment.radius - TUBE_CORNER_RADIUS_RATIO) < 1e-9,
 			)
-			.filter((segment) => {
-				const [start] = endpointsOf(segment);
-				const radius = radiusOf(center, start);
-				const angle = rawAngleOf(center, start);
-				return (
-					radius > doorRadiusLow &&
-					radius < doorRadiusHigh &&
-					Math.abs(angle - childMidAngle) < 0.2
-				);
-			});
+			.filter((segment) =>
+				endpointsOf(segment).every((point) => {
+					const radius = radiusOf(center, point);
+					const angle = rawAngleOf(center, point);
+					return (
+						radius > doorRadiusLow &&
+						radius < doorRadiusHigh &&
+						Math.abs(angle - childMidAngle) < 0.19
+					);
+				}),
+			);
 
-		expect(doorFillets).toHaveLength(4);
+		// Only the two lower jamb corners (into the parent's band arc) remain
+		// real corners — the child cell's own tube hugs the door span exactly,
+		// so the jambs continue straight through the child's band with no
+		// corner at its inner edge.
+		expect(doorFillets).toHaveLength(2);
 	});
 
 	// The closed-pipe look: a closed tangential wall renders as each cell's
@@ -769,12 +774,26 @@ describe("computeCircleTubeSegments", () => {
 	// rectangle-crossing's separate flat caps, not one shared line.
 	it("renders a closed tangential wall as two separate cap lines with a visible gap between the neighboring tubes", () => {
 		const sectorCounts = [6];
-		const maze = buildFullyWalledCircleMaze(sectorCounts);
+		const cells = createCircleGrid(sectorCounts);
+		// Two tangential corridors terminating on either side of the closed
+		// boundary between sectors 1 and 2: (0,0)-(0,1) opens sector 1's ccw
+		// side, (0,2)-(0,3) opens sector 2's cw side.
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 0 },
+			{ ring: 0, sector: 1 },
+		);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 2 },
+			{ ring: 0, sector: 3 },
+		);
+		const maze = { sectorCounts, cells };
 		const center = mazeCenter(maze);
 		const midRadius = computeHubRadius(6) + 0.5;
 		const angleStep = (2 * Math.PI) / 6;
-		// The boundary between sectors 1 and 2 — neither is the entrance/exit
-		// sector, so both sides are plain closed walls.
 		const boundaryAngle = 2 * angleStep;
 
 		const segments = computeCircleTubeSegments(maze);
@@ -794,6 +813,61 @@ describe("computeCircleTubeSegments", () => {
 		expect(Math.max(...angles)).toBeGreaterThan(boundaryAngle + 1e-6);
 		const gapWidth = (Math.max(...angles) - Math.min(...angles)) * midRadius;
 		expect(gapWidth).toBeCloseTo(0.3, 6);
+	});
+
+	// The harmonization rule (user feedback: "il y a un petit crénelage"): a
+	// straight multi-ring radial corridor must render with perfectly straight
+	// unbroken walls — every door of an aligned straight-through chain shares
+	// the exact same angular span (propagated from the chain's outermost
+	// door), and a straight-through cell's own tube hugs that span exactly,
+	// so all the wall pieces merge into one line per side with no step at
+	// any ring transition.
+	it("renders a straight multi-ring radial corridor with two perfectly straight unbroken walls", () => {
+		const sectorCounts = [4, 4, 4];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 1 },
+			{ ring: 1, sector: 1 },
+		);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 1, sector: 1 },
+			{ ring: 2, sector: 1 },
+		);
+		const maze = { sectorCounts, cells };
+		const center = mazeCenter(maze);
+		const hubRadius = computeHubRadius(4);
+		// The chain's outermost child is (2,1): every door in the run takes
+		// its angular half-width.
+		const runHalfAngle = h / (2 + hubRadius + 0.5);
+		const midAngle = 1.5 * ((2 * Math.PI) / 4);
+		// The corridor spans from the innermost cell's inner tube edge to the
+		// outermost cell's outer tube edge.
+		const spanLow = hubRadius + 0.5 - h;
+		const spanHigh = 2 + hubRadius + 0.5 + h;
+
+		const segments = computeCircleTubeSegments(maze);
+		const walls = segments.filter((segment) => {
+			if (isArcSegment(segment)) return false;
+			const [start, end] = endpointsOf(segment);
+			const r1 = radiusOf(center, start);
+			const r2 = radiusOf(center, end);
+			// One single unbroken line per side, spanning (almost) the whole
+			// corridor — only shortened by the end-cap fillets.
+			return (
+				Math.min(r1, r2) < spanLow + 0.15 && Math.max(r1, r2) > spanHigh - 0.15
+			);
+		});
+
+		expect(walls).toHaveLength(2);
+		const angles = walls.map((segment) =>
+			rawAngleOf(center, endpointsOf(segment)[0]),
+		);
+		expect(Math.abs(angles[0] - midAngle)).toBeCloseTo(runHalfAngle, 9);
+		expect(Math.abs(angles[1] - midAngle)).toBeCloseTo(runHalfAngle, 9);
 	});
 
 	it("keeps a crossing's over axis (tangential) fully covered by arcs across its own span at both tube edges", () => {
@@ -838,7 +912,7 @@ describe("computeCircleTubeSegments", () => {
 		expect(Math.min(...distancesToCenter)).toBeGreaterThan(0.2);
 	});
 
-	it("draws a crossing's over axis (radial) as two bridge sides running through the hub interior, jogging at mid-radius from the inward door's angles to the outward door's", () => {
+	it("draws a crossing's over axis (radial) as two straight bridge sides running through the hub interior from the inward door's angles to the outward door's", () => {
 		const sectorCounts = [3, 3, 3];
 		const cells = createCircleGrid(sectorCounts);
 		carveEdge(
@@ -873,49 +947,46 @@ describe("computeCircleTubeSegments", () => {
 
 		const center = mazeCenter(maze);
 		const angleStep = (2 * Math.PI) / sectorCounts[1];
+		const midAngle = 1.5 * angleStep;
 		const midRadius = 1 + computeHubRadius(sectorCounts[0]) + 0.5;
 		const childMidRadius = midRadius + 1;
 		// The inward and outward doors share the same physical width, sized
-		// from their own mid-radii, so their angular widths always differ —
-		// each bridge side jogs at mid-radius between the two angles.
-		const inwardSeparation = (2 * h) / midRadius;
-		const outwardSeparation = (2 * h) / childMidRadius;
+		// from their own mid-radii, so their angular half-widths differ —
+		// each bridge side is one straight (slightly slanted) line from the
+		// inward door's edge to the outward door's, with no step in between.
+		const inwardHalfAngle = h / midRadius;
+		const outwardHalfAngle = h / childMidRadius;
 
 		const segments = computeCircleTubeSegments(maze);
 		const cellSpan = (angle: number) =>
 			angle > 1 * angleStep && angle < 2 * angleStep;
-		const linesTouchingMidRadius = segments.filter((segment) => {
+		const bridgeSides = segments.filter((segment) => {
 			if (isArcSegment(segment)) return false;
 			const [start, end] = endpointsOf(segment);
+			const r1 = radiusOf(center, start);
+			const r2 = radiusOf(center, end);
 			return (
-				(Math.abs(radiusOf(center, start) - midRadius) < TOLERANCE ||
-					Math.abs(radiusOf(center, end) - midRadius) < TOLERANCE) &&
+				Math.min(r1, r2) < midRadius - TOLERANCE &&
+				Math.max(r1, r2) > midRadius + TOLERANCE &&
 				cellSpan(rawAngleOf(center, start))
 			);
 		});
-		expect(linesTouchingMidRadius).toHaveLength(4);
+		expect(bridgeSides).toHaveLength(2);
 
-		const angleSpread = (fromBelow: boolean): number => {
-			const angles = linesTouchingMidRadius
-				.filter((segment) => {
-					const [start, end] = endpointsOf(segment);
-					const other = Math.max(
-						radiusOf(center, start),
-						radiusOf(center, end),
-					);
-					const reachesBelow =
-						Math.abs(
-							Math.min(radiusOf(center, start), radiusOf(center, end)) -
-								midRadius,
-						) > TOLERANCE;
-					return fromBelow ? reachesBelow : other > midRadius + TOLERANCE;
-				})
-				.map((segment) => rawAngleOf(center, endpointsOf(segment)[0]));
-			expect(angles).toHaveLength(2);
-			return Math.abs(angles[0] - angles[1]);
-		};
-		expect(angleSpread(true)).toBeCloseTo(inwardSeparation, 6);
-		expect(angleSpread(false)).toBeCloseTo(outwardSeparation, 6);
+		for (const segment of bridgeSides) {
+			const [start, end] = endpointsOf(segment);
+			const inner =
+				radiusOf(center, start) < radiusOf(center, end) ? start : end;
+			const outer = inner === start ? end : start;
+			expect(Math.abs(rawAngleOf(center, inner) - midAngle)).toBeCloseTo(
+				inwardHalfAngle,
+				6,
+			);
+			expect(Math.abs(rawAngleOf(center, outer) - midAngle)).toBeCloseTo(
+				outwardHalfAngle,
+				6,
+			);
+		}
 	});
 
 	it("draws a stub channel connecting the entrance cell to the hub boundary", () => {

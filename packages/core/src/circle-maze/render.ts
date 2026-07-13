@@ -274,10 +274,12 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 	const hubRadius = computeHubRadius(sectorCounts[0]);
 	const lastRing = sectorCounts.length - 1;
 	const crossingLookup = buildCrossingLookup(maze);
+	const doorSpans = computeRadialDoorSpans(maze, hubRadius, lastRing);
 
 	const rects: PolarRect[] = [];
 	const openings: PolarOpening[] = [];
 	const forcedEdges: PolarBoundaryEdge[] = [];
+	const bridgeSegments: TubeSegment[] = [];
 	const roundingExclusions: PolarRect[] = [];
 
 	for (let ring = 0; ring < sectorCounts.length; ring++) {
@@ -299,101 +301,117 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 			const isExit = ring === lastRing && sector === 0;
 			const inwardOpen =
 				ring > 0 && isInwardOpen(cells, sectorCounts, ring, sector);
-
-			// Every door this cell's own tube must stay open to, as angular
-			// spans — used both to place the connectors and to clamp the cap
-			// insets below so a cap never cuts across an open door.
-			const doorSpans: { start: number; end: number }[] = [];
-			if (inwardOpen || isEntrance || isExit) {
-				doorSpans.push({ start: midAngle - hA, end: midAngle + hA });
-			}
-			const openChildDoors: { start: number; end: number }[] = [];
+			const inwardSpan = inwardOpen
+				? doorSpans.get(doorSpanKey(ring, sector))
+				: undefined;
+			const stubSpan =
+				isEntrance || isExit
+					? { start: midAngle - hA, end: midAngle + hA }
+					: undefined;
+			const openChildDoors: AngularSpan[] = [];
 			if (ring < lastRing) {
 				const children = outwardChildren(sectorCounts, ring, sector);
-				const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
-				const childHalfAngle = h / (ring + 1 + hubRadius + 0.5);
 				children.forEach((child, index) => {
 					if (!cells[ring][sector].outwardOpen[index]) return;
-					const childMidAngle = (child + 0.5) * childAngleStep;
-					openChildDoors.push({
-						start: childMidAngle - childHalfAngle,
-						end: childMidAngle + childHalfAngle,
-					});
+					const span = doorSpans.get(doorSpanKey(ring + 1, child));
+					if (span !== undefined) openChildDoors.push(span);
 				});
 			}
-			doorSpans.push(...openChildDoors);
 
-			// The closed-pipe look (same margin as the rectangular tube's own
-			// hub): each closed tangential side sets this cell's own tube back
-			// from the shared boundary, so two closed neighbors show two
-			// separate rounded caps with a visible gap of white between them
-			// instead of one shared line. An open side stays flush, merging
-			// exactly with the neighbor's own flush side. The inset is clamped
-			// to the nearest door edge — for a typical 1-unit cell with a
-			// centered door both bounds coincide, putting the cap flush with
-			// the door jamb, exactly like the rectangular hub's corner.
+			// Everything this cell's own tube must stay open to.
+			const covers: AngularSpan[] = [...openChildDoors];
+			if (inwardSpan !== undefined) covers.push(inwardSpan);
+			if (stubSpan !== undefined) covers.push(stubSpan);
+
+			// The tube band covers exactly what the passage needs: flush with
+			// the boundary on an open tangential side (merging with the
+			// neighbor's own flush band); on a closed side, set back by the
+			// cap inset when a tangential corridor terminates against it (the
+			// other side being open), or hugging the outermost door edge when
+			// the cell is purely radial — this is what keeps a straight
+			// multi-ring corridor's walls perfectly straight, with no step at
+			// any ring transition, and cap gaps regular where corridors run
+			// along a ring. The cap never cuts across a door: door needs win
+			// over the inset.
 			const capInset = (0.5 - h) / midRadius;
-			const insetStart = isCcwOpen(cells, sectorCounts, ring, sector)
-				? 0
-				: Math.max(
-						0,
-						Math.min(
-							capInset,
-							...doorSpans.map((door) => door.start - startAngle),
-						),
-					);
-			const insetEnd = cells[ring][sector].cwOpen
-				? 0
-				: Math.max(
-						0,
-						Math.min(capInset, ...doorSpans.map((door) => endAngle - door.end)),
-					);
+			const cwOpen = cells[ring][sector].cwOpen;
+			const ccwOpen = isCcwOpen(cells, sectorCounts, ring, sector);
+			const needStart =
+				covers.length > 0
+					? Math.min(...covers.map((span) => span.start))
+					: undefined;
+			const needEnd =
+				covers.length > 0
+					? Math.max(...covers.map((span) => span.end))
+					: undefined;
+			let aStart: number;
+			if (ccwOpen) {
+				aStart = startAngle;
+			} else if (cwOpen) {
+				aStart = Math.min(
+					startAngle + capInset,
+					needStart ?? Number.POSITIVE_INFINITY,
+				);
+			} else {
+				aStart = needStart ?? midAngle - hA;
+			}
+			let aEnd: number;
+			if (cwOpen) {
+				aEnd = endAngle;
+			} else if (ccwOpen) {
+				aEnd = Math.max(
+					endAngle - capInset,
+					needEnd ?? Number.NEGATIVE_INFINITY,
+				);
+			} else {
+				aEnd = needEnd ?? midAngle + hA;
+			}
 
 			rects.push({
 				rStart: innerHubR,
 				rEnd: outerHubR,
-				aStart: startAngle + insetStart,
-				aEnd: endAngle - insetEnd,
+				aStart,
+				aEnd,
 			});
 
-			// Each open radial edge's connector is owned by the child side,
-			// at the child's own door angles — the fan-out to several open
-			// children happens naturally, one connector per child.
-			if (inwardOpen) {
+			// Each open radial edge's connector is owned by the child side, at
+			// its (possibly run-aligned) door span — the fan-out to several
+			// open children happens naturally, one connector per child.
+			if (inwardSpan !== undefined) {
 				rects.push({
 					rStart: ring - 1 + hubRadius + 0.5 + h,
 					rEnd: innerHubR,
-					aStart: midAngle - hA,
-					aEnd: midAngle + hA,
+					aStart: inwardSpan.start,
+					aEnd: inwardSpan.end,
 				});
 			}
 
-			if (isEntrance) {
+			if (isEntrance && stubSpan !== undefined) {
 				rects.push({
 					rStart: hubRadius,
 					rEnd: innerHubR,
-					aStart: midAngle - hA,
-					aEnd: midAngle + hA,
+					aStart: stubSpan.start,
+					aEnd: stubSpan.end,
 				});
 				openings.push({
 					radius: hubRadius,
-					aStart: midAngle - hA,
-					aEnd: midAngle + hA,
+					aStart: stubSpan.start,
+					aEnd: stubSpan.end,
 				});
 			}
 
-			if (isExit) {
+			if (isExit && stubSpan !== undefined) {
 				const outerBoundary = lastRing + 1 + hubRadius;
 				rects.push({
 					rStart: outerHubR,
 					rEnd: outerBoundary,
-					aStart: midAngle - hA,
-					aEnd: midAngle + hA,
+					aStart: stubSpan.start,
+					aEnd: stubSpan.end,
 				});
 				openings.push({
 					radius: outerBoundary,
-					aStart: midAngle - hA,
-					aEnd: midAngle + hA,
+					aStart: stubSpan.start,
+					aEnd: stubSpan.end,
 				});
 			}
 
@@ -407,6 +425,8 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 				aEnd: endAngle,
 			});
 
+			const underInward = inwardSpan ??
+				stubSpan ?? { start: midAngle - hA, end: midAngle + hA };
 			if (crossing.underAxis === "radial") {
 				// Tangential over: seal the over tube's two edges across the
 				// under corridor's door spans, so its arcs read uninterrupted
@@ -414,8 +434,8 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 				forcedEdges.push({
 					kind: "arc",
 					radius: innerHubR,
-					aStart: midAngle - hA,
-					aEnd: midAngle + hA,
+					aStart: underInward.start,
+					aEnd: underInward.end,
 				});
 				for (const door of openChildDoors) {
 					forcedEdges.push({
@@ -426,47 +446,27 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 					});
 				}
 			} else {
-				// Radial over: each side of the bridge visibly connects the
-				// inward door to the outward door through the hub interior.
-				// The outward door is the open child's own and may sit
-				// off-center from this cell's (the child ring subdivides
-				// further), so each side runs to the mid-radius at the inward
-				// door's angle, jogs along it, and continues at the outward
-				// door's angle — a straight line again when the two doors
-				// align, since the engine merges the collinear halves.
-				let outwardDoorStart = midAngle - hA;
-				let outwardDoorEnd = midAngle + hA;
-				if (openChildDoors.length > 0) {
-					outwardDoorStart = Math.min(
-						...openChildDoors.map((door) => door.start),
-					);
-					outwardDoorEnd = Math.max(...openChildDoors.map((door) => door.end));
-				}
+				// Radial over: each side of the bridge is one straight line
+				// from the inward door's edge to the outward door's, cutting
+				// across the hub interior — slightly slanted when the two
+				// doors' angular widths or positions differ, with no step.
+				// Its endpoints are the exact connector-jamb tips on both
+				// sides, so it always joins the outline.
+				const outwardSpan: AngularSpan =
+					openChildDoors.length > 0
+						? {
+								start: Math.min(...openChildDoors.map((door) => door.start)),
+								end: Math.max(...openChildDoors.map((door) => door.end)),
+							}
+						: (stubSpan ?? underInward);
 				const sides: [number, number][] = [
-					[midAngle - hA, outwardDoorStart],
-					[midAngle + hA, outwardDoorEnd],
+					[underInward.start, outwardSpan.start],
+					[underInward.end, outwardSpan.end],
 				];
 				for (const [inwardAngle, outwardAngle] of sides) {
-					forcedEdges.push({
-						kind: "radial",
-						angle: inwardAngle,
-						rStart: innerHubR,
-						rEnd: midRadius,
-					});
-					forcedEdges.push({
-						kind: "radial",
-						angle: outwardAngle,
-						rStart: midRadius,
-						rEnd: outerHubR,
-					});
-					if (Math.abs(inwardAngle - outwardAngle) > 1e-9) {
-						forcedEdges.push({
-							kind: "arc",
-							radius: midRadius,
-							aStart: Math.min(inwardAngle, outwardAngle),
-							aEnd: Math.max(inwardAngle, outwardAngle),
-						});
-					}
+					const from = circlePoint(maze, innerHubR, inwardAngle);
+					const to = circlePoint(maze, outerHubR, outwardAngle);
+					bridgeSegments.push({ x1: from.x, y1: from.y, x2: to.x, y2: to.y });
 				}
 			}
 		}
@@ -479,7 +479,74 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 			: [radialLine(maze, edge.angle, edge.rStart, edge.rEnd)],
 	);
 
-	return roundTubeCorners(maze, segments, roundingExclusions);
+	return roundTubeCorners(
+		maze,
+		[...segments, ...bridgeSegments],
+		roundingExclusions,
+	);
+}
+
+interface AngularSpan {
+	start: number;
+	end: number;
+}
+
+function doorSpanKey(ring: number, sector: number): string {
+	return `${ring},${sector}`;
+}
+
+/**
+ * The angular span of every open radial door, keyed by the child cell. A
+ * door's natural span is centered on the child cell with a half-width
+ * derived from the child ring's physical mid-radius (constant physical
+ * width). On top of that, spans propagate inward along straight-through
+ * chains: when a cell is a pure radial corridor (both tangential sides
+ * closed, one inward and exactly one outward connection) and its two doors
+ * are center-aligned, its inward door adopts its outward door's exact span
+ * — so every door of a straight multi-ring corridor shares the same two
+ * angles (the outermost, narrowest door's) and the corridor's walls merge
+ * into two perfectly straight lines instead of stepping at each ring.
+ */
+function computeRadialDoorSpans(
+	maze: CircleMazeLike,
+	hubRadius: number,
+	lastRing: number,
+): Map<string, AngularSpan> {
+	const { sectorCounts, cells } = maze;
+	const h = TUBE_HALF_WIDTH_RATIO;
+	const spans = new Map<string, AngularSpan>();
+
+	for (let ring = lastRing; ring >= 1; ring--) {
+		const angleStep = (2 * Math.PI) / sectorCounts[ring];
+		const hA = h / (ring + hubRadius + 0.5);
+
+		for (let sector = 0; sector < sectorCounts[ring]; sector++) {
+			if (!isInwardOpen(cells, sectorCounts, ring, sector)) continue;
+			const midAngle = (sector + 0.5) * angleStep;
+			let span: AngularSpan = { start: midAngle - hA, end: midAngle + hA };
+
+			const cell = cells[ring][sector];
+			const isStraightThrough =
+				!cell.cwOpen &&
+				!isCcwOpen(cells, sectorCounts, ring, sector) &&
+				cell.outwardOpen.filter(Boolean).length === 1;
+			if (isStraightThrough) {
+				const children = outwardChildren(sectorCounts, ring, sector);
+				const openChild = children[cell.outwardOpen.findIndex(Boolean)];
+				const childSpan = spans.get(doorSpanKey(ring + 1, openChild));
+				if (childSpan !== undefined) {
+					const childCenter = (childSpan.start + childSpan.end) / 2;
+					if (Math.abs(childCenter - midAngle) < 1e-9) {
+						span = { ...childSpan };
+					}
+				}
+			}
+
+			spans.set(doorSpanKey(ring, sector), span);
+		}
+	}
+
+	return spans;
 }
 
 function unit(from: Point, to: Point): Point {
