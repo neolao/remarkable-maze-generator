@@ -266,9 +266,23 @@ function radialLine(
  * except inside crossing cells (which need their exact weave shape) and
  * where either piece is too short to absorb the fillet.
  */
-export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
-	validateCircleMazeShape(maze);
+interface CirclePassageBuild {
+	rects: PolarRect[];
+	openings: PolarOpening[];
+	forcedEdges: PolarBoundaryEdge[];
+	bridgeSegments: TubeSegment[];
+	roundingExclusions: PolarRect[];
+}
 
+/**
+ * Every axis-aligned-in-polar-space rectangle making up the maze's passage
+ * area — hub bands, radial connectors, entrance/exit stubs — plus the forced
+ * edges and bridge segments a crossing's weave needs, shared by
+ * `computeCircleTubeSegments` (which feeds `rects` to the boundary-outline
+ * extraction) and `computeCircleTubeFillShapes` (which turns each `rect`
+ * directly into its own closed fill shape instead, see ADR 060).
+ */
+function buildCircleTubePassage(maze: CircleMazeLike): CirclePassageBuild {
 	const { sectorCounts, cells } = maze;
 	const h = TUBE_HALF_WIDTH_RATIO;
 	const hubRadius = computeHubRadius(sectorCounts[0]);
@@ -472,6 +486,15 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 		}
 	}
 
+	return { rects, openings, forcedEdges, bridgeSegments, roundingExclusions };
+}
+
+export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
+	validateCircleMazeShape(maze);
+
+	const { rects, openings, forcedEdges, bridgeSegments, roundingExclusions } =
+		buildCircleTubePassage(maze);
+
 	const edges = computePolarRegionBoundary(rects, openings, forcedEdges);
 	const segments = edges.flatMap((edge): TubeSegment[] =>
 		edge.kind === "arc"
@@ -484,6 +507,55 @@ export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 		[...segments, ...bridgeSegments],
 		roundingExclusions,
 	);
+}
+
+function reverseSegment(segment: TubeSegment): TubeSegment {
+	if (isArcSegment(segment)) {
+		return {
+			x1: segment.x2,
+			y1: segment.y2,
+			x2: segment.x1,
+			y2: segment.y1,
+			radius: segment.radius,
+			sweep: segment.sweep === 0 ? 1 : 0,
+		};
+	}
+	return { x1: segment.x2, y1: segment.y2, x2: segment.x1, y2: segment.y1 };
+}
+
+function polarRectToClosedShape(
+	maze: CircleMazeLike,
+	rect: PolarRect,
+): TubeSegment[] {
+	const { rStart, rEnd, aStart, aEnd } = rect;
+	const outerArcReversed = circleArcSegments(maze, rEnd, aStart, aEnd)
+		.reverse()
+		.map(reverseSegment);
+
+	return [
+		...circleArcSegments(maze, rStart, aStart, aEnd),
+		radialLine(maze, aEnd, rStart, rEnd),
+		...outerArcReversed,
+		radialLine(maze, aStart, rEnd, rStart),
+	];
+}
+
+/**
+ * The `circle-crossing` equivalent of `computeTubeFillRects` (see ADR 060):
+ * every passage-area rectangle `computeCircleTubeSegments` builds internally
+ * — the same hub bands, connectors, and entrance/exit stubs — converted into
+ * its own closed polar wedge instead of being fed to the boundary-outline
+ * extraction. Meant to be drawn as a flat, overlapping fill under the
+ * outline; corners are left as the raw wedge corners, unrounded like the
+ * rectangular fill (see ADR 060).
+ */
+export function computeCircleTubeFillShapes(
+	maze: CircleMazeLike,
+): TubeSegment[][] {
+	validateCircleMazeShape(maze);
+
+	const { rects } = buildCircleTubePassage(maze);
+	return rects.map((rect) => polarRectToClosedShape(maze, rect));
 }
 
 interface AngularSpan {

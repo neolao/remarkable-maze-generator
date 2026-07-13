@@ -21,6 +21,7 @@ const STROKE_THICKNESS_PT = 1.5;
 const STROKE_COLOR = rgb(0, 0, 0);
 const SOLUTION_THICKNESS_PT = 2;
 const SOLUTION_COLOR = rgb(0.85, 0.1, 0.1);
+const TUBE_FILL_COLOR = rgb(0.85, 0.85, 0.85);
 const PARAMETERS_LABEL_SIZE_PT = 8;
 const PARAMETERS_LABEL_COLOR = rgb(0.45, 0.45, 0.45);
 const PARAMETERS_LABEL_Y_PT = PAGE_MARGIN_PT / 2;
@@ -45,6 +46,7 @@ export function invalidSolutionModeMessage(value: string): string {
 
 export interface RenderMazeToPdfOptions {
 	solution?: SolutionDisplayMode;
+	tubeBackgroundFill?: boolean;
 }
 
 interface MazeLayout {
@@ -137,6 +139,44 @@ function drawMazeSegments(
 	}
 }
 
+function shapeToPathData(shape: TubeSegment[], cellSize: number): string {
+	let d = "";
+	shape.forEach((segment, index) => {
+		const x1 = segment.x1 * cellSize;
+		const y1 = segment.y1 * cellSize;
+		const x2 = segment.x2 * cellSize;
+		const y2 = segment.y2 * cellSize;
+		if (index === 0) d += `M ${x1} ${y1} `;
+		if (isArcSegment(segment)) {
+			const radius = segment.radius * cellSize;
+			d += `A ${radius} ${radius} 0 0 ${segment.sweep} ${x2} ${y2} `;
+		} else {
+			d += `L ${x2} ${y2} `;
+		}
+	});
+	return `${d}Z `;
+}
+
+// Same anchor reasoning as drawMazeSegments' arc handling: pdf-lib's
+// drawSvgPath() applies its own translate-then-flip-Y transform, so the path
+// data itself stays in plain, unflipped, Y-down unit*cellSize coordinates.
+function drawTubeFill(
+	page: PDFPage,
+	shapes: TubeSegment[][],
+	layout: MazeLayout,
+): void {
+	if (shapes.length === 0) return;
+
+	const { cellSize, leftOffset } = layout;
+	const d = shapes.map((shape) => shapeToPathData(shape, cellSize)).join("");
+
+	page.drawSvgPath(d, {
+		x: leftOffset,
+		y: REMARKABLE_2_PAGE_HEIGHT_PT - layout.topOffset,
+		color: TUBE_FILL_COLOR,
+	});
+}
+
 function drawSolutionPath(
 	page: PDFPage,
 	maze: Maze,
@@ -192,11 +232,22 @@ function drawParametersLabel(
 	});
 }
 
-function drawMaze(page: PDFPage, maze: Maze, layout: MazeLayout): void {
+function drawMaze(
+	page: PDFPage,
+	maze: Maze,
+	layout: MazeLayout,
+	tubeBackgroundFill: boolean,
+): void {
+	// Only the two tube types expose fillShapes (see ADR 060) — drawn before
+	// the outline so the outline's strokes render on top of it.
+	const strategy = getMazeRenderStrategy(maze);
+	if (tubeBackgroundFill && strategy.fillShapes) {
+		drawTubeFill(page, strategy.fillShapes(maze), layout);
+	}
+
 	// Every line is independent — no fill or stroke-width layering. A
 	// "rectangle-crossing" corridor is its own two edge lines with round caps
 	// (see ADR 026); every other type draws flat-capped walls.
-	const strategy = getMazeRenderStrategy(maze);
 	drawMazeSegments(
 		page,
 		strategy.segments(maze),
@@ -214,6 +265,7 @@ function addMazePages(
 	options: RenderMazeToPdfOptions,
 ): void {
 	const solutionMode = options.solution ?? "none";
+	const tubeBackgroundFill = options.tubeBackgroundFill ?? false;
 	const layout = computeLayout(maze);
 	const parametersLabel = formatParametersLabel(maze);
 
@@ -221,7 +273,7 @@ function addMazePages(
 		REMARKABLE_2_PAGE_WIDTH_PT,
 		REMARKABLE_2_PAGE_HEIGHT_PT,
 	]);
-	drawMaze(mazePage, maze, layout);
+	drawMaze(mazePage, maze, layout, tubeBackgroundFill);
 	if (parametersLabel) drawParametersLabel(mazePage, font, parametersLabel);
 
 	if (solutionMode === "overlay") {
@@ -231,7 +283,7 @@ function addMazePages(
 			REMARKABLE_2_PAGE_WIDTH_PT,
 			REMARKABLE_2_PAGE_HEIGHT_PT,
 		]);
-		drawMaze(solutionPage, maze, layout);
+		drawMaze(solutionPage, maze, layout, tubeBackgroundFill);
 		drawSolutionPath(solutionPage, maze, solveMaze(maze), layout);
 		if (parametersLabel)
 			drawParametersLabel(solutionPage, font, parametersLabel);

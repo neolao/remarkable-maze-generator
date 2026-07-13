@@ -3,6 +3,7 @@ import {
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
+	computeCircleTubeFillShapes,
 	computeCircleTubeSegments,
 } from "../circle-maze/render.js";
 import type { Maze, MazeType } from "../maze-domain.js";
@@ -10,8 +11,10 @@ import type { MazePosition } from "../maze-solver.js";
 import type { TubeSegment } from "./maze-layout.js";
 import {
 	computeCellCenter,
+	computeTubeFillRects,
 	computeTubeSegments,
 	computeWallSegments,
+	fillRectToClosedShape,
 } from "./maze-layout.js";
 
 export interface MazeRenderStrategy {
@@ -20,6 +23,10 @@ export interface MazeRenderStrategy {
 	roundedCaps: boolean;
 	cellCenter(maze: Maze, position: MazePosition): MazePosition;
 	solutionPoints(maze: Maze, path: MazePosition[]): MazePosition[];
+	// Only defined for the two tube types (see ADR 060) — each returned shape
+	// is an independent closed loop meant to be filled with a single flat
+	// color before `segments()`'s outline is drawn on top of it.
+	fillShapes?(maze: Maze): TubeSegment[][];
 }
 
 function circleLike(maze: Maze) {
@@ -43,6 +50,7 @@ const rectangleCrossingStrategy: MazeRenderStrategy = {
 	...rectangleStrategy,
 	segments: (maze) => computeTubeSegments(maze),
 	roundedCaps: true,
+	fillShapes: (maze) => computeTubeFillRects(maze).map(fillRectToClosedShape),
 };
 
 const circleStrategy: MazeRenderStrategy = {
@@ -68,6 +76,7 @@ const circleCrossingStrategy: MazeRenderStrategy = {
 	...circleStrategy,
 	segments: (maze) => computeCircleTubeSegments(circleLike(maze)),
 	roundedCaps: true,
+	fillShapes: (maze) => computeCircleTubeFillShapes(circleLike(maze)),
 };
 
 // The single registration point for how each maze type is laid out and

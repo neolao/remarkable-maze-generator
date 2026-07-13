@@ -159,4 +159,106 @@ describe("renderMazeToSvg", () => {
 		expect(svg.startsWith("<svg")).toBe(true);
 		expect(countCircleElements(svg)).toBe(0);
 	});
+
+	describe("tubeBackgroundFill", () => {
+		const FILL_COLOR = "#d9d9d9";
+
+		it("produces byte-identical output whether the option is omitted or explicitly false, for a rectangle-crossing maze", () => {
+			const maze = generateMaze({
+				width: 8,
+				height: 8,
+				seed: 3,
+				type: "rectangle-crossing",
+			});
+
+			const omitted = renderMazeToSvg(maze);
+			const explicitFalse = renderMazeToSvg(maze, {
+				tubeBackgroundFill: false,
+			});
+
+			expect(explicitFalse).toBe(omitted);
+			expect(omitted).not.toContain(FILL_COLOR);
+		});
+
+		it("draws a light gray fill under the outline for a rectangle-crossing maze when enabled", () => {
+			const maze = generateMaze({
+				width: 8,
+				height: 8,
+				seed: 3,
+				type: "rectangle-crossing",
+			});
+
+			const svg = renderMazeToSvg(maze, { tubeBackgroundFill: true });
+
+			expect(svg).toContain(FILL_COLOR);
+			const fillIndex = svg.indexOf(FILL_COLOR);
+			const firstOutlineIndex = svg.indexOf('stroke="black"');
+			expect(firstOutlineIndex).toBeGreaterThan(-1);
+			expect(fillIndex).toBeLessThan(firstOutlineIndex);
+		});
+
+		it("draws a light gray fill for a circle-crossing maze when enabled", () => {
+			const maze = generateMaze({
+				width: 10,
+				height: 10,
+				seed: 3,
+				type: "circle-crossing",
+			});
+
+			const svg = renderMazeToSvg(maze, { tubeBackgroundFill: true });
+
+			expect(svg).toContain(FILL_COLOR);
+		});
+
+		it("has no effect on a plain rectangle maze even when enabled (no tube to fill)", () => {
+			const maze = generateMaze({ width: 6, height: 6, seed: 2 });
+
+			const withFill = renderMazeToSvg(maze, { tubeBackgroundFill: true });
+			const withoutFill = renderMazeToSvg(maze);
+
+			expect(withFill).toBe(withoutFill);
+			expect(withFill).not.toContain(FILL_COLOR);
+		});
+
+		it("has no effect on a plain circle maze even when enabled (no tube to fill)", () => {
+			const maze = generateMaze({
+				width: 8,
+				height: 6,
+				seed: 5,
+				type: "circle",
+			});
+
+			const withFill = renderMazeToSvg(maze, { tubeBackgroundFill: true });
+			const withoutFill = renderMazeToSvg(maze);
+
+			expect(withFill).toBe(withoutFill);
+			expect(withFill).not.toContain(FILL_COLOR);
+		});
+
+		it("does not error for a 1x1 rectangle-crossing maze with the fill enabled", () => {
+			const maze = generateMaze({
+				width: 1,
+				height: 1,
+				seed: 1,
+				type: "rectangle-crossing",
+			});
+
+			const svg = renderMazeToSvg(maze, { tubeBackgroundFill: true });
+
+			expect(svg).toContain(FILL_COLOR);
+		});
+
+		it("does not error for a 1x1 circle-crossing maze with the fill enabled", () => {
+			const maze = generateMaze({
+				width: 1,
+				height: 1,
+				seed: 1,
+				type: "circle-crossing",
+			});
+
+			expect(() =>
+				renderMazeToSvg(maze, { tubeBackgroundFill: true }),
+			).not.toThrow();
+		});
+	});
 });

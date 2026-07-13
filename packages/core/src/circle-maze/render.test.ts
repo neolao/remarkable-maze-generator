@@ -14,6 +14,7 @@ import {
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
+	computeCircleTubeFillShapes,
 	computeCircleTubeSegments,
 } from "./render.js";
 import { computeCircleSectorCounts, computeHubRadius } from "./topology.js";
@@ -1097,5 +1098,101 @@ describe("computeCircleTubeSegments", () => {
 		}
 		// The sweep must have exercised the crossing rendering path for real.
 		expect(totalCrossings).toBeGreaterThan(0);
+	});
+});
+
+// computeCircleTubeFillShapes reuses the exact same passage-area rectangles
+// computeCircleTubeSegments builds internally (see ADR 060), converting each
+// one into its own closed loop (arc/line/arc/line) instead of feeding it to
+// the boundary-outline extraction — one filled shape per hub band, connector,
+// or entrance/exit stub, meant to be drawn under the outline with the same
+// flat fill color so neighboring shapes appear seamlessly merged.
+describe("computeCircleTubeFillShapes", () => {
+	const TOLERANCE = 1e-6;
+
+	interface Point {
+		x: number;
+		y: number;
+	}
+
+	const endpointsOf = (segment: TubeSegment): [Point, Point] => [
+		{ x: segment.x1, y: segment.y1 },
+		{ x: segment.x2, y: segment.y2 },
+	];
+
+	const samePoint = (a: Point, b: Point) =>
+		Math.hypot(a.x - b.x, a.y - b.y) < TOLERANCE;
+
+	// A shape is only usable as a fill path if consecutive segments actually
+	// chain endpoint-to-endpoint and the last one closes back onto the first
+	// — anything else would draw a self-intersecting or open blob instead of
+	// the intended wedge.
+	const isClosedChain = (shape: TubeSegment[]): boolean => {
+		if (shape.length === 0) return false;
+		for (let i = 0; i < shape.length; i++) {
+			const [, end] = endpointsOf(shape[i]);
+			const [nextStart] = endpointsOf(shape[(i + 1) % shape.length]);
+			if (!samePoint(end, nextStart)) return false;
+		}
+		return true;
+	};
+
+	it("throws when cells do not match the sector counts", () => {
+		const sectorCounts = computeCircleSectorCounts(4, 3);
+		const maze = buildFullyWalledCircleMaze(sectorCounts);
+		maze.cells.pop();
+
+		expect(() => computeCircleTubeFillShapes(maze)).toThrow();
+	});
+
+	it("returns one closed shape per hub band, connector, and entrance/exit stub for a hand-built crossing maze", () => {
+		const maze = buildCircleCrossingMaze();
+
+		const shapes = computeCircleTubeFillShapes(maze);
+
+		// 9 cells (one hub band each) + 4 open inward connectors + entrance
+		// stub + exit stub, independently counted from the fixture's carved
+		// edges (see the fixture's own crossing/topology comments above).
+		expect(shapes).toHaveLength(15);
+	});
+
+	it("returns only genuinely closed shapes, each chaining endpoint-to-endpoint back to its start", () => {
+		const maze = buildCircleCrossingMaze();
+
+		const shapes = computeCircleTubeFillShapes(maze);
+
+		for (const shape of shapes) {
+			expect(isClosedChain(shape)).toBe(true);
+		}
+	});
+
+	it("produces a non-empty list of closed shapes for a generated circle-crossing maze, none degenerate", () => {
+		const maze = generateCircleMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			allowsCrossings: true,
+		});
+
+		const shapes = computeCircleTubeFillShapes(maze);
+
+		expect(shapes.length).toBeGreaterThan(0);
+		for (const shape of shapes) {
+			expect(shape.length).toBeGreaterThanOrEqual(4);
+			expect(isClosedChain(shape)).toBe(true);
+			for (const segment of shape) {
+				expect(Number.isFinite(segment.x1)).toBe(true);
+				expect(Number.isFinite(segment.y1)).toBe(true);
+				expect(Number.isFinite(segment.x2)).toBe(true);
+				expect(Number.isFinite(segment.y2)).toBe(true);
+			}
+		}
+	});
+
+	it("does not error for the minimal 1x1 circle-crossing maze", () => {
+		const sectorCounts = computeCircleSectorCounts(1, 1);
+		const maze = buildFullyWalledCircleMaze(sectorCounts);
+
+		expect(() => computeCircleTubeFillShapes(maze)).not.toThrow();
 	});
 });

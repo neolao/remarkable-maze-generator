@@ -17,6 +17,7 @@ const REQUIRED_ELEMENT_IDS = [
 	"solution-mode",
 	"path-length",
 	"show-solution",
+	"tube-background-fill",
 	"form-error",
 	"maze-preview",
 	"maze-seed",
@@ -67,6 +68,12 @@ describe("public maze configuration page", () => {
 	it("exposes the show-solution option as a checkbox input", () => {
 		expect(html).toMatch(
 			/<input[^>]+id="show-solution"[^>]+type="checkbox"|<input[^>]+type="checkbox"[^>]+id="show-solution"/,
+		);
+	});
+
+	it("exposes the tube-background-fill option as a checkbox input", () => {
+		expect(html).toMatch(
+			/<input[^>]+id="tube-background-fill"[^>]+type="checkbox"|<input[^>]+type="checkbox"[^>]+id="tube-background-fill"/,
 		);
 	});
 

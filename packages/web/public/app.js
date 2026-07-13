@@ -35,7 +35,8 @@ function isMazeFormPreferences(value) {
 		typeof value.showSolution === "boolean" &&
 		typeof value.folder === "string" &&
 		typeof value.pathLength === "string" &&
-		typeof value.pathLengthCandidateCount === "string"
+		typeof value.pathLengthCandidateCount === "string" &&
+		typeof value.tubeBackgroundFill === "boolean"
 	);
 }
 
@@ -80,6 +81,7 @@ function computeMazeFormFieldVisibility({ type, algorithm, pathLength }) {
 		showAlgorithm: !isCrossingType,
 		showDifficulty: effectiveAlgorithm === DIFFICULTY_ALGORITHM,
 		showPathLengthCandidates: pathLength !== undefined,
+		showTubeBackgroundFill: isCrossingType,
 		effectiveAlgorithm,
 	};
 }
@@ -240,6 +242,9 @@ function initMazeForm() {
 	const pathLengthCandidatesField = document.getElementById(
 		"path-length-candidates-field",
 	);
+	const tubeBackgroundFillField = document.getElementById(
+		"tube-background-fill-field",
+	);
 	const remarkableFolderField = document.getElementById(
 		"remarkable-folder-field",
 	);
@@ -267,6 +272,7 @@ function initMazeForm() {
 				folder: remarkableFolderInput.value.trim(),
 				pathLength: pathLengthSelect.value,
 				pathLengthCandidateCount: pathLengthCandidatesInput.value,
+				tubeBackgroundFill: form["tube-background-fill"].checked,
 			}),
 			FORM_PREFERENCES_COOKIE_MAX_AGE_SECONDS,
 		);
@@ -287,6 +293,7 @@ function initMazeForm() {
 		pathLengthSelect.value = storedPreferences.pathLength;
 		pathLengthCandidatesInput.value =
 			storedPreferences.pathLengthCandidateCount;
+		form["tube-background-fill"].checked = storedPreferences.tubeBackgroundFill;
 	}
 
 	const currentFieldVisibility = () =>
@@ -302,6 +309,9 @@ function initMazeForm() {
 		difficultyField.style.display = visibility.showDifficulty ? "" : "none";
 		pathLengthCandidatesField.style.display =
 			visibility.showPathLengthCandidates ? "" : "none";
+		tubeBackgroundFillField.style.display = visibility.showTubeBackgroundFill
+			? ""
+			: "none";
 	};
 
 	updateFieldVisibility();
@@ -428,6 +438,7 @@ function initMazeForm() {
 		const requestBody = JSON.stringify({
 			...result.value,
 			showSolution: form["show-solution"].checked,
+			tubeBackgroundFill: form["tube-background-fill"].checked,
 		});
 		const requestInit = {
 			method: "POST",
@@ -464,6 +475,7 @@ function initMazeForm() {
 			pathLength: undefined,
 			pathLengthCandidateCount: undefined,
 			showSolution: form["show-solution"].checked,
+			tubeBackgroundFill: form["tube-background-fill"].checked,
 		});
 		const seededRequestInit = {
 			method: "POST",

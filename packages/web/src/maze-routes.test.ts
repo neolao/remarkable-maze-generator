@@ -339,6 +339,53 @@ describe("POST /api/mazes/generate", () => {
 			error: expect.stringMatching(/candidate count/i),
 		});
 	});
+
+	it("accepts tubeBackgroundFill, producing a different PDF for a rectangle-crossing maze", async () => {
+		const app = buildServer();
+
+		const withoutFill = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+			},
+		});
+		const withFill = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+				tubeBackgroundFill: true,
+			},
+		});
+
+		expect(withFill.statusCode).toBe(200);
+		expect(withFill.rawPayload).not.toEqual(withoutFill.rawPayload);
+	});
+
+	it("has no effect on a plain rectangle maze even when tubeBackgroundFill is set", async () => {
+		const app = buildServer();
+
+		const withoutFill = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 6, height: 6, seed: 2 },
+		});
+		const withFill = await app.inject({
+			method: "POST",
+			url: "/api/mazes/generate",
+			payload: { width: 6, height: 6, seed: 2, tubeBackgroundFill: true },
+		});
+
+		expect(withFill.statusCode).toBe(200);
+		expect(withFill.rawPayload).toEqual(withoutFill.rawPayload);
+	});
 });
 
 describe("POST /api/mazes/preview", () => {
@@ -668,5 +715,42 @@ describe("POST /api/mazes/preview", () => {
 		});
 
 		expect(secondResponse.body).toBe(response.body);
+	});
+
+	it("draws a light gray tube background fill for a rectangle-crossing maze when tubeBackgroundFill is enabled", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+				tubeBackgroundFill: true,
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toContain("#d9d9d9");
+	});
+
+	it("does not draw a tube background fill when tubeBackgroundFill is left disabled", async () => {
+		const app = buildServer();
+
+		const response = await app.inject({
+			method: "POST",
+			url: "/api/mazes/preview",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).not.toContain("#d9d9d9");
 	});
 });

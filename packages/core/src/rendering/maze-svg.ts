@@ -10,10 +10,36 @@ const STROKE_WIDTH_PX = 2;
 const SOLUTION_STROKE_WIDTH_PX = 2;
 const SOLUTION_COLOR = "#d91a1a";
 const BRANCH_POINT_RADIUS_RATIO = 0.25;
+const TUBE_FILL_COLOR = "#d9d9d9";
 
 export interface RenderMazeToSvgOptions {
 	cellSizePx?: number;
 	showSolution?: boolean;
+	tubeBackgroundFill?: boolean;
+}
+
+function shapeToPathData(shape: TubeSegment[], cellSizePx: number): string {
+	let d = "";
+	shape.forEach((segment, index) => {
+		const x1 = segment.x1 * cellSizePx;
+		const y1 = segment.y1 * cellSizePx;
+		const x2 = segment.x2 * cellSizePx;
+		const y2 = segment.y2 * cellSizePx;
+		if (index === 0) d += `M ${x1} ${y1} `;
+		if (isArcSegment(segment)) {
+			const r = segment.radius * cellSizePx;
+			d += `A ${r} ${r} 0 0 ${segment.sweep} ${x2} ${y2} `;
+		} else {
+			d += `L ${x2} ${y2} `;
+		}
+	});
+	return `${d}Z `;
+}
+
+function renderTubeFill(shapes: TubeSegment[][], cellSizePx: number): string {
+	if (shapes.length === 0) return "";
+	const d = shapes.map((shape) => shapeToPathData(shape, cellSizePx)).join("");
+	return `<path d="${d}" fill="${TUBE_FILL_COLOR}" stroke="none" />`;
 }
 
 function renderLines(
@@ -106,10 +132,17 @@ export function renderMazeToSvg(
 		strategy.roundedCaps ? "round" : "square",
 	);
 
+	// Only the two tube types expose fillShapes (see ADR 060) — drawn before
+	// the outline so the outline's black strokes render on top of it.
+	const fillMarkup =
+		options.tubeBackgroundFill && strategy.fillShapes
+			? renderTubeFill(strategy.fillShapes(maze), cellSizePx)
+			: "";
+
 	const solutionMarkup = options.showSolution
 		? renderSolutionTrace(maze, solveMaze(maze), cellSizePx) +
 			renderBranchPointMarkers(maze, findSolutionBranchPoints(maze), cellSizePx)
 		: "";
 
-	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="white" />${lines}${solutionMarkup}</svg>`;
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="white" />${fillMarkup}${lines}${solutionMarkup}</svg>`;
 }

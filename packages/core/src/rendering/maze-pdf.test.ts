@@ -28,6 +28,17 @@ function countStrokedLines(pdfBytes: Uint8Array): number {
 	return (content.match(/^S$/gm) || []).length;
 }
 
+function countFillOperations(pdfBytes: Uint8Array): number {
+	const text = Buffer.from(pdfBytes).toString("latin1");
+	const streamMatch = text.match(/stream\r?\n([\s\S]*?)endstream/);
+	if (!streamMatch) throw new Error("No content stream found in PDF");
+
+	const compressed = Buffer.from(streamMatch[1], "latin1");
+	const content = inflateSync(compressed).toString("latin1");
+
+	return (content.match(/^f$/gm) || []).length;
+}
+
 // A rounded tube corner is drawn via pdf-lib's drawSvgPath(), which wraps
 // each call in its own "q ... Q" graphics-state block: a "cm" matrix
 // encoding the anchor translate + the library's own Y-flip (its own source
@@ -322,6 +333,114 @@ describe("renderMazeToPdf", () => {
 
 		expect(maze.circleCrossings).toEqual([]);
 		await expect(renderMazeToPdf(maze)).resolves.toBeInstanceOf(Uint8Array);
+	});
+
+	describe("tubeBackgroundFill", () => {
+		it("produces byte-identical output whether the option is omitted or explicitly false, for a rectangle-crossing maze", async () => {
+			const maze = generateMaze({
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+			});
+
+			const omitted = await renderMazeToPdf(maze);
+			const explicitFalse = await renderMazeToPdf(maze, {
+				tubeBackgroundFill: false,
+			});
+
+			expect(Buffer.from(explicitFalse)).toEqual(Buffer.from(omitted));
+			expect(countFillOperations(omitted)).toBe(0);
+		});
+
+		it("adds one fill operation drawing the tube background for a rectangle-crossing maze when enabled", async () => {
+			const maze = generateMaze({
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+			});
+
+			const withoutFill = await renderMazeToPdf(maze);
+			const withFill = await renderMazeToPdf(maze, {
+				tubeBackgroundFill: true,
+			});
+
+			expect(countFillOperations(withFill)).toBe(
+				countFillOperations(withoutFill) + 1,
+			);
+		});
+
+		it("adds one fill operation drawing the tube background for a circle-crossing maze when enabled", async () => {
+			const maze = generateMaze({
+				width: 10,
+				height: 10,
+				seed: 3,
+				type: "circle-crossing",
+			});
+
+			const withoutFill = await renderMazeToPdf(maze);
+			const withFill = await renderMazeToPdf(maze, {
+				tubeBackgroundFill: true,
+			});
+
+			expect(countFillOperations(withFill)).toBe(
+				countFillOperations(withoutFill) + 1,
+			);
+		});
+
+		it("has no effect on a plain rectangle maze even when enabled (no tube to fill)", async () => {
+			const maze = generateMaze({ width: 6, height: 6, seed: 2 });
+
+			const withFill = await renderMazeToPdf(maze, {
+				tubeBackgroundFill: true,
+			});
+			const withoutFill = await renderMazeToPdf(maze);
+
+			expect(Buffer.from(withFill)).toEqual(Buffer.from(withoutFill));
+		});
+
+		it("has no effect on a plain circle maze even when enabled (no tube to fill)", async () => {
+			const maze = generateMaze({
+				width: 8,
+				height: 6,
+				seed: 5,
+				type: "circle",
+			});
+
+			const withFill = await renderMazeToPdf(maze, {
+				tubeBackgroundFill: true,
+			});
+			const withoutFill = await renderMazeToPdf(maze);
+
+			expect(Buffer.from(withFill)).toEqual(Buffer.from(withoutFill));
+		});
+
+		it("does not error for a 1x1 rectangle-crossing maze with the fill enabled", async () => {
+			const maze = generateMaze({
+				width: 1,
+				height: 1,
+				seed: 1,
+				type: "rectangle-crossing",
+			});
+
+			await expect(
+				renderMazeToPdf(maze, { tubeBackgroundFill: true }),
+			).resolves.toBeInstanceOf(Uint8Array);
+		});
+
+		it("does not error for a 1x1 circle-crossing maze with the fill enabled", async () => {
+			const maze = generateMaze({
+				width: 1,
+				height: 1,
+				seed: 1,
+				type: "circle-crossing",
+			});
+
+			await expect(
+				renderMazeToPdf(maze, { tubeBackgroundFill: true }),
+			).resolves.toBeInstanceOf(Uint8Array);
+		});
 	});
 });
 

@@ -17,7 +17,7 @@ async function handleGenerateMaze(
 	reply: FastifyReply,
 ) {
 	const body = request.body ?? {};
-	const { solution } = body;
+	const { solution, tubeBackgroundFill } = body;
 
 	if (solution !== undefined && !isValidSolutionMode(solution)) {
 		reply.code(400);
@@ -27,7 +27,7 @@ async function handleGenerateMaze(
 	let pdfBytes: Uint8Array;
 	try {
 		const maze = buildMazeFromRequest(body);
-		pdfBytes = await renderMazeToPdf(maze, { solution });
+		pdfBytes = await renderMazeToPdf(maze, { solution, tubeBackgroundFill });
 	} catch (error) {
 		reply.code(400);
 		return { error: (error as Error).message };
@@ -42,13 +42,14 @@ function handleGenerateMazePreview(
 	reply: FastifyReply,
 ) {
 	const showSolution = request.body?.showSolution === true;
+	const tubeBackgroundFill = request.body?.tubeBackgroundFill === true;
 
 	let maze: Maze;
 	let svg: string;
 	let branchPointCount: number | undefined;
 	try {
 		maze = buildMazeFromRequest(request.body ?? {});
-		svg = renderMazeToSvg(maze, { showSolution });
+		svg = renderMazeToSvg(maze, { showSolution, tubeBackgroundFill });
 		if (showSolution) branchPointCount = findSolutionBranchPoints(maze).length;
 	} catch (error) {
 		reply.code(400);

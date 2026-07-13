@@ -11,6 +11,7 @@ export interface GenerateAndSendOptions {
 	solution?: string;
 	pathLength?: string;
 	pathLengthCandidateCount?: number;
+	tubeBackgroundFill?: boolean;
 	output?: string;
 	cwd?: string;
 	visibleName?: string;
@@ -61,6 +62,7 @@ export async function runGenerateAndSend(
 		solution: options.solution,
 		pathLength: options.pathLength,
 		pathLengthCandidateCount: options.pathLengthCandidateCount,
+		tubeBackgroundFill: options.tubeBackgroundFill,
 		output: options.output,
 		cwd: options.cwd,
 	});

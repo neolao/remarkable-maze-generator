@@ -5,8 +5,10 @@ import {
 	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
 	computeCellCenter,
+	computeTubeFillRects,
 	computeTubeSegments,
 	computeWallSegments,
+	fillRectToClosedShape,
 	isArcSegment,
 } from "./maze-layout.js";
 
@@ -546,6 +548,197 @@ describe("computeTubeSegments", () => {
 
 	it("keeps the tube narrower than a full cell, leaving a real boundary margin", () => {
 		expect(TUBE_HALF_WIDTH_RATIO).toBeLessThan(0.5);
+	});
+});
+
+describe("computeTubeFillRects", () => {
+	const h = TUBE_HALF_WIDTH_RATIO;
+
+	// Every returned rect's area is derived independently from the documented
+	// hub+arm construction (hub: (2h)^2, each open-side arm: 2h * (0.5 - h)),
+	// not from the implementation itself — a wrong rect count or wrong arm
+	// length would change these sums.
+	const totalArea = (rects: { width: number; height: number }[]) =>
+		rects.reduce((sum, r) => sum + r.width * r.height, 0);
+
+	it("throws a clear error for a maze with invalid dimensions", () => {
+		const invalidMaze = generateMaze({ width: 3, height: 3, seed: 1 });
+		invalidMaze.width = 0;
+
+		expect(() => computeTubeFillRects(invalidMaze)).toThrow();
+	});
+
+	it("covers a dead end as the hub plus its single open arm, no more", () => {
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[1][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+
+		const inTargetCell = (r: {
+			x: number;
+			y: number;
+			width: number;
+			height: number;
+		}) =>
+			r.x >= 0.95 &&
+			r.x + r.width <= 2.05 &&
+			r.y >= 0.95 &&
+			r.y + r.height <= 2.05;
+		const rects = computeTubeFillRects(maze).filter(inTargetCell);
+
+		expect(rects).toHaveLength(2);
+		expect(totalArea(rects)).toBeCloseTo(h * (2 * h + 1), 9);
+	});
+
+	it("covers a straight passage as the hub plus its two opposite arms, with no gap between them", () => {
+		const maze = buildFullyWalledMaze(3, 5);
+		maze.cells[1][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+		maze.cells[2][1].walls.south = false;
+		maze.cells[3][1].walls.north = false;
+
+		const inRow2 = (r: {
+			x: number;
+			y: number;
+			width: number;
+			height: number;
+		}) =>
+			r.x >= 0.95 &&
+			r.x + r.width <= 2.05 &&
+			r.y >= 1.95 &&
+			r.y + r.height <= 3.05;
+		const rects = computeTubeFillRects(maze).filter(inRow2);
+
+		expect(rects).toHaveLength(3);
+		expect(totalArea(rects)).toBeCloseTo(2 * h, 9);
+	});
+
+	it("covers a turn as the hub plus its two perpendicular arms", () => {
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[0][1].walls.south = false;
+		maze.cells[1][1].walls.north = false;
+		maze.cells[1][1].walls.east = false;
+		maze.cells[1][2].walls.west = false;
+
+		const inTargetCell = (r: {
+			x: number;
+			y: number;
+			width: number;
+			height: number;
+		}) =>
+			r.x >= 0.95 &&
+			r.x + r.width <= 2.05 &&
+			r.y >= 0.95 &&
+			r.y + r.height <= 2.05;
+		const rects = computeTubeFillRects(maze).filter(inTargetCell);
+
+		expect(rects).toHaveLength(3);
+		expect(totalArea(rects)).toBeCloseTo(2 * h, 9);
+	});
+
+	it("covers a full 4-way junction as the hub plus its four arms", () => {
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[1][1].walls = {
+			north: false,
+			south: false,
+			east: false,
+			west: false,
+		};
+		maze.cells[0][1].walls.south = false;
+		maze.cells[2][1].walls.north = false;
+		maze.cells[1][0].walls.east = false;
+		maze.cells[1][2].walls.west = false;
+
+		const inTargetCell = (r: {
+			x: number;
+			y: number;
+			width: number;
+			height: number;
+		}) =>
+			r.x >= 0.95 &&
+			r.x + r.width <= 2.05 &&
+			r.y >= 0.95 &&
+			r.y + r.height <= 2.05;
+		const rects = computeTubeFillRects(maze).filter(inTargetCell);
+
+		expect(rects).toHaveLength(5);
+		expect(totalArea(rects)).toBeCloseTo(4 * h * (1 - h), 9);
+	});
+
+	it("covers a bridge crossing as an uninterrupted over-axis band plus two gapped under-axis arms", () => {
+		const maze = buildFullyWalledMaze(3, 3);
+		maze.cells[1][1].walls = {
+			north: false,
+			south: false,
+			east: false,
+			west: false,
+		};
+		maze.crossings = [{ x: 1, y: 1, underAxis: "vertical" }];
+
+		const inCrossingCell = (r: {
+			x: number;
+			y: number;
+			width: number;
+			height: number;
+		}) =>
+			r.x >= 0.9 && r.x + r.width <= 2.1 && r.y >= 0.9 && r.y + r.height <= 2.1;
+		const rects = computeTubeFillRects(maze).filter(inCrossingCell);
+
+		// One full-length over-axis (horizontal) band spanning the whole cell.
+		const overBand = rects.find(
+			(r) =>
+				r.x === 1 && r.width === 1 && r.y === 1.5 - h && r.height === 2 * h,
+		);
+		expect(overBand).toBeDefined();
+		expect(rects).toHaveLength(3);
+		expect(totalArea(rects)).toBeCloseTo(4 * h * (1 - h), 9);
+	});
+
+	it("computes fill rects from wall data alone, regardless of maze.type (gating is the render strategy's job)", () => {
+		const maze = generateMaze({ width: 4, height: 4, seed: 7 });
+
+		const rects = computeTubeFillRects(maze);
+
+		expect(rects.length).toBeGreaterThan(0);
+	});
+
+	it("produces a valid, non-empty rect list for a generated rectangle-crossing maze", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 5,
+			type: "rectangle-crossing",
+		});
+
+		const rects = computeTubeFillRects(maze);
+
+		expect(rects.length).toBeGreaterThan(0);
+		for (const rect of rects) {
+			expect(rect.width).toBeGreaterThan(0);
+			expect(rect.height).toBeGreaterThan(0);
+		}
+	});
+});
+
+describe("fillRectToClosedShape", () => {
+	it("converts a rect into a clockwise closed 4-segment loop, corner to corner", () => {
+		const shape = fillRectToClosedShape({ x: 1, y: 2, width: 3, height: 0.5 });
+
+		expect(shape).toEqual([
+			{ x1: 1, y1: 2, x2: 4, y2: 2 },
+			{ x1: 4, y1: 2, x2: 4, y2: 2.5 },
+			{ x1: 4, y1: 2.5, x2: 1, y2: 2.5 },
+			{ x1: 1, y1: 2.5, x2: 1, y2: 2 },
+		]);
+	});
+
+	it("chains each segment's end to the next segment's start, closing back to the first", () => {
+		const shape = fillRectToClosedShape({ x: 0, y: 0, width: 2, height: 2 });
+
+		for (let i = 0; i < shape.length; i++) {
+			const next = shape[(i + 1) % shape.length];
+			expect(shape[i].x2).toBe(next.x1);
+			expect(shape[i].y2).toBe(next.y1);
+		}
 	});
 });
 

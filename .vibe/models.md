@@ -91,7 +91,15 @@ Defined in: `packages/core/src/maze-solver.ts`
 | Field | Type | Notes |
 |---|---|---|
 | solution | SolutionDisplayMode | optional, defaults to `"none"` |
-Defined in: `packages/core/src/maze-pdf.ts`
+| tubeBackgroundFill | boolean | optional, defaults to false; draws the tube's fill shapes (light gray) before the outline, `rectangle-crossing`/`circle-crossing` only, see ADR 060 |
+Defined in: `packages/core/src/rendering/maze-pdf.ts`
+
+## FillRect
+| Field | Type | Notes |
+|---|---|---|
+| x, y | number | top-left corner, unit cell coordinates |
+| width, height | number | |
+Defined in: `packages/core/src/rendering/maze-layout.ts` — one hub-or-arm rectangle of a `rectangle-crossing` tube's fill; `fillRectToClosedShape(rect): LineSegment[]` converts it into a closed 4-segment loop, see ADR 060
 
 ## LineSegment
 | Field | Type | Notes |
@@ -126,7 +134,8 @@ Defined in: `packages/core/src/circle-maze/region-boundary.ts` — inputs/output
 |---|---|---|
 | cellSizePx | number | optional, defaults to 20 |
 | showSolution | boolean | optional, defaults to false; traces the solution path in red with a red circle per branch point (from `findSolutionBranchPoints`), kept separate from `RenderMazeToPdfOptions.solution`, see ADR 028 |
-Defined in: `packages/core/src/maze-svg.ts`
+| tubeBackgroundFill | boolean | optional, defaults to false; mirrors `RenderMazeToPdfOptions.tubeBackgroundFill`, see ADR 060 |
+Defined in: `packages/core/src/rendering/maze-svg.ts`
 
 ## RemarkableCredentials
 | Field | Type | Notes |
@@ -230,6 +239,7 @@ Defined in: `packages/web/src/maze-form-validation.ts`
 | folder | string | raw "reMarkable folder" field value, `""` when left blank (see ADR 043) |
 | pathLength | string | raw "Path length" field value, `""` when left at "None" (see ADR 046) |
 | pathLengthCandidateCount | string | raw "Candidate mazes to compare" field value, `""` when left blank (see ADR 047) |
+| tubeBackgroundFill | boolean | "Fill tube background" checkbox state, only meaningful for `rectangle-crossing`/`circle-crossing` (see ADR 060) |
 Round-tripped through a single cookie (`serializeFormPreferences`/`parseFormPreferences`); parsing rejects any value with a missing or wrong-typed field, returning `null` rather than a partial object (see ADR 042).
 Defined in: `packages/web/src/form-preferences.ts`
 

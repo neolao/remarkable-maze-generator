@@ -325,6 +325,41 @@ describe("runGenerateAndSend", () => {
 		expect(uploadPdfMock).not.toHaveBeenCalled();
 	});
 
+	it("forwards the tubeBackgroundFill option to PDF generation", async () => {
+		const fakeSession = { uploadPdf: vi.fn() };
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue(fakeSession as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+
+		const withoutFill = await runGenerateAndSend({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle-crossing",
+			output: join(workDir, "without-fill.pdf"),
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+		const withFill = await runGenerateAndSend({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle-crossing",
+			tubeBackgroundFill: true,
+			output: join(workDir, "with-fill.pdf"),
+			cwd: workDir,
+			credentialsPath,
+			promptPairingCode: vi.fn(),
+		});
+
+		const [withoutBytes, withBytes] = await Promise.all([
+			readFile(withoutFill.outputPath),
+			readFile(withFill.outputPath),
+		]);
+		expect(withBytes).not.toEqual(withoutBytes);
+	});
+
 	it("forwards the pathLength option to maze generation", async () => {
 		const fakeSession = { uploadPdf: vi.fn() };
 		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type

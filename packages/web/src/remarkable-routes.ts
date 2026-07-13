@@ -59,7 +59,12 @@ async function handleSendMaze(
 	reply: FastifyReply,
 ) {
 	const body = request.body ?? {};
-	const { solution, visibleName: requestedVisibleName, folder } = body;
+	const {
+		solution,
+		tubeBackgroundFill,
+		visibleName: requestedVisibleName,
+		folder,
+	} = body;
 
 	if (solution !== undefined && !isValidSolutionMode(solution)) {
 		reply.code(400);
@@ -70,7 +75,7 @@ async function handleSendMaze(
 	let pdfBytes: Uint8Array;
 	try {
 		maze = buildMazeFromRequest(body);
-		pdfBytes = await renderMazeToPdf(maze, { solution });
+		pdfBytes = await renderMazeToPdf(maze, { solution, tubeBackgroundFill });
 	} catch (error) {
 		reply.code(400);
 		return { error: (error as Error).message };

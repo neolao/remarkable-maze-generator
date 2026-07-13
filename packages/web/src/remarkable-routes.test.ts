@@ -244,6 +244,50 @@ describe("POST /api/mazes/send", () => {
 		expect(response.statusCode).toBe(400);
 	});
 
+	it("forwards tubeBackgroundFill to PDF generation, producing a different upload than without it", async () => {
+		await writeFile(
+			credentialsPath,
+			JSON.stringify({ deviceToken: "existing-token" }),
+		);
+		// biome-ignore lint/suspicious/noExplicitAny: partial fake of the opaque core session type
+		authenticateMock.mockResolvedValue({} as any);
+		uploadPdfMock.mockResolvedValue(undefined);
+		const app = buildServer({ credentialsPath });
+
+		await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+			},
+		});
+		const withoutFillReadFile = uploadPdfMock.mock.calls[0][3].readFile;
+
+		await app.inject({
+			method: "POST",
+			url: "/api/mazes/send",
+			payload: {
+				width: 8,
+				height: 6,
+				seed: 3,
+				type: "rectangle-crossing",
+				tubeBackgroundFill: true,
+			},
+		});
+		const withFillReadFile = uploadPdfMock.mock.calls[1][3].readFile;
+
+		const [withoutFillBytes, withFillBytes] = await Promise.all([
+			withoutFillReadFile(""),
+			withFillReadFile(""),
+		]);
+		expect(Buffer.from(withFillBytes as Uint8Array)).not.toEqual(
+			Buffer.from(withoutFillBytes as Uint8Array),
+		);
+	});
+
 	it("returns 400 when the maze type is unknown", async () => {
 		const app = buildServer({ credentialsPath });
 

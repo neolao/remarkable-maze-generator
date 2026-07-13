@@ -1,0 +1,13 @@
+---
+date: 2026-07-13
+status: accepted
+---
+# Tube background fill via overlapping per-cell shapes, not exact boundary tracing
+
+**Context:** Backlog item 035 asks for an optional light background fill inside the tube passages of `rectangle-crossing` and `circle-crossing` mazes, so the tube shape reads more clearly against the page. Both renderers currently only draw the tube's boundary as independent stroked line/arc segments (see ADR 026 for `rectangle-crossing`, ADR 059 for `circle-crossing`) — there is no single closed polygon per corridor readily available to fill, since a corridor's outline is only closed once every cell along its run is chained together, and `computePolarRegionBoundary` (ADR 059) returns its edges unordered, not grouped into traversal-ready contours.
+
+**Decision:** Reuse the exact same per-cell hub+arm decomposition already used to build the outline segments, but emit it as one *closed, filled* shape per cell (a plain rectangle for `rectangle-crossing`; the same `PolarRect` list already built for `circle-crossing`'s boundary extraction, rendered as filled polar wedges) instead of as boundary lines. Every cell's fill shape closes exactly at its own cell/sector border, so adjacent cells' shapes touch with no gap and no overlap-driven color banding when drawn with the same flat fill color, before the existing outline strokes are drawn on top. Corners of the fill layer are left unrounded (square for `rectangle-crossing`, the raw polar rectangle's corner for `circle-crossing`), unlike the outline's rounded corners.
+
+**Reason:** Tracing each corridor run into one exact closed polygon (matching the outline's rounded corners pixel-for-pixel) would require graph-based contour assembly across cells — new machinery neither renderer has today, for a purely cosmetic, "light and subtle" fill (per the backlog item's own guidance). The chosen approach reuses geometry that already exists for the outline, keeps the change localized to each cell's own rendering step, and the unrounded-corner mismatch is a sub-pixel-scale artifact at `TUBE_CORNER_RADIUS_RATIO` (0.08 of a cell) that a light gray fill does not make visible in practice.
+
+**Rejected alternatives:** Exact boundary-polygon tracing/union (rejected: substantial new geometry work for a subtle cosmetic effect, and `circle-crossing`'s `computePolarRegionBoundary` doesn't return contour-ordered edges today); drawing a single thick stroke along a corridor's centerline (rejected: no centerline path is currently computed, only the two edge lines, and it would not follow the tube's hub/junction shape).

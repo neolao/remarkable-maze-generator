@@ -13,6 +13,7 @@ describe("computeMazeFormFieldVisibility", () => {
 			showAlgorithm: true,
 			showDifficulty: true,
 			showPathLengthCandidates: false,
+			showTubeBackgroundFill: false,
 			effectiveAlgorithm: "growing-tree",
 		});
 	});
@@ -38,6 +39,7 @@ describe("computeMazeFormFieldVisibility", () => {
 			showAlgorithm: false,
 			showDifficulty: true,
 			showPathLengthCandidates: false,
+			showTubeBackgroundFill: true,
 			effectiveAlgorithm: "growing-tree",
 		});
 	});
@@ -53,6 +55,7 @@ describe("computeMazeFormFieldVisibility", () => {
 			showAlgorithm: true,
 			showDifficulty: false,
 			showPathLengthCandidates: false,
+			showTubeBackgroundFill: false,
 			effectiveAlgorithm: "wilson",
 		});
 	});
@@ -68,6 +71,7 @@ describe("computeMazeFormFieldVisibility", () => {
 			showAlgorithm: false,
 			showDifficulty: true,
 			showPathLengthCandidates: false,
+			showTubeBackgroundFill: true,
 			effectiveAlgorithm: "growing-tree",
 		});
 	});
@@ -83,7 +87,25 @@ describe("computeMazeFormFieldVisibility", () => {
 			showAlgorithm: true,
 			showDifficulty: false,
 			showPathLengthCandidates: true,
+			showTubeBackgroundFill: false,
 			effectiveAlgorithm: "aldous-broder",
 		});
+	});
+
+	it("shows tube background fill only for the two crossing types", () => {
+		expect(
+			computeMazeFormFieldVisibility({
+				type: "circle",
+				algorithm: "growing-tree",
+				pathLength: undefined,
+			}).showTubeBackgroundFill,
+		).toBe(false);
+		expect(
+			computeMazeFormFieldVisibility({
+				type: "circle-crossing",
+				algorithm: "growing-tree",
+				pathLength: undefined,
+			}).showTubeBackgroundFill,
+		).toBe(true);
 	});
 });

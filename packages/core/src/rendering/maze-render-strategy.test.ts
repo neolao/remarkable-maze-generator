@@ -4,6 +4,7 @@ import {
 	computeCircleMazeDiameter,
 	computeCircleMazeSegments,
 	computeCircleSolutionPoints,
+	computeCircleTubeFillShapes,
 	computeCircleTubeSegments,
 } from "../circle-maze/render.js";
 import { MAZE_TYPES } from "../maze-domain.js";
@@ -11,8 +12,10 @@ import { solveMaze } from "../maze-solver.js";
 import { generateMaze } from "../maze.js";
 import {
 	computeCellCenter,
+	computeTubeFillRects,
 	computeTubeSegments,
 	computeWallSegments,
+	fillRectToClosedShape,
 } from "./maze-layout.js";
 import { getMazeRenderStrategy } from "./maze-render-strategy.js";
 
@@ -151,5 +154,57 @@ describe("getMazeRenderStrategy", () => {
 		);
 
 		expect(strategy.solutionPoints(maze, path)).toEqual(expected);
+	});
+
+	it("has no fill shapes for the rectangle strategy (no tube to fill)", () => {
+		const maze = generateMaze({
+			width: 5,
+			height: 5,
+			seed: 1,
+			type: "rectangle",
+		});
+
+		expect(getMazeRenderStrategy(maze).fillShapes).toBeUndefined();
+	});
+
+	it("has no fill shapes for the circle strategy (no tube to fill)", () => {
+		const maze = generateMaze({ width: 8, height: 6, seed: 5, type: "circle" });
+
+		expect(getMazeRenderStrategy(maze).fillShapes).toBeUndefined();
+	});
+
+	it("resolves the rectangle-crossing strategy's fill shapes from computeTubeFillRects", () => {
+		const maze = generateMaze({
+			width: 6,
+			height: 4,
+			seed: 2,
+			type: "rectangle-crossing",
+		});
+		const strategy = getMazeRenderStrategy(maze);
+
+		expect(strategy.fillShapes).toBeDefined();
+		expect(strategy.fillShapes?.(maze)).toEqual(
+			computeTubeFillRects(maze).map(fillRectToClosedShape),
+		);
+	});
+
+	it("resolves the circle-crossing strategy's fill shapes from computeCircleTubeFillShapes", () => {
+		const maze = generateMaze({
+			width: 10,
+			height: 10,
+			seed: 3,
+			type: "circle-crossing",
+		});
+		const strategy = getMazeRenderStrategy(maze);
+		const circleLike = {
+			sectorCounts: maze.circleSectorCounts ?? [],
+			cells: maze.circleCells ?? [],
+			crossings: maze.circleCrossings ?? [],
+		};
+
+		expect(strategy.fillShapes).toBeDefined();
+		expect(strategy.fillShapes?.(maze)).toEqual(
+			computeCircleTubeFillShapes(circleLike),
+		);
 	});
 });

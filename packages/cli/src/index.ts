@@ -44,6 +44,10 @@ program
 		"--path-length-candidates <number>",
 		"number of candidate mazes to generate and compare when --path-length is set (defaults to 10, max 50)",
 	)
+	.option(
+		"--tube-fill",
+		"fill the tube passages with a light background so they stand out from the page (rectangle-crossing and circle-crossing only)",
+	)
 	.action(
 		async (opts: {
 			width: string;
@@ -55,6 +59,7 @@ program
 			solution?: string;
 			pathLength?: string;
 			pathLengthCandidates?: string;
+			tubeFill?: boolean;
 			output?: string;
 		}) => {
 			try {
@@ -86,6 +91,7 @@ program
 					solution: opts.solution,
 					pathLength: opts.pathLength,
 					pathLengthCandidateCount,
+					tubeBackgroundFill: opts.tubeFill,
 					output: opts.output,
 				});
 				console.log(`Maze written to ${outputPath}`);
@@ -167,6 +173,10 @@ program
 		"--path-length-candidates <number>",
 		"number of candidate mazes to generate and compare when --path-length is set (defaults to 10, max 50)",
 	)
+	.option(
+		"--tube-fill",
+		"fill the tube passages with a light background so they stand out from the page (rectangle-crossing and circle-crossing only)",
+	)
 	.action(
 		async (opts: {
 			width: string;
@@ -181,6 +191,7 @@ program
 			solution?: string;
 			pathLength?: string;
 			pathLengthCandidates?: string;
+			tubeFill?: boolean;
 		}) => {
 			try {
 				const width = parseIntegerOption(opts.width, "--width");
@@ -211,6 +222,7 @@ program
 					solution: opts.solution,
 					pathLength: opts.pathLength,
 					pathLengthCandidateCount,
+					tubeBackgroundFill: opts.tubeFill,
 					output: opts.output,
 					visibleName: opts.visibleName,
 					folder: opts.folder,

@@ -484,4 +484,80 @@ describe("runGenerate", () => {
 			}),
 		).rejects.toThrow(/candidate count/i);
 	});
+
+	it("keeps producing the exact same maze when tubeBackgroundFill is omitted", async () => {
+		const withoutOption = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle-crossing",
+			output: join(workDir, "without-fill.pdf"),
+			cwd: workDir,
+		});
+		const withExplicitFalse = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle-crossing",
+			tubeBackgroundFill: false,
+			output: join(workDir, "with-explicit-false.pdf"),
+			cwd: workDir,
+		});
+
+		const [withoutBytes, withBytes] = await Promise.all([
+			readFile(withoutOption.outputPath),
+			readFile(withExplicitFalse.outputPath),
+		]);
+		expect(withoutBytes).toEqual(withBytes);
+	});
+
+	it("forwards the tubeBackgroundFill option, producing a different PDF for a rectangle-crossing maze", async () => {
+		const withoutFill = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle-crossing",
+			output: join(workDir, "without-fill.pdf"),
+			cwd: workDir,
+		});
+		const withFill = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			type: "rectangle-crossing",
+			tubeBackgroundFill: true,
+			output: join(workDir, "with-fill.pdf"),
+			cwd: workDir,
+		});
+
+		const [withoutBytes, withBytes] = await Promise.all([
+			readFile(withoutFill.outputPath),
+			readFile(withFill.outputPath),
+		]);
+		expect(withBytes).not.toEqual(withoutBytes);
+	});
+
+	it("has no effect on a plain rectangle maze even when tubeBackgroundFill is set", async () => {
+		const withoutFill = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			output: join(workDir, "without-fill.pdf"),
+			cwd: workDir,
+		});
+		const withFill = await runGenerate({
+			width: 8,
+			height: 6,
+			seed: 3,
+			tubeBackgroundFill: true,
+			output: join(workDir, "with-fill.pdf"),
+			cwd: workDir,
+		});
+
+		const [withoutBytes, withBytes] = await Promise.all([
+			readFile(withoutFill.outputPath),
+			readFile(withFill.outputPath),
+		]);
+		expect(withBytes).toEqual(withoutBytes);
+	});
 });

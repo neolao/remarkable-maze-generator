@@ -102,6 +102,117 @@ export const TUBE_HALF_WIDTH_RATIO = 0.35;
  */
 export const TUBE_CORNER_RADIUS_RATIO = 0.08;
 
+export interface FillRect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * The filled cross-section of every corridor in a "rectangle-crossing" maze,
+ * in unit cell coordinates — an optional light background wash drawn under
+ * the tube's outline (see ADR 060). Built from the exact same per-cell
+ * hub+arm decomposition as `computeTubeSegments`, but as closed rectangles
+ * instead of boundary lines: a hub square always present, plus one
+ * rectangle per open side reaching to the cell boundary. Each cell's own
+ * rectangles close exactly at that cell's border, so neighboring cells'
+ * rectangles touch with no gap and no overlap when filled with the same flat
+ * color — corners are left unrounded here, unlike the outline (see ADR 060).
+ */
+export function computeTubeFillRects(maze: Maze): FillRect[] {
+	validateMazeShape(maze);
+
+	const h = TUBE_HALF_WIDTH_RATIO;
+	const rects: FillRect[] = [];
+	const crossingLookup = buildCrossingLookup(maze);
+
+	for (let y = 0; y < maze.height; y++) {
+		for (let x = 0; x < maze.width; x++) {
+			rects.push(...computeCellTubeFillRects(maze, x, y, h, crossingLookup));
+		}
+	}
+
+	return rects;
+}
+
+function computeCellTubeFillRects(
+	maze: Maze,
+	x: number,
+	y: number,
+	h: number,
+	crossingLookup: Map<string, MazeCrossing>,
+): FillRect[] {
+	const cx = x + 0.5;
+	const cy = y + 0.5;
+
+	const crossing = crossingLookup.get(crossingKey(x, y));
+	if (crossing) {
+		const overAxis =
+			crossing.underAxis === "vertical" ? "horizontal" : "vertical";
+
+		if (overAxis === "horizontal") {
+			return [
+				{ x, y: cy - h, width: 1, height: 2 * h },
+				{ x: cx - h, y, width: 2 * h, height: cy - h - y },
+				{ x: cx - h, y: cy + h, width: 2 * h, height: y + 1 - (cy + h) },
+			];
+		}
+		return [
+			{ x: cx - h, y, width: 2 * h, height: 1 },
+			{ x, y: cy - h, width: cx - h - x, height: 2 * h },
+			{ x: cx + h, y: cy - h, width: x + 1 - (cx + h), height: 2 * h },
+		];
+	}
+
+	const cell = maze.cells[y][x];
+	const isEntrance = x === 0 && y === 0;
+	const isExit = x === maze.width - 1 && y === maze.height - 1;
+	const northOpen = !cell.walls.north || isEntrance;
+	const southOpen = !cell.walls.south || isExit;
+	const eastOpen = !cell.walls.east;
+	const westOpen = !cell.walls.west;
+
+	const rects: FillRect[] = [
+		{ x: cx - h, y: cy - h, width: 2 * h, height: 2 * h },
+	];
+	if (northOpen) rects.push({ x: cx - h, y, width: 2 * h, height: cy - h - y });
+	if (southOpen) {
+		rects.push({
+			x: cx - h,
+			y: cy + h,
+			width: 2 * h,
+			height: y + 1 - (cy + h),
+		});
+	}
+	if (eastOpen) {
+		rects.push({
+			x: cx + h,
+			y: cy - h,
+			width: x + 1 - (cx + h),
+			height: 2 * h,
+		});
+	}
+	if (westOpen) rects.push({ x, y: cy - h, width: cx - h - x, height: 2 * h });
+
+	return rects;
+}
+
+/**
+ * Converts a fill rect into its own closed 4-segment loop (see ADR 060) —
+ * the shape a renderer draws as one filled path, before the tube's outline
+ * is drawn on top of it.
+ */
+export function fillRectToClosedShape(rect: FillRect): LineSegment[] {
+	const { x, y, width, height } = rect;
+	return [
+		{ x1: x, y1: y, x2: x + width, y2: y },
+		{ x1: x + width, y1: y, x2: x + width, y2: y + height },
+		{ x1: x + width, y1: y + height, x2: x, y2: y + height },
+		{ x1: x, y1: y + height, x2: x, y2: y },
+	];
+}
+
 function crossingKey(x: number, y: number): string {
 	return `${x},${y}`;
 }

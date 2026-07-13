@@ -32,6 +32,7 @@ export interface GenerateMazeRequestBody {
 	pathLength?: string;
 	pathLengthCandidateCount?: number;
 	showSolution?: boolean;
+	tubeBackgroundFill?: boolean;
 }
 
 export function buildMazeFromRequest(body: GenerateMazeRequestBody): Maze {

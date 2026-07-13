@@ -16,6 +16,7 @@ const SAMPLE_PREFERENCES = {
 	folder: "Maze Archive",
 	pathLength: "long",
 	pathLengthCandidateCount: "5",
+	tubeBackgroundFill: true,
 };
 
 describe("form preferences cookie name", () => {
@@ -32,6 +33,12 @@ describe("serializeFormPreferences / parseFormPreferences round trip", () => {
 
 	it("round-trips a falsy showSolution value correctly", () => {
 		const preferences = { ...SAMPLE_PREFERENCES, showSolution: false };
+		const serialized = serializeFormPreferences(preferences);
+		expect(parseFormPreferences(serialized)).toEqual(preferences);
+	});
+
+	it("round-trips a falsy tubeBackgroundFill value correctly", () => {
+		const preferences = { ...SAMPLE_PREFERENCES, tubeBackgroundFill: false };
 		const serialized = serializeFormPreferences(preferences);
 		expect(parseFormPreferences(serialized)).toEqual(preferences);
 	});
@@ -93,6 +100,12 @@ describe("parseFormPreferences edge cases", () => {
 
 	it("returns null for a cookie written before the pathLengthCandidateCount field existed", () => {
 		const { pathLengthCandidateCount, ...rest } = SAMPLE_PREFERENCES;
+		const serialized = encodeURIComponent(JSON.stringify(rest));
+		expect(parseFormPreferences(serialized)).toBeNull();
+	});
+
+	it("returns null for a cookie written before the tubeBackgroundFill field existed", () => {
+		const { tubeBackgroundFill, ...rest } = SAMPLE_PREFERENCES;
 		const serialized = encodeURIComponent(JSON.stringify(rest));
 		expect(parseFormPreferences(serialized)).toBeNull();
 	});

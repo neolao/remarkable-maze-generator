@@ -14,6 +14,7 @@ export interface MazeFormFieldVisibility {
 	showAlgorithm: boolean;
 	showDifficulty: boolean;
 	showPathLengthCandidates: boolean;
+	showTubeBackgroundFill: boolean;
 	effectiveAlgorithm: MazeAlgorithm;
 }
 
@@ -40,6 +41,7 @@ export function computeMazeFormFieldVisibility(
 		showAlgorithm: !isCrossingType,
 		showDifficulty: effectiveAlgorithm === DIFFICULTY_ALGORITHM,
 		showPathLengthCandidates: input.pathLength !== undefined,
+		showTubeBackgroundFill: isCrossingType,
 		effectiveAlgorithm,
 	};
 }
