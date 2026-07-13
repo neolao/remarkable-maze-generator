@@ -1,6 +1,6 @@
 ---
 date: 2026-07-12
-status: accepted
+status: superseded by 058
 ---
 # circle-crossing tube rendering: back to a per-cell polar hub, with radius-based sizing and real corner rounding
 

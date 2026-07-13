@@ -90,32 +90,6 @@ function circleArcSegments(
 	return [{ x1: from.x, y1: from.y, x2: to.x, y2: to.y, radius, sweep: 1 }];
 }
 
-// Same arc as `circleArcSegments`, but guarantees a real shared vertex
-// (rather than just visually passing through) at every one of `splitAngles`
-// that falls strictly inside `[startAngle, endAngle]` — used by the outward
-// side to give a cell's own hub corners a real vertex even when a child's
-// own slot/door isn't aligned with them (see the outward side's own doc
-// comment, ADR 055 follow-up).
-function circleArcSegmentsSplitAt(
-	maze: CircleMazeLike,
-	radius: number,
-	startAngle: number,
-	endAngle: number,
-	splitAngles: number[],
-): ArcSegment[] {
-	const bounds = [
-		startAngle,
-		...splitAngles.filter((a) => a > startAngle + 1e-9 && a < endAngle - 1e-9),
-		endAngle,
-	].sort((a, b) => a - b);
-
-	const segments: ArcSegment[] = [];
-	for (let i = 0; i < bounds.length - 1; i++) {
-		segments.push(...circleArcSegments(maze, radius, bounds[i], bounds[i + 1]));
-	}
-	return segments;
-}
-
 /**
  * Wall segments for the real growing-sector circle maze (see ADR 037), in the
  * same unit coordinate system the PDF/SVG renderers already scale/offset
@@ -261,33 +235,40 @@ function radialLine(
 }
 
 /**
- * The circle-maze equivalent of `computeTubeSegments` (see ADR 055, hub
- * sizing redesigned per its first follow-up, corner rounding added per its
- * second — see ADR 056): each cell's tube is a small hub in local (radius,
- * angle) space, plus an "arm" reaching to the cell boundary for each open
- * side (cw/ccw/inward/outward), a flat cap otherwise. Both the hub's radial
- * half-width (`TUBE_HALF_WIDTH_RATIO`) and its angular half-width are sized
- * in absolute (Cartesian) terms rather than as a fraction of the ring's own
- * angular step — a ring's sector count only gets recomputed at growth
- * boundaries, so an angleStep-relative width would otherwise keep growing
- * ring by ring within a same-count band, purely because the radius keeps
- * growing while the angular step doesn't. The outward side sizes/positions
- * each open child's own door from *that child's own* angle and radius rather
- * than the parent's, so it always agrees exactly with the same door as drawn
- * by the child's own inward side, fanning out one door per open child when
- * the maze branches. Every hub corner where two adjacent sides share the
- * same open/closed state — the same "real corner" rule the rectangular tube
- * renderer uses — is rounded with `roundCorner`: unlike the rectangular
- * grid, this corner isn't always fixed at 90° in absolute terms, but it *is*
- * always between one radial-direction side and one tangential-direction
- * side of the same cell, which are inherently perpendicular, so the same
- * 90°-only formula applies correctly here too.
+ * The circle-maze equivalent of `computeTubeSegments` (see ADR 055 for the
+ * original per-cell hub design; redesigned per ADR 057's own follow-up to
+ * fix a recurring class of disconnected-tube bugs — see below). Unlike the
+ * rectangular grid, a cell's *outward* side can face several neighbors at
+ * once (the next ring out may subdivide further), each at its own angle —
+ * so every side is anchored directly to this cell's own **true** angular
+ * boundaries (`startAngle`/`endAngle`), not to a separately inset "hub"
+ * window: the two are always in exact agreement by construction, since
+ * `outwardChildren` always exactly partitions `[startAngle, endAngle]` (see
+ * ADR 040), instead of needing to be kept in sync by hand.
  *
- * At a crossing node the *over* axis (see ADR 055) is drawn as two full-span
- * arcs/lines across the entire cell, ignoring the hub entirely; the *under*
- * axis draws its normal open arms only (hub corner to cell boundary), with
- * no cap connecting them across the hub — the real gap where the over-axis
- * tube passes through. Crossing cells are excluded from corner rounding.
+ * Concretely: `inwardSide`/`outwardSide` each draw a full-width arc at
+ * `innerHubR`/`outerHubR` spanning this cell's own entire `[startAngle,
+ * endAngle]`, punctuated by a door-sized notch wherever a connection is
+ * open (fanning out to one notch per open child on the outward side).
+ * `cwSide`/`ccwSide` are reduced to the simplest possible cases: a closed
+ * tangential wall is one plain radial line at this cell's own true
+ * boundary angle; an open one draws *nothing* at all, since the same-ring
+ * neighbor's own inward/outward arcs already reach that exact same
+ * boundary point on their own, meeting with no gap and no coordination
+ * needed between the two cells. The 4 hub corners — now simply
+ * `(innerHubR/outerHubR) × (startAngle/endAngle)` — round the same way as
+ * before wherever their two adjacent sides share the same open/closed
+ * state.
+ *
+ * At a crossing node (see ADR 055) the *over* axis reads as continuous:
+ * tangential-over draws its two full-width arcs unconditionally (the same
+ * shape a plain closed cell's own arcs already have); radial-over bridges
+ * straight through the hub's own interior at this cell's own door angle,
+ * then hands off to `outwardSide`'s own child-aware positioning from
+ * `outerHubR` onward. The *under* axis is left to its normal, restricted
+ * self, which only ever reaches to `innerHubR`/`outerHubR` — never through
+ * the hub's own interior — leaving the real gap where the over-axis tube
+ * cuts across. Crossing cells are excluded from corner rounding.
  */
 export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 	validateCircleMazeShape(maze);
@@ -342,14 +323,14 @@ function computeCircleCellTubeSegments(
 	const midRadius = ring + hubRadius + 0.5;
 	const innerHubR = midRadius - h;
 	const outerHubR = midRadius + h;
-	// An angular half-width sized from the *radius* rather than the ring's own
-	// angular step keeps the hub's physical (Cartesian) width consistent
-	// across rings — angleStep alone stays flat across a whole "sector count
-	// band" while the radius (and so the arc length it carves out) keeps
-	// growing ring by ring within that band (see ADR 055 follow-up).
+	// This cell's own door half-width, used whenever *this* cell's own
+	// inward side (a 1:1 relationship, never fanning out) is open. Sized
+	// from the physical radius rather than the ring's own angular step, so
+	// a door's physical (Cartesian) width stays consistent across rings —
+	// angleStep alone stays flat across a whole "sector count band" while
+	// the radius (and so the arc length it carves out) keeps growing ring
+	// by ring within that band (see ADR 055 follow-up).
 	const hA = h / midRadius;
-	const startHubA = midAngle - hA;
-	const endHubA = midAngle + hA;
 
 	const isEntrance = ring === 0 && sector === 0;
 	const isExit = ring === lastRing && sector === 0;
@@ -360,77 +341,39 @@ function computeCircleCellTubeSegments(
 	const outwardOpenAny =
 		ring === lastRing ? isExit : cells[ring][sector].outwardOpen.some(Boolean);
 
-	// Open outward doors, computed once up front (`outwardSide` below reuses
-	// this same list): a corner (`startHubA`/`endHubA`) sometimes lands
-	// *inside* an open child's own door rather than in a capped margin —
-	// a child's own slot is generally not aligned with this cell's own
-	// narrower hub window (see ADR 055 follow-up) — in which case a cw/ccw
-	// closed side has nothing at the hub boundary to meet: reaching all the
-	// way to `outerHubR` there would poke the wall stub straight into the
-	// open doorway with nothing to visually close it off. `clippedOuterReach`
-	// retracts that one corner back to the nearest door edge instead.
-	const outwardDoors: { start: number; end: number }[] =
-		ring === lastRing
-			? []
-			: outwardChildren(sectorCounts, ring, sector)
-					.filter((_, index) => cells[ring][sector].outwardOpen[index])
-					.map((child) => {
-						const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
-						const childMidRadius = ring + 1 + hubRadius + 0.5;
-						const childHalfAngle = h / childMidRadius;
-						const childMidAngle = (child + 0.5) * childAngleStep;
-						return {
-							start: childMidAngle - childHalfAngle,
-							end: childMidAngle + childHalfAngle,
-						};
-					});
+	// A closed tangential wall is one plain radial line at this cell's own
+	// true boundary angle. An open one draws nothing: the same-ring
+	// neighbor's own inward/outward arcs (below) already reach that exact
+	// same point on their own — same radius, same angle, no coordination
+	// needed between the two cells for them to meet with no gap.
+	const cwSegment = (): TubeSegment[] =>
+		cwOpen ? [] : [radialLine(maze, endAngle, innerHubR, outerHubR)];
+	const ccwSegment = (): TubeSegment[] =>
+		ccwOpen ? [] : [radialLine(maze, startAngle, innerHubR, outerHubR)];
 
-	// A corner inside an open door has nothing at `outerHubR` to visually
-	// close it off (the doorway must stay open there) — reaching the wall
-	// stub out to the corner anyway leaves it dangling mid-passage with a
-	// round cap, reading as a stray, disconnected fragment. Retracting the
-	// wall to stop at the hub's own middle radius avoids that without
-	// otherwise changing this cell's geometry.
-	const fallsInsideOpenDoor = (angle: number): boolean =>
-		outwardDoors.some((d) => angle > d.start && angle < d.end);
-
-	const cwSide = (open: boolean): TubeSegment[] =>
-		open
-			? [
-					...circleArcSegments(maze, innerHubR, endHubA, endAngle),
-					...circleArcSegments(maze, outerHubR, endHubA, endAngle),
-				]
-			: [
-					radialLine(
-						maze,
-						endHubA,
-						innerHubR,
-						fallsInsideOpenDoor(endHubA) ? midRadius : outerHubR,
-					),
-				];
-
-	const ccwSide = (open: boolean): TubeSegment[] =>
-		open
-			? [
-					...circleArcSegments(maze, innerHubR, startAngle, startHubA),
-					...circleArcSegments(maze, outerHubR, startAngle, startHubA),
-				]
-			: [
-					radialLine(
-						maze,
-						startHubA,
-						innerHubR,
-						fallsInsideOpenDoor(startHubA) ? midRadius : outerHubR,
-					),
-				];
-
-	const inwardSide = (open: boolean): TubeSegment[] =>
-		open
-			? [
-					radialLine(maze, startHubA, innerRadius, innerHubR),
-					radialLine(maze, endHubA, innerRadius, innerHubR),
-				]
-			: circleArcSegments(maze, innerHubR, startHubA, endHubA);
+	// For ring 0, `inwardOpen` is really "is this the entrance sector" (see
+	// above) rather than a real neighbor relationship, but the geometry is
+	// identical either way: a full-width cap when closed, or a door-sized
+	// notch — margins capped on both sides, exactly like every other open
+	// inward side — when open, `innerRadius` already being ring 0's own hub
+	// radius. Capping those margins here too (rather than leaving them
+	// bare, as an earlier version of this did for the entrance specifically)
+	// is what gives the entrance's own ccw/cw walls a real corner to meet,
+	// instead of a dangling stub reaching into open air (see ADR 057
+	// follow-up).
+	const inwardSide = (): TubeSegment[] => {
+		if (!inwardOpen) {
+			return circleArcSegments(maze, innerHubR, startAngle, endAngle);
+		}
+		const doorStart = midAngle - hA;
+		const doorEnd = midAngle + hA;
+		return [
+			...circleArcSegments(maze, innerHubR, startAngle, doorStart),
+			radialLine(maze, doorStart, innerRadius, innerHubR),
+			radialLine(maze, doorEnd, innerRadius, innerHubR),
+			...circleArcSegments(maze, innerHubR, doorEnd, endAngle),
+		];
+	};
 
 	// The outward side is the one place a cell's own angular resolution isn't
 	// authoritative: an outward child lives in the *next* ring, which may have
@@ -443,67 +386,56 @@ function computeCircleCellTubeSegments(
 	//
 	// Every child's own angular slot is walked individually — not just the
 	// open ones — each closed child capped across its *own* full slot
-	// (`childStart`/`childEnd`, not this cell's own narrower hub width), and
-	// each open child capped on both margins around its own (narrower) door.
-	// A child's own hub half-width is typically a majority, but not all, of
-	// its own slot's half-width (see ADR 055 follow-up) — both an edge
-	// child's own door position and, even for a centered child, the margin
-	// left over on either side of its own door within its own slot, often
-	// fall outside this cell's own `[startHubA, endHubA]` window. Capping
-	// each child across its own full slot minus its own door — instead of
-	// this cell's narrower hub window — is what actually guarantees a closed
-	// boundary with no gap between this cell's own hub corners, each child's
-	// own door, and every other child's own slot; since `outwardChildren`
-	// always exactly partitions this cell's own `[startAngle, endAngle]`
-	// (see ADR 040), walking every child in order leaves no angular gap
-	// regardless of how their own doors happen to be positioned or sized.
+	// (`childStart`/`childEnd`), and each open child capped on both margins
+	// around its own (narrower) door. Since `outwardChildren` always exactly
+	// partitions this cell's own `[startAngle, endAngle]` (see ADR 040),
+	// walking every child in order leaves no angular gap regardless of how
+	// their own doors happen to be positioned or sized, and the very first
+	// and last pieces always land exactly on this cell's own `startAngle`/
+	// `endAngle` — the same points `cwSegment`/`ccwSegment` anchor to.
 	const outwardSide = (): TubeSegment[] => {
 		if (ring === lastRing) {
-			return isExit
-				? [
-						radialLine(maze, startHubA, outerHubR, outerRadius),
-						radialLine(maze, endHubA, outerHubR, outerRadius),
-					]
-				: circleArcSegments(maze, outerHubR, startHubA, endHubA);
+			if (!isExit)
+				return circleArcSegments(maze, outerHubR, startAngle, endAngle);
+			// Same door-with-capped-margins shape as every other open side —
+			// leaving the margins bare here left the exit cell's own cw/ccw
+			// walls with a dangling stub reaching into open air (see ADR 057
+			// follow-up), the same bug the entrance had.
+			const doorStart = midAngle - hA;
+			const doorEnd = midAngle + hA;
+			return [
+				...circleArcSegments(maze, outerHubR, startAngle, doorStart),
+				radialLine(maze, doorStart, outerHubR, outerRadius),
+				radialLine(maze, doorEnd, outerHubR, outerRadius),
+				...circleArcSegments(maze, outerHubR, doorEnd, endAngle),
+			];
 		}
 
 		const children = outwardChildren(sectorCounts, ring, sector);
 		if (children.length === 0) {
-			return circleArcSegments(maze, outerHubR, startHubA, endHubA);
+			return circleArcSegments(maze, outerHubR, startAngle, endAngle);
 		}
 
 		const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
 		const childMidRadius = ring + 1 + hubRadius + 0.5;
 		const childHalfAngle = h / childMidRadius;
-		// This cell's own hub corners frequently fall *inside* one of the cap
-		// arcs below rather than exactly at one of their endpoints (a child's
-		// own slot/door is generally not aligned with this cell's narrower hub
-		// window — see ADR 055 follow-up) — visually seamless (the arc's own
-		// sweep still passes right through that point), but it leaves the
-		// hub corner without a real shared vertex, undercounting this cell's
-		// own connectivity to the rest of the maze and permanently losing the
-		// chance to round that corner. Splitting any cap arc that spans across
-		// one of these two corners into two pieces, exactly at the corner,
-		// restores a real shared vertex there at no visual cost.
-		const capArc = (radius: number, from: number, to: number): ArcSegment[] =>
-			circleArcSegmentsSplitAt(maze, radius, from, to, [startHubA, endHubA]);
 
 		return children.flatMap((child, index) => {
 			const childStart = child * childAngleStep;
 			const childEnd = (child + 1) * childAngleStep;
 
 			if (!cells[ring][sector].outwardOpen[index]) {
-				return capArc(outerHubR, childStart, childEnd);
+				return circleArcSegments(maze, outerHubR, childStart, childEnd);
 			}
 
 			const childMidAngle = (child + 0.5) * childAngleStep;
 			const doorStart = childMidAngle - childHalfAngle;
 			const doorEnd = childMidAngle + childHalfAngle;
 			return [
-				...capArc(outerHubR, childStart, doorStart),
+				...circleArcSegments(maze, outerHubR, childStart, doorStart),
 				radialLine(maze, doorStart, outerHubR, outerRadius),
 				radialLine(maze, doorEnd, outerHubR, outerRadius),
-				...capArc(outerHubR, doorEnd, childEnd),
+				...circleArcSegments(maze, outerHubR, doorEnd, childEnd),
 			];
 		});
 	};
@@ -513,49 +445,48 @@ function computeCircleCellTubeSegments(
 		const overAxis = crossing.underAxis === "radial" ? "tangential" : "radial";
 
 		if (overAxis === "tangential") {
+			// The tangential axis reads as fully open/continuous: the same two
+			// full-width arcs a plain closed cell's own inward/outward sides
+			// already draw, just unconditionally. The radial axis is left to
+			// its normal, restricted self (`inwardSide`/`outwardSide`, which
+			// only ever reach as far as `innerHubR`/`outerHubR`, never into the
+			// hub's own interior) — that alone leaves the real gap where the
+			// tangential tube passes through.
 			return [
 				...circleArcSegments(maze, innerHubR, startAngle, endAngle),
 				...circleArcSegments(maze, outerHubR, startAngle, endAngle),
-				...inwardSide(true),
+				...inwardSide(),
 				...outwardSide(),
 			];
 		}
+
+		// The radial axis reads as fully open/continuous: bridge straight
+		// through the hub's own interior — the part `inwardSide`/`outwardSide`
+		// normally leave alone — at this cell's own door angle, then hand off
+		// to `outwardSide`'s own child-aware positioning from `outerHubR`
+		// onward, so it still lands exactly on whichever open child's own door
+		// the crossing continues into. The tangential axis shows the real gap
+		// simply by staying its normal (here: topologically forced open) self
+		// — drawing nothing — while these two bridging lines visibly cut
+		// across the space an uninterrupted tangential tube would occupy.
+		const doorStart = midAngle - hA;
+		const doorEnd = midAngle + hA;
 		return [
-			radialLine(maze, startHubA, innerRadius, outerRadius),
-			radialLine(maze, endHubA, innerRadius, outerRadius),
-			...cwSide(true),
-			...ccwSide(true),
+			radialLine(maze, doorStart, innerRadius, outerHubR),
+			radialLine(maze, doorEnd, innerRadius, outerHubR),
+			...outwardSide(),
 		];
 	}
 
 	// Every hub corner where the two adjacent sides share the same
 	// open/closed state is a "real" corner — the two lines that would meet
 	// there are genuinely perpendicular (one radial, one tangential), so it
-	// gets rounded (see ADR 056 follow-up); a corner whose two sides differ
-	// is already collinear with its neighbor and stays untouched.
-	const innerStartCorner = circlePoint(maze, innerHubR, startHubA);
-	const innerEndCorner = circlePoint(maze, innerHubR, endHubA);
-	const outerStartCorner = circlePoint(maze, outerHubR, startHubA);
-	const outerEndCorner = circlePoint(maze, outerHubR, endHubA);
-
-	if (process.env.DEBUG_CELL_TAG) {
-		console.error(
-			"CELL",
-			ring,
-			sector,
-			JSON.stringify({
-				cwOpen,
-				ccwOpen,
-				inwardOpen,
-				outwardOpenAny,
-				innerStartCorner,
-				innerEndCorner,
-				outerStartCorner,
-				outerEndCorner,
-				isCrossing: Boolean(crossing),
-			}),
-		);
-	}
+	// gets rounded; a corner whose two sides differ is already collinear
+	// with its neighbor and stays untouched.
+	const innerStartCorner = circlePoint(maze, innerHubR, startAngle);
+	const innerEndCorner = circlePoint(maze, innerHubR, endAngle);
+	const outerStartCorner = circlePoint(maze, outerHubR, startAngle);
+	const outerEndCorner = circlePoint(maze, outerHubR, endAngle);
 
 	const corners: { point: Point; real: boolean }[] = [
 		{ point: innerStartCorner, real: inwardOpen === ccwOpen },
@@ -565,9 +496,9 @@ function computeCircleCellTubeSegments(
 	];
 
 	const rawSegments = [
-		...cwSide(cwOpen),
-		...ccwSide(ccwOpen),
-		...inwardSide(inwardOpen),
+		...cwSegment(),
+		...ccwSegment(),
+		...inwardSide(),
 		...outwardSide(),
 	];
 
