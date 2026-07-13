@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The web maze configuration form now shows only the fields that are actually relevant given your current choices: the difficulty field is hidden for generation algorithms that don't use it, the generation algorithm field is hidden for maze types that only support one algorithm, and the candidate-count field is hidden until a path length target is chosen — each field appears or disappears instantly as you change related options, without reloading the page
 - The web page now adapts its layout across the full range of screen sizes: on wide desktop screens the form and the maze preview are shown side by side instead of a narrow centered column, tablet-width screens get a smoother intermediate layout instead of jumping straight from the desktop form to the single-column mobile one, and all buttons, inputs, and dropdowns now have a more comfortable minimum size for tapping on mobile
 
+### Fixed
+
+- Circle-crossing mazes now render as real closed pipes, like the rectangular tunnel-crossing type: every corridor is a fully closed tube with rounded caps and a visible gap of white between neighboring tubes, with no floating or disconnected wall fragments — the drawing is now derived from the maze's passage area as a whole, making unclosed tubes impossible by construction, in both the PDF and the web preview
+
 ### Changed
 
 - Internal: how each maze type (classic, tunnel-crossing, circular) is rendered, solved, and generated per algorithm is now centralized in three single lookup tables instead of duplicated conditional checks scattered across the rendering, solving, and generation code — no user-visible change; generated mazes, PDFs, and previews are unaffected

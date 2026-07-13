@@ -5,10 +5,17 @@ import {
 	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
 	type TubeSegment,
+	isArcSegment,
 	roundCorner,
 } from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
 import { isCcwOpen, isInwardOpen } from "./cells.js";
+import {
+	type PolarBoundaryEdge,
+	type PolarOpening,
+	type PolarRect,
+	computePolarRegionBoundary,
+} from "./region-boundary.js";
 import { computeHubRadius, outwardChildren } from "./topology.js";
 
 interface CircleMazeLike {
@@ -235,274 +242,244 @@ function radialLine(
 }
 
 /**
- * The circle-maze equivalent of `computeTubeSegments` (see ADR 055 for the
- * original per-cell hub design; redesigned per ADR 057's own follow-up to
- * fix a recurring class of disconnected-tube bugs — see below). Unlike the
- * rectangular grid, a cell's *outward* side can face several neighbors at
- * once (the next ring out may subdivide further), each at its own angle —
- * so every side is anchored directly to this cell's own **true** angular
- * boundaries (`startAngle`/`endAngle`), not to a separately inset "hub"
- * window: the two are always in exact agreement by construction, since
- * `outwardChildren` always exactly partitions `[startAngle, endAngle]` (see
- * ADR 040), instead of needing to be kept in sync by hand.
+ * The circle-maze equivalent of `computeTubeSegments`, rebuilt on a
+ * region-outline construction (see ADR 059, superseding the per-cell segment
+ * assembly of ADR 055/057/058): the maze's whole passage area is described as
+ * a filled region of axis-aligned polar rectangles — one hub band per cell at
+ * `midRadius ± h`, flush with the cell's own boundary on each open tangential
+ * side (merging seamlessly with the neighbor's own flush band) and set back
+ * by a cap inset on each closed one, so two closed neighbors read as two
+ * separate rounded pipe caps with a visible gap of white between them; one
+ * connector per open radial edge sized from the child's own physical radius;
+ * and an entrance/exit stub each. The drawn segments are that region's own
+ * outline, which is closed by construction. The only thing the region alone
+ * cannot express is a crossing's weave marks, added as forced edges — arcs
+ * sealing the over-axis tube where the under corridor's doors would otherwise
+ * open into it (tangential over), or two bridge sides running through the hub
+ * interior (radial over). Forced edges land on region-emitted arcs by
+ * construction (their radii are the very hub-band radii those arcs are drawn
+ * at), so they always join the outline instead of floating.
  *
- * Concretely: `inwardSide`/`outwardSide` each draw a full-width arc at
- * `innerHubR`/`outerHubR` spanning this cell's own entire `[startAngle,
- * endAngle]`, punctuated by a door-sized notch wherever a connection is
- * open (fanning out to one notch per open child on the outward side).
- * `cwSide`/`ccwSide` are reduced to the simplest possible cases: a closed
- * tangential wall is one plain radial line at this cell's own true
- * boundary angle; an open one draws *nothing* at all, since the same-ring
- * neighbor's own inward/outward arcs already reach that exact same
- * boundary point on their own, meeting with no gap and no coordination
- * needed between the two cells. The 4 hub corners — now simply
- * `(innerHubR/outerHubR) × (startAngle/endAngle)` — round the same way as
- * before wherever their two adjacent sides share the same open/closed
- * state.
- *
- * At a crossing node (see ADR 055) the *over* axis reads as continuous:
- * tangential-over draws its two full-width arcs unconditionally (the same
- * shape a plain closed cell's own arcs already have); radial-over bridges
- * straight through the hub's own interior at this cell's own door angle,
- * then hands off to `outwardSide`'s own child-aware positioning from
- * `outerHubR` onward. The *under* axis is left to its normal, restricted
- * self, which only ever reaches to `innerHubR`/`outerHubR` — never through
- * the hub's own interior — leaving the real gap where the over-axis tube
- * cuts across. Crossing cells are excluded from corner rounding.
+ * Corner rounding is a post-pass on the outline: every vertex where exactly
+ * one radial line and one concentric arc meet end-to-end is a true 90°
+ * corner and gets the same `roundCorner` fillet the rectangular tube uses,
+ * except inside crossing cells (which need their exact weave shape) and
+ * where either piece is too short to absorb the fillet.
  */
 export function computeCircleTubeSegments(maze: CircleMazeLike): TubeSegment[] {
 	validateCircleMazeShape(maze);
 
-	const { sectorCounts } = maze;
-	const segments: TubeSegment[] = [];
+	const { sectorCounts, cells } = maze;
+	const h = TUBE_HALF_WIDTH_RATIO;
 	const hubRadius = computeHubRadius(sectorCounts[0]);
 	const lastRing = sectorCounts.length - 1;
 	const crossingLookup = buildCrossingLookup(maze);
 
+	const rects: PolarRect[] = [];
+	const openings: PolarOpening[] = [];
+	const forcedEdges: PolarBoundaryEdge[] = [];
+	const roundingExclusions: PolarRect[] = [];
+
 	for (let ring = 0; ring < sectorCounts.length; ring++) {
 		const angleStep = (2 * Math.PI) / sectorCounts[ring];
-		const innerRadius = ring + hubRadius;
-		const outerRadius = ring + 1 + hubRadius;
+		const midRadius = ring + hubRadius + 0.5;
+		const innerHubR = midRadius - h;
+		const outerHubR = midRadius + h;
+		// A door's angular half-width derives from the physical radius, not
+		// the ring's own angular step, so its physical width stays consistent
+		// however deep in the maze it sits (see ADR 055 follow-up).
+		const hA = h / midRadius;
 
 		for (let sector = 0; sector < sectorCounts[ring]; sector++) {
-			segments.push(
-				...computeCircleCellTubeSegments(
-					maze,
-					ring,
-					sector,
-					angleStep,
-					innerRadius,
-					outerRadius,
-					hubRadius,
-					lastRing,
-					crossingLookup,
-				),
-			);
-		}
-	}
+			const startAngle = sector * angleStep;
+			const endAngle = (sector + 1) * angleStep;
+			const midAngle = (startAngle + endAngle) / 2;
 
-	return segments;
-}
+			const isEntrance = ring === 0 && sector === 0;
+			const isExit = ring === lastRing && sector === 0;
+			const inwardOpen =
+				ring > 0 && isInwardOpen(cells, sectorCounts, ring, sector);
 
-function computeCircleCellTubeSegments(
-	maze: CircleMazeLike,
-	ring: number,
-	sector: number,
-	angleStep: number,
-	innerRadius: number,
-	outerRadius: number,
-	hubRadius: number,
-	lastRing: number,
-	crossingLookup: Map<string, CircleMazeCrossing>,
-): TubeSegment[] {
-	const { sectorCounts, cells } = maze;
-	const h = TUBE_HALF_WIDTH_RATIO;
-	const startAngle = sector * angleStep;
-	const endAngle = (sector + 1) * angleStep;
-	const midAngle = (startAngle + endAngle) / 2;
-	const midRadius = ring + hubRadius + 0.5;
-	const innerHubR = midRadius - h;
-	const outerHubR = midRadius + h;
-	// This cell's own door half-width, used whenever *this* cell's own
-	// inward side (a 1:1 relationship, never fanning out) is open. Sized
-	// from the physical radius rather than the ring's own angular step, so
-	// a door's physical (Cartesian) width stays consistent across rings —
-	// angleStep alone stays flat across a whole "sector count band" while
-	// the radius (and so the arc length it carves out) keeps growing ring
-	// by ring within that band (see ADR 055 follow-up).
-	const hA = h / midRadius;
+			// Every door this cell's own tube must stay open to, as angular
+			// spans — used both to place the connectors and to clamp the cap
+			// insets below so a cap never cuts across an open door.
+			const doorSpans: { start: number; end: number }[] = [];
+			if (inwardOpen || isEntrance || isExit) {
+				doorSpans.push({ start: midAngle - hA, end: midAngle + hA });
+			}
+			const openChildDoors: { start: number; end: number }[] = [];
+			if (ring < lastRing) {
+				const children = outwardChildren(sectorCounts, ring, sector);
+				const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
+				const childHalfAngle = h / (ring + 1 + hubRadius + 0.5);
+				children.forEach((child, index) => {
+					if (!cells[ring][sector].outwardOpen[index]) return;
+					const childMidAngle = (child + 0.5) * childAngleStep;
+					openChildDoors.push({
+						start: childMidAngle - childHalfAngle,
+						end: childMidAngle + childHalfAngle,
+					});
+				});
+			}
+			doorSpans.push(...openChildDoors);
 
-	const isEntrance = ring === 0 && sector === 0;
-	const isExit = ring === lastRing && sector === 0;
-	const cwOpen = cells[ring][sector].cwOpen;
-	const ccwOpen = isCcwOpen(cells, sectorCounts, ring, sector);
-	const inwardOpen =
-		ring === 0 ? isEntrance : isInwardOpen(cells, sectorCounts, ring, sector);
-	const outwardOpenAny =
-		ring === lastRing ? isExit : cells[ring][sector].outwardOpen.some(Boolean);
+			// The closed-pipe look (same margin as the rectangular tube's own
+			// hub): each closed tangential side sets this cell's own tube back
+			// from the shared boundary, so two closed neighbors show two
+			// separate rounded caps with a visible gap of white between them
+			// instead of one shared line. An open side stays flush, merging
+			// exactly with the neighbor's own flush side. The inset is clamped
+			// to the nearest door edge — for a typical 1-unit cell with a
+			// centered door both bounds coincide, putting the cap flush with
+			// the door jamb, exactly like the rectangular hub's corner.
+			const capInset = (0.5 - h) / midRadius;
+			const insetStart = isCcwOpen(cells, sectorCounts, ring, sector)
+				? 0
+				: Math.max(
+						0,
+						Math.min(
+							capInset,
+							...doorSpans.map((door) => door.start - startAngle),
+						),
+					);
+			const insetEnd = cells[ring][sector].cwOpen
+				? 0
+				: Math.max(
+						0,
+						Math.min(capInset, ...doorSpans.map((door) => endAngle - door.end)),
+					);
 
-	// A closed tangential wall is one plain radial line at this cell's own
-	// true boundary angle. An open one draws nothing: the same-ring
-	// neighbor's own inward/outward arcs (below) already reach that exact
-	// same point on their own — same radius, same angle, no coordination
-	// needed between the two cells for them to meet with no gap.
-	const cwSegment = (): TubeSegment[] =>
-		cwOpen ? [] : [radialLine(maze, endAngle, innerHubR, outerHubR)];
-	const ccwSegment = (): TubeSegment[] =>
-		ccwOpen ? [] : [radialLine(maze, startAngle, innerHubR, outerHubR)];
+			rects.push({
+				rStart: innerHubR,
+				rEnd: outerHubR,
+				aStart: startAngle + insetStart,
+				aEnd: endAngle - insetEnd,
+			});
 
-	// For ring 0, `inwardOpen` is really "is this the entrance sector" (see
-	// above) rather than a real neighbor relationship, but the geometry is
-	// identical either way: a full-width cap when closed, or a door-sized
-	// notch — margins capped on both sides, exactly like every other open
-	// inward side — when open, `innerRadius` already being ring 0's own hub
-	// radius. Capping those margins here too (rather than leaving them
-	// bare, as an earlier version of this did for the entrance specifically)
-	// is what gives the entrance's own ccw/cw walls a real corner to meet,
-	// instead of a dangling stub reaching into open air (see ADR 057
-	// follow-up).
-	const inwardSide = (): TubeSegment[] => {
-		if (!inwardOpen) {
-			return circleArcSegments(maze, innerHubR, startAngle, endAngle);
-		}
-		const doorStart = midAngle - hA;
-		const doorEnd = midAngle + hA;
-		return [
-			...circleArcSegments(maze, innerHubR, startAngle, doorStart),
-			radialLine(maze, doorStart, innerRadius, innerHubR),
-			radialLine(maze, doorEnd, innerRadius, innerHubR),
-			...circleArcSegments(maze, innerHubR, doorEnd, endAngle),
-		];
-	};
-
-	// The outward side is the one place a cell's own angular resolution isn't
-	// authoritative: an outward child lives in the *next* ring, which may have
-	// a different (finer) sector count. Sizing/positioning each door from its
-	// own open child's own angle would silently disagree with the same door
-	// as drawn by the child's own `inwardSide` (using the child's angle) —
-	// see ADR 055 follow-up. Deferring to each child's own angle and radius
-	// keeps both sides in exact agreement, and naturally fans out one door
-	// per open child when the maze branches at this node.
-	//
-	// Every child's own angular slot is walked individually — not just the
-	// open ones — each closed child capped across its *own* full slot
-	// (`childStart`/`childEnd`), and each open child capped on both margins
-	// around its own (narrower) door. Since `outwardChildren` always exactly
-	// partitions this cell's own `[startAngle, endAngle]` (see ADR 040),
-	// walking every child in order leaves no angular gap regardless of how
-	// their own doors happen to be positioned or sized, and the very first
-	// and last pieces always land exactly on this cell's own `startAngle`/
-	// `endAngle` — the same points `cwSegment`/`ccwSegment` anchor to.
-	const outwardSide = (): TubeSegment[] => {
-		if (ring === lastRing) {
-			if (!isExit)
-				return circleArcSegments(maze, outerHubR, startAngle, endAngle);
-			// Same door-with-capped-margins shape as every other open side —
-			// leaving the margins bare here left the exit cell's own cw/ccw
-			// walls with a dangling stub reaching into open air (see ADR 057
-			// follow-up), the same bug the entrance had.
-			const doorStart = midAngle - hA;
-			const doorEnd = midAngle + hA;
-			return [
-				...circleArcSegments(maze, outerHubR, startAngle, doorStart),
-				radialLine(maze, doorStart, outerHubR, outerRadius),
-				radialLine(maze, doorEnd, outerHubR, outerRadius),
-				...circleArcSegments(maze, outerHubR, doorEnd, endAngle),
-			];
-		}
-
-		const children = outwardChildren(sectorCounts, ring, sector);
-		if (children.length === 0) {
-			return circleArcSegments(maze, outerHubR, startAngle, endAngle);
-		}
-
-		const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
-		const childMidRadius = ring + 1 + hubRadius + 0.5;
-		const childHalfAngle = h / childMidRadius;
-
-		return children.flatMap((child, index) => {
-			const childStart = child * childAngleStep;
-			const childEnd = (child + 1) * childAngleStep;
-
-			if (!cells[ring][sector].outwardOpen[index]) {
-				return circleArcSegments(maze, outerHubR, childStart, childEnd);
+			// Each open radial edge's connector is owned by the child side,
+			// at the child's own door angles — the fan-out to several open
+			// children happens naturally, one connector per child.
+			if (inwardOpen) {
+				rects.push({
+					rStart: ring - 1 + hubRadius + 0.5 + h,
+					rEnd: innerHubR,
+					aStart: midAngle - hA,
+					aEnd: midAngle + hA,
+				});
 			}
 
-			const childMidAngle = (child + 0.5) * childAngleStep;
-			const doorStart = childMidAngle - childHalfAngle;
-			const doorEnd = childMidAngle + childHalfAngle;
-			return [
-				...circleArcSegments(maze, outerHubR, childStart, doorStart),
-				radialLine(maze, doorStart, outerHubR, outerRadius),
-				radialLine(maze, doorEnd, outerHubR, outerRadius),
-				...circleArcSegments(maze, outerHubR, doorEnd, childEnd),
-			];
-		});
-	};
+			if (isEntrance) {
+				rects.push({
+					rStart: hubRadius,
+					rEnd: innerHubR,
+					aStart: midAngle - hA,
+					aEnd: midAngle + hA,
+				});
+				openings.push({
+					radius: hubRadius,
+					aStart: midAngle - hA,
+					aEnd: midAngle + hA,
+				});
+			}
 
-	const crossing = crossingLookup.get(crossingKey(ring, sector));
-	if (crossing) {
-		const overAxis = crossing.underAxis === "radial" ? "tangential" : "radial";
+			if (isExit) {
+				const outerBoundary = lastRing + 1 + hubRadius;
+				rects.push({
+					rStart: outerHubR,
+					rEnd: outerBoundary,
+					aStart: midAngle - hA,
+					aEnd: midAngle + hA,
+				});
+				openings.push({
+					radius: outerBoundary,
+					aStart: midAngle - hA,
+					aEnd: midAngle + hA,
+				});
+			}
 
-		if (overAxis === "tangential") {
-			// The tangential axis reads as fully open/continuous: the same two
-			// full-width arcs a plain closed cell's own inward/outward sides
-			// already draw, just unconditionally. The radial axis is left to
-			// its normal, restricted self (`inwardSide`/`outwardSide`, which
-			// only ever reach as far as `innerHubR`/`outerHubR`, never into the
-			// hub's own interior) — that alone leaves the real gap where the
-			// tangential tube passes through.
-			return [
-				...circleArcSegments(maze, innerHubR, startAngle, endAngle),
-				...circleArcSegments(maze, outerHubR, startAngle, endAngle),
-				...inwardSide(),
-				...outwardSide(),
-			];
+			const crossing = crossingLookup.get(crossingKey(ring, sector));
+			if (crossing === undefined) continue;
+
+			roundingExclusions.push({
+				rStart: innerHubR,
+				rEnd: outerHubR,
+				aStart: startAngle,
+				aEnd: endAngle,
+			});
+
+			if (crossing.underAxis === "radial") {
+				// Tangential over: seal the over tube's two edges across the
+				// under corridor's door spans, so its arcs read uninterrupted
+				// while the radial corridor visibly stops at them.
+				forcedEdges.push({
+					kind: "arc",
+					radius: innerHubR,
+					aStart: midAngle - hA,
+					aEnd: midAngle + hA,
+				});
+				for (const door of openChildDoors) {
+					forcedEdges.push({
+						kind: "arc",
+						radius: outerHubR,
+						aStart: door.start,
+						aEnd: door.end,
+					});
+				}
+			} else {
+				// Radial over: each side of the bridge visibly connects the
+				// inward door to the outward door through the hub interior.
+				// The outward door is the open child's own and may sit
+				// off-center from this cell's (the child ring subdivides
+				// further), so each side runs to the mid-radius at the inward
+				// door's angle, jogs along it, and continues at the outward
+				// door's angle — a straight line again when the two doors
+				// align, since the engine merges the collinear halves.
+				let outwardDoorStart = midAngle - hA;
+				let outwardDoorEnd = midAngle + hA;
+				if (openChildDoors.length > 0) {
+					outwardDoorStart = Math.min(
+						...openChildDoors.map((door) => door.start),
+					);
+					outwardDoorEnd = Math.max(...openChildDoors.map((door) => door.end));
+				}
+				const sides: [number, number][] = [
+					[midAngle - hA, outwardDoorStart],
+					[midAngle + hA, outwardDoorEnd],
+				];
+				for (const [inwardAngle, outwardAngle] of sides) {
+					forcedEdges.push({
+						kind: "radial",
+						angle: inwardAngle,
+						rStart: innerHubR,
+						rEnd: midRadius,
+					});
+					forcedEdges.push({
+						kind: "radial",
+						angle: outwardAngle,
+						rStart: midRadius,
+						rEnd: outerHubR,
+					});
+					if (Math.abs(inwardAngle - outwardAngle) > 1e-9) {
+						forcedEdges.push({
+							kind: "arc",
+							radius: midRadius,
+							aStart: Math.min(inwardAngle, outwardAngle),
+							aEnd: Math.max(inwardAngle, outwardAngle),
+						});
+					}
+				}
+			}
 		}
-
-		// The radial axis reads as fully open/continuous: bridge straight
-		// through the hub's own interior — the part `inwardSide`/`outwardSide`
-		// normally leave alone — at this cell's own door angle, then hand off
-		// to `outwardSide`'s own child-aware positioning from `outerHubR`
-		// onward, so it still lands exactly on whichever open child's own door
-		// the crossing continues into. The tangential axis shows the real gap
-		// simply by staying its normal (here: topologically forced open) self
-		// — drawing nothing — while these two bridging lines visibly cut
-		// across the space an uninterrupted tangential tube would occupy.
-		const doorStart = midAngle - hA;
-		const doorEnd = midAngle + hA;
-		return [
-			radialLine(maze, doorStart, innerRadius, outerHubR),
-			radialLine(maze, doorEnd, innerRadius, outerHubR),
-			...outwardSide(),
-		];
 	}
 
-	// Every hub corner where the two adjacent sides share the same
-	// open/closed state is a "real" corner — the two lines that would meet
-	// there are genuinely perpendicular (one radial, one tangential), so it
-	// gets rounded; a corner whose two sides differ is already collinear
-	// with its neighbor and stays untouched.
-	const innerStartCorner = circlePoint(maze, innerHubR, startAngle);
-	const innerEndCorner = circlePoint(maze, innerHubR, endAngle);
-	const outerStartCorner = circlePoint(maze, outerHubR, startAngle);
-	const outerEndCorner = circlePoint(maze, outerHubR, endAngle);
+	const edges = computePolarRegionBoundary(rects, openings, forcedEdges);
+	const segments = edges.flatMap((edge): TubeSegment[] =>
+		edge.kind === "arc"
+			? circleArcSegments(maze, edge.radius, edge.aStart, edge.aEnd)
+			: [radialLine(maze, edge.angle, edge.rStart, edge.rEnd)],
+	);
 
-	const corners: { point: Point; real: boolean }[] = [
-		{ point: innerStartCorner, real: inwardOpen === ccwOpen },
-		{ point: innerEndCorner, real: inwardOpen === cwOpen },
-		{ point: outerEndCorner, real: outwardOpenAny === cwOpen },
-		{ point: outerStartCorner, real: outwardOpenAny === ccwOpen },
-	];
-
-	const rawSegments = [
-		...cwSegment(),
-		...ccwSegment(),
-		...inwardSide(),
-		...outwardSide(),
-	];
-
-	return roundRealHubCorners(rawSegments, corners);
+	return roundTubeCorners(maze, segments, roundingExclusions);
 }
 
 function unit(from: Point, to: Point): Point {
@@ -513,103 +490,263 @@ function unit(from: Point, to: Point): Point {
 }
 
 // Rotates a unit vector the same 90° step the rectangular tube's own fixed
-// `CLOCKWISE_DIRECTIONS` cycle encodes (north -> east -> south -> west, each
-// obtained from the previous one by exactly this transform: `(x, y) -> (-y,
-// x)`). A hub corner's two directions aren't fixed compass directions the
-// way a rectangular cell's are — they depend on the corner's own angle on
-// the ring — so instead of a lookup table, this recomputes the same
-// rotational check geometrically: whichever of the two touching directions
-// lands on the other after this rotation goes first when handing the pair
-// to `roundCorner`, otherwise its sweep comes out flipped (see ADR 031).
+// `CLOCKWISE_DIRECTIONS` cycle encodes: whichever of a corner's two touching
+// directions lands on the other after this rotation goes first when handing
+// the pair to `roundCorner`, otherwise its sweep comes out flipped (see ADR
+// 031).
 function rotate90(v: Point): Point {
 	return { x: -v.y, y: v.x };
 }
 
+// A vertex only gets a fillet when both of its pieces can absorb the
+// shortening with room to spare — the entrance/exit stubs' jambs (0.5 - h
+// long) and a crossing's sliver caps deliberately stay sharp.
+const MIN_CORNER_PIECE_LENGTH = 2 * TUBE_CORNER_RADIUS_RATIO;
+
+const VERTEX_TOLERANCE = 1e-7;
+
+interface VertexToucher {
+	index: number;
+	end: "start" | "end";
+}
+
 /**
- * Rounds every "real" hub corner in `rawSegments` (see
- * `computeCircleCellTubeSegments`), shortening whichever segment endpoints
- * land exactly on one — mirrors the rectangular tube's own
- * `roundRealCorners`, generalized from 4 fixed compass corners to 4 corner
- * *points* computed in Cartesian space (a hub corner's own two neighboring
- * directions aren't fixed compass directions here, so they're derived
- * relative to the corner point itself instead of from a shared lookup
- * table). Unlike the rectangular grid, a hub corner's two touching pieces
- * are never two lines — one side is always tangential (an arc when open, a
- * radial line when closed) and the other always radial (a line when open,
- * an arc cap when closed), so exactly one of the two is an `ArcSegment`.
- * Its endpoint is shortened the same way as a line's (straight-line
- * distance from the vertex toward the arc's own far endpoint) — a valid
- * approximation given the rounding radius is small relative to the arc's
- * own radius — while its `radius`/`sweep` are preserved unchanged via the
- * spread below, instead of being flattened into a straight line.
+ * Rounds every true 90° corner of the extracted outline: a vertex where
+ * exactly one radial line and one concentric arc meet end-to-end (a radial
+ * direction and a tangential one are inherently perpendicular). T-junctions
+ * — a forced wall's tip resting on a merged arc's interior — have no
+ * endpoint pair here and stay sharp, as do vertices inside crossing cells
+ * and vertices whose pieces are too short for the fillet. The arc's own
+ * shortened endpoint is recomputed *on its circle* (rotated by the fillet
+ * radius around the maze center) rather than slid along a chord or tangent,
+ * so shortened arcs stay exactly concentric with the ring they bound.
  */
-function roundRealHubCorners(
+function roundTubeCorners(
+	maze: CircleMazeLike,
 	rawSegments: TubeSegment[],
-	corners: { point: Point; real: boolean }[],
+	exclusions: PolarRect[],
 ): TubeSegment[] {
+	const center = computeCircleMazeDiameter(maze) / 2;
+
+	const isExcluded = (point: Point): boolean => {
+		const radius = Math.hypot(point.x - center, point.y - center);
+		let angle = Math.atan2(point.x - center, -(point.y - center));
+		if (angle < 0) angle += 2 * Math.PI;
+		return exclusions.some(
+			(zone) =>
+				radius > zone.rStart - 1e-6 &&
+				radius < zone.rEnd + 1e-6 &&
+				angle > zone.aStart - 1e-6 &&
+				angle < zone.aEnd + 1e-6,
+		);
+	};
+
+	// Group segment endpoints by coincidence.
+	const bucketSize = 1e-4;
+	const buckets = new Map<string, { point: Point; toucher: VertexToucher }[]>();
+	const bucketKey = (x: number, y: number) =>
+		`${Math.round(x / bucketSize)},${Math.round(y / bucketSize)}`;
+	rawSegments.forEach((segment, index) => {
+		const entries: { point: Point; toucher: VertexToucher }[] = [
+			{
+				point: { x: segment.x1, y: segment.y1 },
+				toucher: { index, end: "start" },
+			},
+			{
+				point: { x: segment.x2, y: segment.y2 },
+				toucher: { index, end: "end" },
+			},
+		];
+		for (const entry of entries) {
+			const key = bucketKey(entry.point.x, entry.point.y);
+			const bucket = buckets.get(key);
+			if (bucket === undefined) {
+				buckets.set(key, [entry]);
+			} else {
+				bucket.push(entry);
+			}
+		}
+	});
+	const touchersAt = (point: Point): VertexToucher[] => {
+		const cx = Math.round(point.x / bucketSize);
+		const cy = Math.round(point.y / bucketSize);
+		const touchers: VertexToucher[] = [];
+		for (let dx = -1; dx <= 1; dx++) {
+			for (let dy = -1; dy <= 1; dy++) {
+				for (const entry of buckets.get(`${cx + dx},${cy + dy}`) ?? []) {
+					if (
+						Math.hypot(entry.point.x - point.x, entry.point.y - point.y) <
+						VERTEX_TOLERANCE
+					) {
+						touchers.push(entry.toucher);
+					}
+				}
+			}
+		}
+		return touchers;
+	};
+
+	// A second, coarser index over the same endpoints: a fillet erases the
+	// outline within the fillet radius of its vertex, so a vertex is only
+	// safe to round when no *other* segment's tip rests inside that reach —
+	// a forced wall landing just beside a door jamb would otherwise be left
+	// dangling in the freshly rounded gap.
+	const FILLET_CLEARANCE = 1.25 * TUBE_CORNER_RADIUS_RATIO;
+	const coarseBuckets = new Map<string, Point[]>();
+	const coarseKey = (x: number, y: number) =>
+		`${Math.round(x / FILLET_CLEARANCE)},${Math.round(y / FILLET_CLEARANCE)}`;
+	for (const bucket of buckets.values()) {
+		for (const { point } of bucket) {
+			const key = coarseKey(point.x, point.y);
+			const coarse = coarseBuckets.get(key);
+			if (coarse === undefined) {
+				coarseBuckets.set(key, [point]);
+			} else {
+				coarse.push(point);
+			}
+		}
+	}
+	const hasForeignTipWithinFilletReach = (vertex: Point): boolean => {
+		const cx = Math.round(vertex.x / FILLET_CLEARANCE);
+		const cy = Math.round(vertex.y / FILLET_CLEARANCE);
+		for (let dx = -1; dx <= 1; dx++) {
+			for (let dy = -1; dy <= 1; dy++) {
+				for (const point of coarseBuckets.get(`${cx + dx},${cy + dy}`) ?? []) {
+					const distance = Math.hypot(point.x - vertex.x, point.y - vertex.y);
+					if (distance >= VERTEX_TOLERANCE && distance < FILLET_CLEARANCE) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	};
+
+	const endpointOf = (toucher: VertexToucher): Point => {
+		const segment = rawSegments[toucher.index];
+		return toucher.end === "start"
+			? { x: segment.x1, y: segment.y1 }
+			: { x: segment.x2, y: segment.y2 };
+	};
+	const farPointOf = (toucher: VertexToucher): Point => {
+		const segment = rawSegments[toucher.index];
+		return toucher.end === "start"
+			? { x: segment.x2, y: segment.y2 }
+			: { x: segment.x1, y: segment.y1 };
+	};
+	const chordLengthOf = (toucher: VertexToucher): number => {
+		const segment = rawSegments[toucher.index];
+		return Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1);
+	};
+
 	const startOverride = new Map<number, Point>();
 	const endOverride = new Map<number, Point>();
-	const arcs: ArcSegment[] = [];
+	const fillets: ArcSegment[] = [];
+	const processed = new Set<string>();
 
-	for (const { point, real } of corners) {
-		if (!real) continue;
+	rawSegments.forEach((segment, index) => {
+		for (const end of ["start", "end"] as const) {
+			const vertex = endpointOf({ index, end });
+			const vertexKey = `${vertex.x.toFixed(8)},${vertex.y.toFixed(8)}`;
+			if (processed.has(vertexKey)) continue;
+			processed.add(vertexKey);
 
-		const touching: { index: number; end: "start" | "end" }[] = [];
-		rawSegments.forEach((segment, index) => {
+			const touching = touchersAt(vertex);
+			if (touching.length !== 2) continue;
+			const [first, second] = touching;
+			const firstIsArc = isArcSegment(rawSegments[first.index]);
+			const secondIsArc = isArcSegment(rawSegments[second.index]);
+			if (firstIsArc === secondIsArc) continue;
 			if (
-				Math.abs(segment.x1 - point.x) < 1e-9 &&
-				Math.abs(segment.y1 - point.y) < 1e-9
+				chordLengthOf(first) < MIN_CORNER_PIECE_LENGTH ||
+				chordLengthOf(second) < MIN_CORNER_PIECE_LENGTH
 			) {
-				touching.push({ index, end: "start" });
-			} else if (
-				Math.abs(segment.x2 - point.x) < 1e-9 &&
-				Math.abs(segment.y2 - point.y) < 1e-9
-			) {
-				touching.push({ index, end: "end" });
+				continue;
 			}
-		});
-		if (touching.length !== 2) continue;
+			if (isExcluded(vertex)) continue;
+			if (hasForeignTipWithinFilletReach(vertex)) continue;
 
-		const farPointOf = ({ index, end }: (typeof touching)[number]): Point => {
-			const segment = rawSegments[index];
-			return end === "start"
-				? { x: segment.x2, y: segment.y2 }
-				: { x: segment.x1, y: segment.y1 };
-		};
+			// Exact perpendicular directions at the vertex: the line's own
+			// direction is radial; the arc's is the tangent toward its far
+			// endpoint (its chord direction would drift with the arc's span).
+			const directionFor = (toucher: VertexToucher): Point => {
+				if (!isArcSegment(rawSegments[toucher.index])) {
+					return unit(vertex, farPointOf(toucher));
+				}
+				const radialDir = unit({ x: center, y: center }, vertex);
+				const tangent = rotate90(radialDir);
+				const towardFar = unit(vertex, farPointOf(toucher));
+				const aligned = tangent.x * towardFar.x + tangent.y * towardFar.y > 0;
+				return aligned ? tangent : { x: -tangent.x, y: -tangent.y };
+			};
 
-		const far0 = farPointOf(touching[0]);
-		const far1 = farPointOf(touching[1]);
-		const direction0 = unit(point, far0);
-		const direction1 = unit(point, far1);
-		const rotated0 = rotate90(direction0);
-		const goesFirst =
-			Math.abs(rotated0.x - direction1.x) < 1e-6 &&
-			Math.abs(rotated0.y - direction1.y) < 1e-6;
-		const orderedTouching = goesFirst
-			? [touching[0], touching[1]]
-			: [touching[1], touching[0]];
-		const orderedFar = goesFirst ? [far0, far1] : [far1, far0];
+			const direction0 = directionFor(first);
+			const direction1 = directionFor(second);
+			const rotated0 = rotate90(direction0);
+			const goesFirst =
+				Math.abs(rotated0.x - direction1.x) < 1e-6 &&
+				Math.abs(rotated0.y - direction1.y) < 1e-6;
+			const ordered = goesFirst ? [first, second] : [second, first];
+			const orderedDirections = goesFirst
+				? [direction0, direction1]
+				: [direction1, direction0];
 
-		const radius = TUBE_CORNER_RADIUS_RATIO;
-		const { tangent1, tangent2, arc } = roundCorner(
-			point,
-			orderedFar[0],
-			orderedFar[1],
-			radius,
-		);
+			const radius = TUBE_CORNER_RADIUS_RATIO;
+			const { tangent1, tangent2, arc } = roundCorner(
+				vertex,
+				{
+					x: vertex.x + orderedDirections[0].x,
+					y: vertex.y + orderedDirections[0].y,
+				},
+				{
+					x: vertex.x + orderedDirections[1].x,
+					y: vertex.y + orderedDirections[1].y,
+				},
+				radius,
+			);
 
-		const overrideMap = (end: "start" | "end") =>
-			end === "start" ? startOverride : endOverride;
-		overrideMap(orderedTouching[0].end).set(orderedTouching[0].index, tangent1);
-		overrideMap(orderedTouching[1].end).set(orderedTouching[1].index, tangent2);
-		arcs.push(arc);
-	}
+			// Snap each arc-side tangent point back onto its own circle so the
+			// shortened arc stays exactly concentric.
+			const snapped = [tangent1, tangent2].map((tangent, position) => {
+				const toucher = ordered[position];
+				const piece = rawSegments[toucher.index];
+				if (!isArcSegment(piece)) return tangent;
+				const vertexAngle = Math.atan2(vertex.y - center, vertex.x - center);
+				const delta = radius / piece.radius;
+				const candidates = [vertexAngle + delta, vertexAngle - delta].map(
+					(angle) => ({
+						x: center + piece.radius * Math.cos(angle),
+						y: center + piece.radius * Math.sin(angle),
+					}),
+				);
+				const direction = orderedDirections[position];
+				return (candidates[0].x - vertex.x) * direction.x +
+					(candidates[0].y - vertex.y) * direction.y >
+					0
+					? candidates[0]
+					: candidates[1];
+			});
 
-	const roundedSegments = rawSegments.map((segment, index) => {
+			ordered.forEach((toucher, position) => {
+				const overrideMap =
+					toucher.end === "start" ? startOverride : endOverride;
+				overrideMap.set(toucher.index, snapped[position]);
+			});
+			fillets.push({
+				...arc,
+				x1: snapped[0].x,
+				y1: snapped[0].y,
+				x2: snapped[1].x,
+				y2: snapped[1].y,
+			});
+		}
+	});
+
+	const rounded = rawSegments.map((segment, index) => {
 		const start = startOverride.get(index) ?? { x: segment.x1, y: segment.y1 };
 		const end = endOverride.get(index) ?? { x: segment.x2, y: segment.y2 };
 		return { ...segment, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
 	});
 
-	return [...roundedSegments, ...arcs];
+	return [...rounded, ...fillets];
 }

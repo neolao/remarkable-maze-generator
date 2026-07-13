@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	type ArcSegment,
 	TUBE_CORNER_RADIUS_RATIO,
 	TUBE_HALF_WIDTH_RATIO,
+	type TubeSegment,
 	isArcSegment,
 } from "../rendering/maze-layout.js";
 import type { CircleCell } from "./cells.js";
@@ -408,17 +410,212 @@ describe("computeCircleCellCenter", () => {
 	});
 });
 
-// computeCircleTubeSegments models each cell as a small polar "hub" (an
-// inset window in local radius/angle space) plus an "arm" reaching to the
-// cell boundary for each open side, a flat cap otherwise — the same shape
-// the rectangular tube renderer uses, generalized to a topology where
-// neighboring cells aren't all the same size (see ADR 056 follow-up). The
-// hub's angular half-width is derived from the physical radius rather than
-// the ring's own angular step, so a door's physical (Cartesian) size stays
-// consistent regardless of how far out it sits or how many sectors its own
-// ring happens to have.
+// computeCircleTubeSegments draws the outline of the maze's whole passage
+// area, built as a filled region of axis-aligned polar rectangles — one hub
+// band per cell, one connector per open radial edge, entrance/exit stubs —
+// plus a handful of forced edges (closed tangential walls, crossing weave
+// marks); see ADR 059. The outline of a filled region is closed by
+// construction, so the disconnected-fragment class of bugs that motivated
+// the redesign cannot be expressed at all.
 describe("computeCircleTubeSegments", () => {
 	const h = TUBE_HALF_WIDTH_RATIO;
+	const TOLERANCE = 1e-6;
+
+	interface Point {
+		x: number;
+		y: number;
+	}
+
+	const mazeCenter = (maze: {
+		sectorCounts: number[];
+		cells: CircleCell[][];
+	}): number => computeCircleMazeDiameter(maze) / 2;
+
+	// Inverts the renderer's own polar-to-Cartesian mapping (sector 0 rotated
+	// to 12 o'clock): the raw topology angle of a rendered point, in [0, 2*PI).
+	const rawAngleOf = (center: number, point: Point): number => {
+		const angle = Math.atan2(point.x - center, -(point.y - center));
+		return angle < 0 ? angle + 2 * Math.PI : angle;
+	};
+
+	const radiusOf = (center: number, point: Point): number =>
+		Math.hypot(point.x - center, point.y - center);
+
+	const endpointsOf = (segment: TubeSegment): [Point, Point] => [
+		{ x: segment.x1, y: segment.y1 },
+		{ x: segment.x2, y: segment.y2 },
+	];
+
+	// Reconstructs an arc's center from its endpoints, radius and sweep flag:
+	// of the two candidate centers, the right one puts the start-to-end
+	// rotation in the direction the sweep flag encodes.
+	const arcCenterOf = (arc: ArcSegment): Point => {
+		const [start, end] = endpointsOf(arc);
+		const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+		const halfChord = Math.hypot(end.x - start.x, end.y - start.y) / 2;
+		const offset = Math.sqrt(
+			Math.max(arc.radius * arc.radius - halfChord * halfChord, 0),
+		);
+		const along = {
+			x: (end.x - start.x) / (2 * halfChord),
+			y: (end.y - start.y) / (2 * halfChord),
+		};
+		const perpendicular = { x: -along.y, y: along.x };
+		const candidate = {
+			x: mid.x + offset * perpendicular.x,
+			y: mid.y + offset * perpendicular.y,
+		};
+		const cross =
+			(start.x - candidate.x) * (end.y - candidate.y) -
+			(start.y - candidate.y) * (end.x - candidate.x);
+		const matchesSweep = arc.sweep === 1 ? cross > 0 : cross < 0;
+		return matchesSweep
+			? candidate
+			: {
+					x: mid.x - offset * perpendicular.x,
+					y: mid.y - offset * perpendicular.y,
+				};
+	};
+
+	const pointLiesOnLine = (point: Point, segment: TubeSegment): boolean => {
+		const dx = segment.x2 - segment.x1;
+		const dy = segment.y2 - segment.y1;
+		const lengthSquared = dx * dx + dy * dy;
+		if (lengthSquared < TOLERANCE * TOLERANCE) return false;
+		const t =
+			((point.x - segment.x1) * dx + (point.y - segment.y1) * dy) /
+			lengthSquared;
+		if (t < -TOLERANCE || t > 1 + TOLERANCE) return false;
+		const projection = {
+			x: segment.x1 + t * dx,
+			y: segment.y1 + t * dy,
+		};
+		return (
+			Math.hypot(point.x - projection.x, point.y - projection.y) < TOLERANCE
+		);
+	};
+
+	const pointLiesOnArc = (point: Point, arc: ArcSegment): boolean => {
+		const center = arcCenterOf(arc);
+		const distance = Math.hypot(point.x - center.x, point.y - center.y);
+		if (Math.abs(distance - arc.radius) > TOLERANCE) return false;
+		const angleOf = (p: Point) => Math.atan2(p.y - center.y, p.x - center.x);
+		const normalize = (angle: number) =>
+			angle < 0 ? angle + 2 * Math.PI : angle;
+		const [start, end] = endpointsOf(arc);
+		const angularTolerance = TOLERANCE / arc.radius + 1e-9;
+		const forward = arc.sweep === 1;
+		const from = angleOf(forward ? start : end);
+		const to = angleOf(forward ? end : start);
+		const span = normalize(to - from);
+		const offset = normalize(angleOf(point) - from);
+		return (
+			offset <= span + angularTolerance ||
+			offset >= 2 * Math.PI - angularTolerance
+		);
+	};
+
+	const pointLiesOnSegment = (point: Point, segment: TubeSegment): boolean =>
+		isArcSegment(segment)
+			? pointLiesOnArc(point, segment)
+			: pointLiesOnLine(point, segment);
+
+	/**
+	 * The closure invariant of the region-outline construction: every rendered
+	 * endpoint either coincides with another segment's endpoint or lands on
+	 * another segment's interior (a T-junction) — the only exceptions are the
+	 * entrance stub's inner tips and the exit stub's outer tips, the maze's
+	 * two real openings. A violation is exactly the class of floating
+	 * fragment / dangling stub this renderer was rebuilt to make impossible.
+	 */
+	const findDanglingEndpoints = (
+		maze: { sectorCounts: number[]; cells: CircleCell[][] },
+		segments: TubeSegment[],
+	): Point[] => {
+		const center = mazeCenter(maze);
+		const hubRadius = computeHubRadius(maze.sectorCounts[0]);
+		const outerBoundary = maze.sectorCounts.length + hubRadius;
+		const isMazeOpening = (point: Point): boolean => {
+			const radius = radiusOf(center, point);
+			return (
+				Math.abs(radius - hubRadius) < TOLERANCE ||
+				Math.abs(radius - outerBoundary) < TOLERANCE
+			);
+		};
+
+		const bucketSize = 1e-3;
+		const buckets = new Map<string, Point[]>();
+		const bucketKey = (x: number, y: number) =>
+			`${Math.round(x / bucketSize)},${Math.round(y / bucketSize)}`;
+		const allEndpoints = segments.flatMap(endpointsOf);
+		for (const point of allEndpoints) {
+			const key = bucketKey(point.x, point.y);
+			const bucket = buckets.get(key);
+			if (bucket === undefined) {
+				buckets.set(key, [point]);
+			} else {
+				bucket.push(point);
+			}
+		}
+		const hasCoincidingEndpoint = (point: Point): boolean => {
+			const cx = Math.round(point.x / bucketSize);
+			const cy = Math.round(point.y / bucketSize);
+			let matches = 0;
+			for (let dx = -1; dx <= 1; dx++) {
+				for (let dy = -1; dy <= 1; dy++) {
+					for (const other of buckets.get(`${cx + dx},${cy + dy}`) ?? []) {
+						if (Math.hypot(other.x - point.x, other.y - point.y) < TOLERANCE) {
+							matches++;
+							if (matches >= 2) return true; // itself + one other
+						}
+					}
+				}
+			}
+			return false;
+		};
+
+		const dangling: Point[] = [];
+		segments.forEach((segment, index) => {
+			for (const point of endpointsOf(segment)) {
+				if (isMazeOpening(point)) continue;
+				if (hasCoincidingEndpoint(point)) continue;
+				const restsOnAnother = segments.some(
+					(other, otherIndex) =>
+						otherIndex !== index && pointLiesOnSegment(point, other),
+				);
+				if (!restsOnAnother) dangling.push(point);
+			}
+		});
+		return dangling;
+	};
+
+	// Total angular coverage of the arcs at `radius`, clipped to the raw-angle
+	// window [spanStart, spanEnd] — merged arcs may extend far beyond the
+	// window on either side, so each one is clipped before summing.
+	const coveredAngleWithin = (
+		segments: TubeSegment[],
+		center: number,
+		radius: number,
+		spanStart: number,
+		spanEnd: number,
+	): number => {
+		const overlap = (a1: number, a2: number, b1: number, b2: number) =>
+			Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
+		return segments
+			.filter(isArcSegment)
+			.filter((segment) => Math.abs(segment.radius - radius) < TOLERANCE)
+			.reduce((sum, segment) => {
+				const [start, end] = endpointsOf(segment);
+				const a1 = rawAngleOf(center, start);
+				let a2 = rawAngleOf(center, end);
+				if (a2 < a1 - 1e-9) a2 += 2 * Math.PI;
+				return (
+					sum +
+					overlap(a1, a2, spanStart, spanEnd) +
+					overlap(a1, a2, spanStart + 2 * Math.PI, spanEnd + 2 * Math.PI)
+				);
+			}, 0);
+	};
 
 	it("throws when cells do not match the sector counts", () => {
 		const sectorCounts = computeCircleSectorCounts(4, 3);
@@ -450,7 +647,7 @@ describe("computeCircleTubeSegments", () => {
 		}
 	});
 
-	it("sizes an open side's hub arcs at exactly midRadius ± half-width, regardless of the ring's own sector count", () => {
+	it("bounds the tube band with arcs at exactly midRadius ± half-width, regardless of the ring's own sector count", () => {
 		const sectorCounts = [6];
 		const cells = createCircleGrid(sectorCounts);
 		carveEdge(
@@ -473,13 +670,11 @@ describe("computeCircleTubeSegments", () => {
 		expect(hasRadiusNear(midRadius + h)).toBe(true);
 	});
 
-	// Regression test for the original bug (see ADR 055 follow-up): sizing a
-	// door's angular half-width from the ring's own angular step let a door's
-	// *physical* width balloon within a same-sector-count band, since the
-	// angular step stays flat while the radius (and so the arc length it
-	// carves out) keeps growing ring by ring. Deriving the half-width from
-	// the physical radius instead keeps the door's physical width within a
-	// tight, bounded range no matter how deep in the maze it sits.
+	// Regression test for the original ADR 055 follow-up bug: sizing a door's
+	// angular half-width from the ring's own angular step let a door's
+	// *physical* width balloon within a same-sector-count band. Deriving the
+	// half-width from the physical radius keeps the physical width within a
+	// tight, bounded range no matter how deep in the maze the door sits.
 	it("keeps an outward door's physical width within a tight bounded range across many rings of the same sector count", () => {
 		const measureDoorWidth = (parentRing: number): number => {
 			const sectorCounts = Array(parentRing + 2).fill(6);
@@ -487,59 +682,39 @@ describe("computeCircleTubeSegments", () => {
 			carveEdge(
 				cells,
 				sectorCounts,
-				{ ring: parentRing, sector: 0 },
-				{ ring: parentRing + 1, sector: 0 },
+				{ ring: parentRing, sector: 2 },
+				{ ring: parentRing + 1, sector: 2 },
 			);
 			const maze = { sectorCounts, cells };
-
-			const childCenter = computeCircleCellCenter(maze, {
-				ring: parentRing + 1,
-				sector: 0,
-			});
+			const center = mazeCenter(maze);
 			const boundaryRadius = parentRing + 1 + computeHubRadius(6);
 
 			const segments = computeCircleTubeSegments(maze);
-			const matchingPoints = segments
-				.filter((segment) => !isArcSegment(segment))
-				.flatMap((segment) => [
-					{ x: segment.x1, y: segment.y1 },
-					{ x: segment.x2, y: segment.y2 },
-				])
-				.filter(
-					(point) =>
-						Math.hypot(point.x - childCenter.x, point.y - childCenter.y) < 1.0,
-				)
-				.filter((point) => {
-					const diameter = computeCircleMazeDiameter(maze);
-					const center = diameter / 2;
-					const radius = Math.hypot(point.x - center, point.y - center);
-					return Math.abs(radius - boundaryRadius) < 1e-6;
-				});
-			// The parent's own outward arm and the child's own inward arm each
-			// contribute a line ending at the exact same two boundary points —
-			// deduplicate down to those 2 distinct points before measuring width.
-			const boundaryPoints = matchingPoints.filter(
-				(point, index) =>
-					matchingPoints.findIndex(
-						(other) =>
-							Math.abs(other.x - point.x) < 1e-9 &&
-							Math.abs(other.y - point.y) < 1e-9,
-					) === index,
-			);
+			// The door's two jamb lines are the only line segments whose radial
+			// span straddles the shared ring boundary (closed walls stay within
+			// one band; the entrance/exit stubs sit at other radii).
+			const jambs = segments.filter((segment) => {
+				if (isArcSegment(segment)) return false;
+				const [start, end] = endpointsOf(segment);
+				const r1 = radiusOf(center, start);
+				const r2 = radiusOf(center, end);
+				return (
+					Math.min(r1, r2) < boundaryRadius - TOLERANCE &&
+					Math.max(r1, r2) > boundaryRadius + TOLERANCE
+				);
+			});
+			expect(jambs).toHaveLength(2);
 
-			expect(boundaryPoints).toHaveLength(2);
-			const [a, b] = boundaryPoints;
-			return Math.hypot(a.x - b.x, a.y - b.y);
+			const [first, second] = jambs.map((segment) =>
+				rawAngleOf(center, endpointsOf(segment)[0]),
+			);
+			let angleDiff = Math.abs(first - second);
+			if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+			return angleDiff * boundaryRadius;
 		};
 
 		const widths = [0, 2, 4, 6, 8].map(measureDoorWidth);
 
-		// The width asymptotically approaches 2h as the ring grows (the
-		// boundary radius gets proportionally closer to the hub's own
-		// mid-radius), but even at ring 0 — where that approximation is
-		// loosest — it stays well within a bounded fraction of 2h, unlike the
-		// old angleStep-based sizing (which could drift up to ~4.5x within a
-		// same-sector-count band).
 		for (const width of widths) {
 			expect(width).toBeGreaterThan(1.5 * h);
 			expect(width).toBeLessThan(2 * h);
@@ -547,71 +722,11 @@ describe("computeCircleTubeSegments", () => {
 		expect(Math.max(...widths) / Math.min(...widths)).toBeLessThan(1.4);
 	});
 
-	// Cell (ring 1, sector 2) is open only clockwise (a dead-end analog): its
-	// inner-start and outer-start corners sit between two sides in the same
-	// (closed) state — inward/ccw and outward/ccw respectively — so those are
-	// the "real" corners that get rounded; inner-end and outer-end sit
-	// between an open side (cw) and a closed one (inward/outward), so they
-	// stay sharp and collinear. Corners now sit at this cell's own true
-	// angular boundaries (half an `angleStep` away from its own center, not a
-	// narrow inset) — closer to a same-ring neighbor's own nearest corner
-	// than to this cell's *other* corners, so scoping by distance from this
-	// cell's center alone can't cleanly exclude that neighbor; scoping by
-	// this cell's own angular slice (plus a small margin) does.
-	it("rounds only the hub corners whose two adjacent sides share the same open/closed state", () => {
-		const sectorCounts = [4, 4];
-		const cells = createCircleGrid(sectorCounts);
-		carveEdge(
-			cells,
-			sectorCounts,
-			{ ring: 1, sector: 2 },
-			{ ring: 1, sector: 3 },
-		);
-		const maze = { sectorCounts, cells };
-
-		const diameter = computeCircleMazeDiameter(maze);
-		const center = diameter / 2;
-		const cellCenter = computeCircleCellCenter(maze, { ring: 1, sector: 2 });
-		const cellAngle = Math.atan2(cellCenter.y - center, cellCenter.x - center);
-		const angleStep = (2 * Math.PI) / sectorCounts[1];
-		const hubRadius = computeHubRadius(sectorCounts[0]);
-
-		const inThisCell = (point: { x: number; y: number }): boolean => {
-			const radius = Math.hypot(point.x - center, point.y - center);
-			const angle = Math.atan2(point.y - center, point.x - center);
-			let angleDiff = Math.abs(angle - cellAngle);
-			if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-			return (
-				angleDiff < angleStep / 2 + 0.02 &&
-				radius > 1 + hubRadius - 0.1 &&
-				radius < 2 + hubRadius + 0.1
-			);
-		};
-
-		const segments = computeCircleTubeSegments(maze).filter(
-			(segment) =>
-				inThisCell({ x: segment.x1, y: segment.y1 }) &&
-				inThisCell({ x: segment.x2, y: segment.y2 }),
-		);
-
-		const arcs = segments.filter(isArcSegment);
-		const roundingArcs = arcs.filter(
-			(arc) => Math.abs(arc.radius - TUBE_CORNER_RADIUS_RATIO) < 1e-9,
-		);
-		expect(roundingArcs).toHaveLength(2);
-	});
-
-	// Regression test for a real gap bug: an interior ring's outward side
-	// used to draw *only* the door lines for each open child, with no cap
-	// arc at all connecting them back to this cell's own hub corners or to
-	// its closed siblings — since a child's own door is frequently narrower
-	// than, and not necessarily centered inside, this cell's own narrow hub
-	// window (see ADR 055 follow-up), the result was a tube that visibly
-	// stopped short of closing near almost every ring transition. Growth
-	// ratio 3 here (ring 0 has 3 sectors, ring 1 has 9) makes sector 0's
-	// open child (the middle of its 3 children) still leave real margin on
-	// both sides of its own door within its own slot.
-	it("caps every closed child slot and both margins around an open child's own door, leaving no angular gap at the outward boundary", () => {
+	// The region outline gives a door four real 90° jamb corners (two where
+	// the connector leaves the parent's band, two where it enters the child's)
+	// — each gets the same fillet treatment the rectangular tube applies to
+	// its own hub corners.
+	it("rounds a door's four jamb corners with fillet arcs", () => {
 		const sectorCounts = [3, 9];
 		const cells = createCircleGrid(sectorCounts);
 		carveEdge(
@@ -621,63 +736,84 @@ describe("computeCircleTubeSegments", () => {
 			{ ring: 1, sector: 1 },
 		);
 		const maze = { sectorCounts, cells };
-
+		const center = mazeCenter(maze);
 		const hubRadius = computeHubRadius(3);
-		const outerHubR = hubRadius + 0.5 + h;
-		const childMidRadius = 1 + hubRadius + 0.5;
-		const doorWidth = 2 * (h / childMidRadius);
+		const childAngleStep = (2 * Math.PI) / 9;
+		const childMidAngle = 1.5 * childAngleStep;
+		const doorRadiusLow = hubRadius + 0.5 + h - 0.1;
+		const doorRadiusHigh = 1 + hubRadius + 0.5 - h + 0.1;
 
 		const segments = computeCircleTubeSegments(maze);
-		const totalArcAngle = segments
+		const doorFillets = segments
 			.filter(isArcSegment)
-			.filter((segment) => Math.abs(segment.radius - outerHubR) < 1e-9)
-			.reduce((sum, segment) => {
-				const chordLength = Math.hypot(
-					segment.x2 - segment.x1,
-					segment.y2 - segment.y1,
+			.filter(
+				(segment) => Math.abs(segment.radius - TUBE_CORNER_RADIUS_RATIO) < 1e-9,
+			)
+			.filter((segment) => {
+				const [start] = endpointsOf(segment);
+				const radius = radiusOf(center, start);
+				const angle = rawAngleOf(center, start);
+				return (
+					radius > doorRadiusLow &&
+					radius < doorRadiusHigh &&
+					Math.abs(angle - childMidAngle) < 0.2
 				);
-				return sum + 2 * Math.asin(chordLength / (2 * segment.radius));
-			}, 0);
+			});
 
-		// The whole ring-0 boundary at this radius (a full turn, 3 sectors) is
-		// covered except for the one door's own width, plus a small, bounded
-		// sliver at each rounded corner (real hub corners are always exactly
-		// at this cell's own true angular boundaries now, so several of them
-		// legitimately round here — see ADR 057 follow-up) — anything below
-		// that bounded slack means an uncapped gap somewhere.
-		const roundingSlackUpperBound = 0.5;
-		expect(totalArcAngle).toBeLessThanOrEqual(2 * Math.PI - doorWidth);
-		expect(totalArcAngle).toBeGreaterThan(
-			2 * Math.PI - doorWidth - roundingSlackUpperBound,
-		);
+		expect(doorFillets).toHaveLength(4);
 	});
 
-	it("keeps a crossing node's over axis (tangential here) spanning its exact un-gapped angular range, as a single uninterrupted arc", () => {
+	// The closed-pipe look: a closed tangential wall renders as each cell's
+	// own cap line, set back from the shared boundary, leaving a visible gap
+	// of white between the two neighboring tubes — the same reading as
+	// rectangle-crossing's separate flat caps, not one shared line.
+	it("renders a closed tangential wall as two separate cap lines with a visible gap between the neighboring tubes", () => {
+		const sectorCounts = [6];
+		const maze = buildFullyWalledCircleMaze(sectorCounts);
+		const center = mazeCenter(maze);
+		const midRadius = computeHubRadius(6) + 0.5;
+		const angleStep = (2 * Math.PI) / 6;
+		// The boundary between sectors 1 and 2 — neither is the entrance/exit
+		// sector, so both sides are plain closed walls.
+		const boundaryAngle = 2 * angleStep;
+
+		const segments = computeCircleTubeSegments(maze);
+		const capLines = segments.filter((segment) => {
+			if (isArcSegment(segment)) return false;
+			const [start] = endpointsOf(segment);
+			return Math.abs(rawAngleOf(center, start) - boundaryAngle) < 0.15;
+		});
+
+		expect(capLines).toHaveLength(2);
+		const angles = capLines.map((segment) =>
+			rawAngleOf(center, endpointsOf(segment)[0]),
+		);
+		// One cap on each side of the shared boundary, separated by twice the
+		// cap inset (0.15 of a cell unit per side, measured physically).
+		expect(Math.min(...angles)).toBeLessThan(boundaryAngle - 1e-6);
+		expect(Math.max(...angles)).toBeGreaterThan(boundaryAngle + 1e-6);
+		const gapWidth = (Math.max(...angles) - Math.min(...angles)) * midRadius;
+		expect(gapWidth).toBeCloseTo(0.3, 6);
+	});
+
+	it("keeps a crossing's over axis (tangential) fully covered by arcs across its own span at both tube edges", () => {
 		const maze = buildCircleCrossingMaze();
+		const center = mazeCenter(maze);
 		const angleStep = (2 * Math.PI) / maze.sectorCounts[1];
-		const hubRadius = computeHubRadius(maze.sectorCounts[0]);
-		const midRadius = 1 + hubRadius + 0.5;
+		const midRadius = 1 + computeHubRadius(maze.sectorCounts[0]) + 0.5;
+		const spanStart = 1 * angleStep;
+		const spanEnd = 2 * angleStep;
 
 		const segments = computeCircleTubeSegments(maze);
 		for (const radius of [midRadius - h, midRadius + h]) {
-			// The crossing's own tangential channel is drawn as one single arc
-			// spanning its entire own sector, ignoring the hub entirely — unlike
-			// its cw/ccw neighbors, which only reach partway in from the cell
-			// boundary. Its neighbors' own hub arcs and caps also happen to sit
-			// at this same radius, so this looks for the one whole-sector-wide
-			// piece specifically rather than summing every arc at this radius.
-			const arcsAtRadius = segments
-				.filter(isArcSegment)
-				.filter((segment) => Math.abs(segment.radius - radius) < 1e-9);
-			const fullSpanArc = arcsAtRadius.find((segment) => {
-				const chordLength = Math.hypot(
-					segment.x2 - segment.x1,
-					segment.y2 - segment.y1,
-				);
-				const angle = 2 * Math.asin(chordLength / (2 * segment.radius));
-				return Math.abs(angle - angleStep) < 1e-6;
-			});
-			expect(fullSpanArc).toBeDefined();
+			const covered = coveredAngleWithin(
+				segments,
+				center,
+				radius,
+				spanStart,
+				spanEnd,
+			);
+			expect(covered).toBeGreaterThanOrEqual(angleStep - 1e-6);
 		}
 	});
 
@@ -691,16 +827,10 @@ describe("computeCircleTubeSegments", () => {
 		const segments = computeCircleTubeSegments(maze);
 		const distancesToCenter = segments
 			.filter((segment) => !isArcSegment(segment))
-			.flatMap((segment) => [
-				Math.hypot(
-					segment.x1 - crossingCenter.x,
-					segment.y1 - crossingCenter.y,
-				),
-				Math.hypot(
-					segment.x2 - crossingCenter.x,
-					segment.y2 - crossingCenter.y,
-				),
-			]);
+			.flatMap(endpointsOf)
+			.map((point) =>
+				Math.hypot(point.x - crossingCenter.x, point.y - crossingCenter.y),
+			);
 
 		// Every line segment stops meaningfully short of the crossing's own
 		// center — the real physical gap where the tangential (over-axis) tube
@@ -708,19 +838,100 @@ describe("computeCircleTubeSegments", () => {
 		expect(Math.min(...distancesToCenter)).toBeGreaterThan(0.2);
 	});
 
+	it("draws a crossing's over axis (radial) as two bridge sides running through the hub interior, jogging at mid-radius from the inward door's angles to the outward door's", () => {
+		const sectorCounts = [3, 3, 3];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 1 },
+			{ ring: 1, sector: 1 },
+		);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 1, sector: 1 },
+			{ ring: 2, sector: 1 },
+		);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 1, sector: 0 },
+			{ ring: 1, sector: 1 },
+		);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 1, sector: 1 },
+			{ ring: 1, sector: 2 },
+		);
+		const maze = {
+			sectorCounts,
+			cells,
+			crossings: [{ ring: 1, sector: 1, underAxis: "tangential" as const }],
+		};
+
+		const center = mazeCenter(maze);
+		const angleStep = (2 * Math.PI) / sectorCounts[1];
+		const midRadius = 1 + computeHubRadius(sectorCounts[0]) + 0.5;
+		const childMidRadius = midRadius + 1;
+		// The inward and outward doors share the same physical width, sized
+		// from their own mid-radii, so their angular widths always differ —
+		// each bridge side jogs at mid-radius between the two angles.
+		const inwardSeparation = (2 * h) / midRadius;
+		const outwardSeparation = (2 * h) / childMidRadius;
+
+		const segments = computeCircleTubeSegments(maze);
+		const cellSpan = (angle: number) =>
+			angle > 1 * angleStep && angle < 2 * angleStep;
+		const linesTouchingMidRadius = segments.filter((segment) => {
+			if (isArcSegment(segment)) return false;
+			const [start, end] = endpointsOf(segment);
+			return (
+				(Math.abs(radiusOf(center, start) - midRadius) < TOLERANCE ||
+					Math.abs(radiusOf(center, end) - midRadius) < TOLERANCE) &&
+				cellSpan(rawAngleOf(center, start))
+			);
+		});
+		expect(linesTouchingMidRadius).toHaveLength(4);
+
+		const angleSpread = (fromBelow: boolean): number => {
+			const angles = linesTouchingMidRadius
+				.filter((segment) => {
+					const [start, end] = endpointsOf(segment);
+					const other = Math.max(
+						radiusOf(center, start),
+						radiusOf(center, end),
+					);
+					const reachesBelow =
+						Math.abs(
+							Math.min(radiusOf(center, start), radiusOf(center, end)) -
+								midRadius,
+						) > TOLERANCE;
+					return fromBelow ? reachesBelow : other > midRadius + TOLERANCE;
+				})
+				.map((segment) => rawAngleOf(center, endpointsOf(segment)[0]));
+			expect(angles).toHaveLength(2);
+			return Math.abs(angles[0] - angles[1]);
+		};
+		expect(angleSpread(true)).toBeCloseTo(inwardSeparation, 6);
+		expect(angleSpread(false)).toBeCloseTo(outwardSeparation, 6);
+	});
+
 	it("draws a stub channel connecting the entrance cell to the hub boundary", () => {
 		const sectorCounts = computeCircleSectorCounts(4, 3);
 		const maze = buildFullyWalledCircleMaze(sectorCounts);
 		const hubRadius = computeHubRadius(sectorCounts[0]);
-		const diameter = computeCircleMazeDiameter(maze);
-		const center = diameter / 2;
+		const center = mazeCenter(maze);
 
 		const segments = computeCircleTubeSegments(maze);
 		const reachesHubBoundary = segments.some((segment) => {
 			if (isArcSegment(segment)) return false;
-			const r1 = Math.hypot(segment.x1 - center, segment.y1 - center);
-			const r2 = Math.hypot(segment.x2 - center, segment.y2 - center);
-			return Math.abs(r1 - hubRadius) < 1e-6 || Math.abs(r2 - hubRadius) < 1e-6;
+			const [start, end] = endpointsOf(segment);
+			return (
+				Math.abs(radiusOf(center, start) - hubRadius) < TOLERANCE ||
+				Math.abs(radiusOf(center, end) - hubRadius) < TOLERANCE
+			);
 		});
 
 		expect(reachesHubBoundary).toBe(true);
@@ -730,19 +941,16 @@ describe("computeCircleTubeSegments", () => {
 		const sectorCounts = computeCircleSectorCounts(4, 3);
 		const maze = buildFullyWalledCircleMaze(sectorCounts);
 		const hubRadius = computeHubRadius(sectorCounts[0]);
-		const lastRing = sectorCounts.length - 1;
-		const outerBoundary = lastRing + 1 + hubRadius;
-		const diameter = computeCircleMazeDiameter(maze);
-		const center = diameter / 2;
+		const outerBoundary = sectorCounts.length + hubRadius;
+		const center = mazeCenter(maze);
 
 		const segments = computeCircleTubeSegments(maze);
 		const reachesOuterBoundary = segments.some((segment) => {
 			if (isArcSegment(segment)) return false;
-			const r1 = Math.hypot(segment.x1 - center, segment.y1 - center);
-			const r2 = Math.hypot(segment.x2 - center, segment.y2 - center);
+			const [start, end] = endpointsOf(segment);
 			return (
-				Math.abs(r1 - outerBoundary) < 1e-6 ||
-				Math.abs(r2 - outerBoundary) < 1e-6
+				Math.abs(radiusOf(center, start) - outerBoundary) < TOLERANCE ||
+				Math.abs(radiusOf(center, end) - outerBoundary) < TOLERANCE
 			);
 		});
 
@@ -756,82 +964,9 @@ describe("computeCircleTubeSegments", () => {
 		expect(() => computeCircleTubeSegments(maze)).not.toThrow();
 	});
 
-	// Regression test for a whole class of disconnection bugs (see ADR 057
-	// follow-up): every side used to anchor to a *separately inset* hub
-	// corner (`startHubA`/`endHubA`, narrower than this cell's own true
-	// width) instead of this cell's own true angular boundaries — an open
-	// child's own door (growth ratio 3 here) routinely landed outside that
-	// narrower window, or a growing-tree branch left several of a cell's
-	// outward children open at once, letting the inset corner fall *inside*
-	// an open child's own door with nothing there to anchor to. Anchoring
-	// every side directly to this cell's own true `startAngle`/`endAngle`
-	// instead removes the mismatch structurally: `outwardChildren` always
-	// exactly partitions that same true width (see ADR 040), so the
-	// outward side's own coverage — and, when closed, `cwSegment`'s and
-	// `ccwSegment`'s own line — always meet at that exact point by
-	// construction, not by coincidence.
-	it("anchors cw/ccw and inward/outward to the exact same true-boundary vertex, regardless of how a growing-tree branch opens this cell's children", () => {
-		const sectorCounts = [14, 14, 28];
-		const cells = createCircleGrid(sectorCounts);
-		// The real reported case: (ring 1, sector 12) has both of its outward
-		// children open, and its own ccw side (sector 11) closed — under the
-		// old inset-hub model, this cell's own inset corner landed inside
-		// child 24's own door, leaving the ccw wall with nothing to anchor to.
-		carveEdge(
-			cells,
-			sectorCounts,
-			{ ring: 1, sector: 12 },
-			{ ring: 2, sector: 24 },
-		);
-		carveEdge(
-			cells,
-			sectorCounts,
-			{ ring: 1, sector: 12 },
-			{ ring: 2, sector: 25 },
-		);
-		const maze = { sectorCounts, cells };
-
-		const ring = 1;
-		const sector = 12;
-		const angleStep = (2 * Math.PI) / sectorCounts[ring];
-		const startAngle = sector * angleStep;
-		const hubRadius = computeHubRadius(sectorCounts[0]);
-		const h = TUBE_HALF_WIDTH_RATIO;
-		const outerHubR = ring + hubRadius + 0.5 + h;
-		const diameter = computeCircleMazeDiameter(maze);
-		const center = diameter / 2;
-		const outerStartCorner = {
-			x: center + outerHubR * Math.sin(startAngle),
-			y: center - outerHubR * Math.cos(startAngle),
-		};
-
-		const segments = computeCircleTubeSegments(maze);
-		const touchingCount = segments.reduce((count, segment) => {
-			const touchesStart =
-				Math.hypot(
-					segment.x1 - outerStartCorner.x,
-					segment.y1 - outerStartCorner.y,
-				) < 1e-6;
-			const touchesEnd =
-				Math.hypot(
-					segment.x2 - outerStartCorner.x,
-					segment.y2 - outerStartCorner.y,
-				) < 1e-6;
-			return count + (touchesStart ? 1 : 0) + (touchesEnd ? 1 : 0);
-		}, 0);
-
-		// The ccw closed side's own line, plus the outward side's own margin
-		// arc bordering child 24's door on that side, both end exactly here.
-		expect(touchingCount).toBeGreaterThanOrEqual(2);
-	});
-
-	// The same real-world scenario as above, checked from the opposite
-	// direction: every endpoint anywhere in this small hand-built maze
-	// should be shared with at least one other segment's endpoint — a
-	// dangling, unshared endpoint (other than a true dead end's own rounded
-	// cap, which still shares its *other* end with the rest of the cell) is
-	// exactly what the reported "hairpin" artifact looked like.
-	it("leaves no segment endpoint floating in open space for a cell with several open outward children", () => {
+	// The real-world scenario the reported "hairpin" artifact came from: a
+	// cell with several open outward children and a closed tangential side.
+	it("leaves no dangling endpoint in a hand-built maze where a cell has several open outward children", () => {
 		const sectorCounts = [14, 14, 28];
 		const cells = createCircleGrid(sectorCounts);
 		carveEdge(
@@ -854,39 +989,42 @@ describe("computeCircleTubeSegments", () => {
 		);
 		const maze = { sectorCounts, cells };
 
-		const diameter = computeCircleMazeDiameter(maze);
-		const center = diameter / 2;
-		const hubRadius = computeHubRadius(sectorCounts[0]);
-		const outerBoundary = sectorCounts.length + hubRadius;
-		// The maze's own two true openings — the entrance stub's inner tip and
-		// the exit stub's outer tip — are the only points ever meant to stay
-		// unmatched; every other endpoint should share its position with at
-		// least one other segment's endpoint.
-		const isMazesOwnOpenEnd = (point: { x: number; y: number }): boolean => {
-			const radius = Math.hypot(point.x - center, point.y - center);
-			return (
-				Math.abs(radius - hubRadius) < 1e-6 ||
-				Math.abs(radius - outerBoundary) < 1e-6
-			);
-		};
-
-		const segments = computeCircleTubeSegments(maze);
-		const points = segments
-			.flatMap((segment) => [
-				{ x: segment.x1, y: segment.y1 },
-				{ x: segment.x2, y: segment.y2 },
-			])
-			.filter((point) => !isMazesOwnOpenEnd(point));
-
-		const dangling = points.filter(
-			(point) =>
-				!points.some(
-					(other) =>
-						other !== point &&
-						Math.hypot(other.x - point.x, other.y - point.y) < 1e-6,
-				),
+		const dangling = findDanglingEndpoints(
+			maze,
+			computeCircleTubeSegments(maze),
 		);
+		expect(dangling).toEqual([]);
+	});
 
-		expect(dangling).toHaveLength(0);
+	// The invariant the previous per-cell-assembly renderers could never
+	// guarantee, checked against real generated mazes across sizes and seeds
+	// rather than a hand-picked scenario list.
+	it("leaves no dangling endpoint on generated circle-crossing mazes across sizes and seeds", () => {
+		let totalCrossings = 0;
+		for (const { width, height } of [
+			{ width: 8, height: 6 },
+			{ width: 14, height: 14 },
+		]) {
+			for (let seed = 1; seed <= 10; seed++) {
+				const maze = generateCircleMaze({
+					width,
+					height,
+					seed,
+					allowsCrossings: true,
+				});
+				totalCrossings += maze.crossings.length;
+
+				const dangling = findDanglingEndpoints(
+					maze,
+					computeCircleTubeSegments(maze),
+				);
+				expect(
+					dangling,
+					`dangling endpoints for ${width}x${height} seed ${seed}: ${JSON.stringify(dangling)}`,
+				).toEqual([]);
+			}
+		}
+		// The sweep must have exercised the crossing rendering path for real.
+		expect(totalCrossings).toBeGreaterThan(0);
 	});
 });

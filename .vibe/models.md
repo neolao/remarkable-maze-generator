@@ -113,6 +113,14 @@ Defined in: `packages/core/src/maze-layout.ts` — shared wall geometry consumed
 | sweep | `0 \| 1` | SVG arc sweep-flag; `TubeSegment = LineSegment \| ArcSegment`, narrowed via the exported `isArcSegment()` type guard |
 Defined in: `packages/core/src/maze-layout.ts` — used only for a `rectangle-crossing` tube's two rounded turn corners per cell, see ADR 030
 
+## PolarRect / PolarOpening / PolarBoundaryEdge
+| Field | Type | Notes |
+|---|---|---|
+| rStart, rEnd | number | `PolarRect`: an axis-aligned rectangle in polar (radius, angle) space describing a piece of passage area |
+| aStart, aEnd | number | angular bounds in radians; `PolarOpening` is `{radius, aStart, aEnd}` — a boundary span kept open (entrance/exit doors) |
+| kind | `"arc" \| "radial"` | `PolarBoundaryEdge`: one extracted outline edge — a constant-radius arc or a constant-angle radial span |
+Defined in: `packages/core/src/circle-maze/region-boundary.ts` — inputs/outputs of `computePolarRegionBoundary`, the region-outline engine behind `computeCircleTubeSegments`, see ADR 059
+
 ## RenderMazeToSvgOptions
 | Field | Type | Notes |
 |---|---|---|
