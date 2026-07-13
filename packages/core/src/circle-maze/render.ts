@@ -90,6 +90,32 @@ function circleArcSegments(
 	return [{ x1: from.x, y1: from.y, x2: to.x, y2: to.y, radius, sweep: 1 }];
 }
 
+// Same arc as `circleArcSegments`, but guarantees a real shared vertex
+// (rather than just visually passing through) at every one of `splitAngles`
+// that falls strictly inside `[startAngle, endAngle]` — used by the outward
+// side to give a cell's own hub corners a real vertex even when a child's
+// own slot/door isn't aligned with them (see the outward side's own doc
+// comment, ADR 055 follow-up).
+function circleArcSegmentsSplitAt(
+	maze: CircleMazeLike,
+	radius: number,
+	startAngle: number,
+	endAngle: number,
+	splitAngles: number[],
+): ArcSegment[] {
+	const bounds = [
+		startAngle,
+		...splitAngles.filter((a) => a > startAngle + 1e-9 && a < endAngle - 1e-9),
+		endAngle,
+	].sort((a, b) => a - b);
+
+	const segments: ArcSegment[] = [];
+	for (let i = 0; i < bounds.length - 1; i++) {
+		segments.push(...circleArcSegments(maze, radius, bounds[i], bounds[i + 1]));
+	}
+	return segments;
+}
+
 /**
  * Wall segments for the real growing-sector circle maze (see ADR 037), in the
  * same unit coordinate system the PDF/SVG renderers already scale/offset
@@ -334,13 +360,54 @@ function computeCircleCellTubeSegments(
 	const outwardOpenAny =
 		ring === lastRing ? isExit : cells[ring][sector].outwardOpen.some(Boolean);
 
+	// Open outward doors, computed once up front (`outwardSide` below reuses
+	// this same list): a corner (`startHubA`/`endHubA`) sometimes lands
+	// *inside* an open child's own door rather than in a capped margin —
+	// a child's own slot is generally not aligned with this cell's own
+	// narrower hub window (see ADR 055 follow-up) — in which case a cw/ccw
+	// closed side has nothing at the hub boundary to meet: reaching all the
+	// way to `outerHubR` there would poke the wall stub straight into the
+	// open doorway with nothing to visually close it off. `clippedOuterReach`
+	// retracts that one corner back to the nearest door edge instead.
+	const outwardDoors: { start: number; end: number }[] =
+		ring === lastRing
+			? []
+			: outwardChildren(sectorCounts, ring, sector)
+					.filter((_, index) => cells[ring][sector].outwardOpen[index])
+					.map((child) => {
+						const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
+						const childMidRadius = ring + 1 + hubRadius + 0.5;
+						const childHalfAngle = h / childMidRadius;
+						const childMidAngle = (child + 0.5) * childAngleStep;
+						return {
+							start: childMidAngle - childHalfAngle,
+							end: childMidAngle + childHalfAngle,
+						};
+					});
+
+	// A corner inside an open door has nothing at `outerHubR` to visually
+	// close it off (the doorway must stay open there) — reaching the wall
+	// stub out to the corner anyway leaves it dangling mid-passage with a
+	// round cap, reading as a stray, disconnected fragment. Retracting the
+	// wall to stop at the hub's own middle radius avoids that without
+	// otherwise changing this cell's geometry.
+	const fallsInsideOpenDoor = (angle: number): boolean =>
+		outwardDoors.some((d) => angle > d.start && angle < d.end);
+
 	const cwSide = (open: boolean): TubeSegment[] =>
 		open
 			? [
 					...circleArcSegments(maze, innerHubR, endHubA, endAngle),
 					...circleArcSegments(maze, outerHubR, endHubA, endAngle),
 				]
-			: [radialLine(maze, endHubA, innerHubR, outerHubR)];
+			: [
+					radialLine(
+						maze,
+						endHubA,
+						innerHubR,
+						fallsInsideOpenDoor(endHubA) ? midRadius : outerHubR,
+					),
+				];
 
 	const ccwSide = (open: boolean): TubeSegment[] =>
 		open
@@ -348,7 +415,14 @@ function computeCircleCellTubeSegments(
 					...circleArcSegments(maze, innerHubR, startAngle, startHubA),
 					...circleArcSegments(maze, outerHubR, startAngle, startHubA),
 				]
-			: [radialLine(maze, startHubA, innerHubR, outerHubR)];
+			: [
+					radialLine(
+						maze,
+						startHubA,
+						innerHubR,
+						fallsInsideOpenDoor(startHubA) ? midRadius : outerHubR,
+					),
+				];
 
 	const inwardSide = (open: boolean): TubeSegment[] =>
 		open
@@ -401,23 +475,35 @@ function computeCircleCellTubeSegments(
 		const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
 		const childMidRadius = ring + 1 + hubRadius + 0.5;
 		const childHalfAngle = h / childMidRadius;
+		// This cell's own hub corners frequently fall *inside* one of the cap
+		// arcs below rather than exactly at one of their endpoints (a child's
+		// own slot/door is generally not aligned with this cell's narrower hub
+		// window — see ADR 055 follow-up) — visually seamless (the arc's own
+		// sweep still passes right through that point), but it leaves the
+		// hub corner without a real shared vertex, undercounting this cell's
+		// own connectivity to the rest of the maze and permanently losing the
+		// chance to round that corner. Splitting any cap arc that spans across
+		// one of these two corners into two pieces, exactly at the corner,
+		// restores a real shared vertex there at no visual cost.
+		const capArc = (radius: number, from: number, to: number): ArcSegment[] =>
+			circleArcSegmentsSplitAt(maze, radius, from, to, [startHubA, endHubA]);
 
 		return children.flatMap((child, index) => {
 			const childStart = child * childAngleStep;
 			const childEnd = (child + 1) * childAngleStep;
 
 			if (!cells[ring][sector].outwardOpen[index]) {
-				return circleArcSegments(maze, outerHubR, childStart, childEnd);
+				return capArc(outerHubR, childStart, childEnd);
 			}
 
 			const childMidAngle = (child + 0.5) * childAngleStep;
 			const doorStart = childMidAngle - childHalfAngle;
 			const doorEnd = childMidAngle + childHalfAngle;
 			return [
-				...circleArcSegments(maze, outerHubR, childStart, doorStart),
+				...capArc(outerHubR, childStart, doorStart),
 				radialLine(maze, doorStart, outerHubR, outerRadius),
 				radialLine(maze, doorEnd, outerHubR, outerRadius),
-				...circleArcSegments(maze, outerHubR, doorEnd, childEnd),
+				...capArc(outerHubR, doorEnd, childEnd),
 			];
 		});
 	};
@@ -451,6 +537,25 @@ function computeCircleCellTubeSegments(
 	const innerEndCorner = circlePoint(maze, innerHubR, endHubA);
 	const outerStartCorner = circlePoint(maze, outerHubR, startHubA);
 	const outerEndCorner = circlePoint(maze, outerHubR, endHubA);
+
+	if (process.env.DEBUG_CELL_TAG) {
+		console.error(
+			"CELL",
+			ring,
+			sector,
+			JSON.stringify({
+				cwOpen,
+				ccwOpen,
+				inwardOpen,
+				outwardOpenAny,
+				innerStartCorner,
+				innerEndCorner,
+				outerStartCorner,
+				outerEndCorner,
+				isCrossing: Boolean(crossing),
+			}),
+		);
+	}
 
 	const corners: { point: Point; real: boolean }[] = [
 		{ point: innerStartCorner, real: inwardOpen === ccwOpen },

@@ -730,4 +730,128 @@ describe("computeCircleTubeSegments", () => {
 
 		expect(() => computeCircleTubeSegments(maze)).not.toThrow();
 	});
+
+	// Regression test for a real disconnection bug: an outward margin-cap arc
+	// that happens to span across this cell's own hub corner (because an
+	// open child's own door isn't aligned with this cell's narrower hub
+	// window — growth ratio 3 here, so the open child's own margin doesn't
+	// line up with the parent's own startHubA) used to just pass through
+	// that corner as an unmarked interior point of one long arc, instead of
+	// stopping there — leaving the cw/ccw closed line that also reaches that
+	// exact point with no real shared vertex, undercounting this cell's own
+	// connectivity to the rest of the tube network and permanently losing
+	// its corner-rounding candidacy.
+	it("splits an outward margin-cap arc at this cell's own hub corner instead of only passing through it", () => {
+		const sectorCounts = [3, 9];
+		const cells = createCircleGrid(sectorCounts);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 0, sector: 0 },
+			{ ring: 1, sector: 1 },
+		);
+		const maze = { sectorCounts, cells };
+
+		const hubRadius = computeHubRadius(sectorCounts[0]);
+		const h = TUBE_HALF_WIDTH_RATIO;
+		const midRadius = hubRadius + 0.5;
+		const outerHubR = midRadius + h;
+		const angleStep = (2 * Math.PI) / sectorCounts[0];
+		const startHubA = angleStep / 2 - h / midRadius;
+		const diameter = computeCircleMazeDiameter(maze);
+		const center = diameter / 2;
+		const outerStartCorner = {
+			x: center + outerHubR * Math.sin(startHubA),
+			y: center - outerHubR * Math.cos(startHubA),
+		};
+
+		const segments = computeCircleTubeSegments(maze);
+		const touchingCount = segments.reduce((count, segment) => {
+			const touchesStart =
+				Math.hypot(
+					segment.x1 - outerStartCorner.x,
+					segment.y1 - outerStartCorner.y,
+				) < 1e-6;
+			const touchesEnd =
+				Math.hypot(
+					segment.x2 - outerStartCorner.x,
+					segment.y2 - outerStartCorner.y,
+				) < 1e-6;
+			return count + (touchesStart ? 1 : 0) + (touchesEnd ? 1 : 0);
+		}, 0);
+
+		expect(touchingCount).toBeGreaterThanOrEqual(2);
+	});
+
+	// Regression test for the disconnected "hairpin" artifact reported
+	// against a real generated maze: when two (or more) of a cell's outward
+	// children are all open, this cell's own hub corner can land *inside*
+	// one of their doors rather than in a capped margin — there is nothing
+	// at `outerHubR` there to close off (the doorway must stay open), so a
+	// cw/ccw closed side reaching all the way out anyway leaves a bare,
+	// round-capped stub dangling in the middle of an open passage.
+	it("does not let a closed cw/ccw side dangle into an open doorway that swallows its own hub corner", () => {
+		const sectorCounts = [14, 14, 28];
+		const cells = createCircleGrid(sectorCounts);
+		// Matches a real reported case: (ring 1, sector 12) has both of its
+		// outward children open, and its own ccw side (sector 11) closed —
+		// its own startHubA lands inside child 24's own door.
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 1, sector: 12 },
+			{ ring: 2, sector: 24 },
+		);
+		carveEdge(
+			cells,
+			sectorCounts,
+			{ ring: 1, sector: 12 },
+			{ ring: 2, sector: 25 },
+		);
+		const maze = { sectorCounts, cells };
+
+		const hubRadius = computeHubRadius(sectorCounts[0]);
+		const h = TUBE_HALF_WIDTH_RATIO;
+		const ring = 1;
+		const angleStep = (2 * Math.PI) / sectorCounts[ring];
+		const midAngle = 12.5 * angleStep;
+		const midRadius = ring + hubRadius + 0.5;
+		const startHubA = midAngle - h / midRadius;
+		const outerHubR = midRadius + h;
+
+		const childAngleStep = (2 * Math.PI) / sectorCounts[ring + 1];
+		const childMidRadius = ring + 1 + hubRadius + 0.5;
+		const childHalfAngle = h / childMidRadius;
+		const child24MidAngle = 24.5 * childAngleStep;
+		const doorStart = child24MidAngle - childHalfAngle;
+		const doorEnd = child24MidAngle + childHalfAngle;
+		// Confirms the scenario this test is actually exercising — if this
+		// ever stops holding (e.g. after an unrelated geometry change), the
+		// test below would silently stop testing the reported bug.
+		expect(startHubA).toBeGreaterThan(doorStart);
+		expect(startHubA).toBeLessThan(doorEnd);
+
+		const diameter = computeCircleMazeDiameter(maze);
+		const center = diameter / 2;
+		const wouldBeCorner = {
+			x: center + outerHubR * Math.sin(startHubA),
+			y: center - outerHubR * Math.cos(startHubA),
+		};
+
+		const segments = computeCircleTubeSegments(maze);
+		const reachesIntoTheDoorway = segments.some(
+			(segment) =>
+				!isArcSegment(segment) &&
+				(Math.hypot(
+					segment.x1 - wouldBeCorner.x,
+					segment.y1 - wouldBeCorner.y,
+				) < 1e-6 ||
+					Math.hypot(
+						segment.x2 - wouldBeCorner.x,
+						segment.y2 - wouldBeCorner.y,
+					) < 1e-6),
+		);
+
+		expect(reachesIntoTheDoorway).toBe(false);
+	});
 });
