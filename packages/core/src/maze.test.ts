@@ -435,11 +435,18 @@ describe("generateMaze - dead-end branch length", () => {
 		// ~75.8% of dead ends were 1-2 cells long.
 		expect(averageDeadEndBranchLength(mazes)).toBeGreaterThan(2.3);
 		expect(shortDeadEndBranchRatio(mazes)).toBeLessThan(0.7);
+		// The minimum branch-commit length now also scales with difficulty (see
+		// ADR 061), so difficulty 5 re-rolls the random-vs-recent choice less
+		// often than under the previous flat commit length — branch points at
+		// this difficulty settled from ~48 down to ~27 per maze as a result, but
+		// stay far above the easiest difficulty's near-zero count (see the
+		// separate "still produces more branch points at higher difficulty"
+		// test for that relative guarantee).
 		const totalBranchPoints = mazes.reduce(
 			(sum, maze) => sum + countBranchPoints(maze),
 			0,
 		);
-		expect(totalBranchPoints / mazes.length).toBeGreaterThan(40);
+		expect(totalBranchPoints / mazes.length).toBeGreaterThan(20);
 	});
 
 	it("does not change dead-end branch length at the easiest difficulty (no branching decision is ever made)", () => {
@@ -476,6 +483,134 @@ describe("generateMaze - dead-end branch length", () => {
 		});
 
 		expect(second.cells).toEqual(first.cells);
+	});
+});
+
+describe("generateMaze - difficulty-scaled dead-end branch length (see ADR 061)", () => {
+	const seeds = Array.from({ length: 20 }, (_, index) => index);
+
+	it("produces noticeably longer dead-end branches on average at difficulty 5 than at difficulty 2, for the rectangle type", () => {
+		const lowMazes = seeds.map((seed) =>
+			generateMaze({ width: 16, height: 16, seed, difficulty: 2 }),
+		);
+		const highMazes = seeds.map((seed) =>
+			generateMaze({ width: 16, height: 16, seed, difficulty: 5 }),
+		);
+
+		const lowAverage = averageDeadEndBranchLength(lowMazes);
+		const highAverage = averageDeadEndBranchLength(highMazes);
+
+		expect(highAverage).toBeGreaterThan(lowAverage * 1.2);
+	});
+
+	it("produces a monotonic increase in average dead-end branch length from difficulty 2 to 3 to 5, for the rectangle type", () => {
+		const mazesByDifficulty = [2, 3, 5].map((difficulty) =>
+			seeds.map((seed) =>
+				generateMaze({ width: 16, height: 16, seed, difficulty }),
+			),
+		);
+		const [averageAtTwo, averageAtThree, averageAtFive] = mazesByDifficulty.map(
+			averageDeadEndBranchLength,
+		);
+
+		expect(averageAtThree).toBeGreaterThan(averageAtTwo);
+		expect(averageAtFive).toBeGreaterThan(averageAtThree);
+	});
+
+	it("produces noticeably longer dead-end branches on average at difficulty 5 than at difficulty 2, for the rectangle-crossing type", () => {
+		const lowMazes = seeds.map((seed) =>
+			generateMaze({
+				width: 16,
+				height: 16,
+				seed,
+				difficulty: 2,
+				type: "rectangle-crossing",
+			}),
+		);
+		const highMazes = seeds.map((seed) =>
+			generateMaze({
+				width: 16,
+				height: 16,
+				seed,
+				difficulty: 5,
+				type: "rectangle-crossing",
+			}),
+		);
+
+		const lowAverage = averageDeadEndBranchLength(lowMazes);
+		const highAverage = averageDeadEndBranchLength(highMazes);
+
+		expect(highAverage).toBeGreaterThan(lowAverage * 1.2);
+	});
+
+	it.each([
+		{ type: "rectangle" as const, minAverage: 1.9, maxAverage: 2.3 },
+		{ type: "rectangle-crossing" as const, minAverage: 1.5, maxAverage: 1.9 },
+	])(
+		"does not change dead-end branch length at the easiest difficulty, for the $type type",
+		({ type, minAverage, maxAverage }) => {
+			const mazes = seeds.map((seed) =>
+				generateMaze({ width: 16, height: 16, seed, difficulty: 1, type }),
+			);
+
+			// No random jump is ever made at difficulty 1 (probability 0), so the
+			// difficulty-scaled minimum branch-commit rule never triggers either.
+			// rectangle-crossing has a lower baseline than plain rectangle because
+			// crossing cells open all 4 walls, which this measurement (blind to
+			// the solver's axis lock) counts as a branch point that cuts a
+			// dead-end trace short.
+			const avg = averageDeadEndBranchLength(mazes);
+			expect(avg).toBeGreaterThan(minAverage);
+			expect(avg).toBeLessThan(maxAverage);
+		},
+	);
+
+	it("still fully connects a maze too small to contain a long dead-end branch, at the hardest difficulty for the rectangle-crossing type", () => {
+		const maze = generateMaze({
+			width: 2,
+			height: 2,
+			seed: 1,
+			difficulty: 5,
+			type: "rectangle-crossing",
+		});
+
+		expect(countReachableCells(maze)).toBe(4);
+	});
+
+	it("still generates the same maze twice at difficulty 5 for the rectangle-crossing type (deterministic under the difficulty-scaled rule)", () => {
+		const first = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 42,
+			difficulty: 5,
+			type: "rectangle-crossing",
+		});
+		const second = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 42,
+			difficulty: 5,
+			type: "rectangle-crossing",
+		});
+
+		expect(second.cells).toEqual(first.cells);
+	});
+
+	it("still produces more branch points at higher difficulty despite longer forced branch commits, for the rectangle type", () => {
+		const easy = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 3,
+			difficulty: 1,
+		});
+		const hard = generateMaze({
+			width: 16,
+			height: 16,
+			seed: 3,
+			difficulty: 5,
+		});
+
+		expect(countBranchPoints(hard)).toBeGreaterThan(countBranchPoints(easy));
 	});
 });
 

@@ -1,6 +1,6 @@
 ---
 date: 2026-07-09
-status: accepted
+status: superseded by 061
 ---
 # Decouple dead-end branch length from difficulty via a minimum branch-commit length
 

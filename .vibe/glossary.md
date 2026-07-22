@@ -26,8 +26,8 @@
 **Do not confuse with:** —
 
 ## Difficulty
-**Definition:** An integer knob from 1 (easiest) to 5 (hardest) that biases the growing-tree generation algorithm's cell-selection strategy to produce more or fewer Branch points along the way — it tunes branch-point density, not the maze's width/height. Only the `growing-tree` Generation algorithm currently reads this value; the other three algorithms ignore it.
-**Code:** `difficulty` field of `GenerateMazeOptions`, integer 1–5, in `packages/core/src/maze-domain.ts` (see ADR 015, ADR 050)
+**Definition:** An integer knob from 1 (easiest) to 5 (hardest) that biases the growing-tree generation algorithm's cell-selection strategy to produce more or fewer Branch points along the way — it tunes branch-point density, not the maze's width/height. For the `rectangle` and `rectangle-crossing` maze types, it also scales how long a wrong-turn branch is forced to run before it's allowed to dead-end, so the hardest setting makes wrong turns both more frequent and more costly to notice. Only the `growing-tree` Generation algorithm currently reads this value; the other three algorithms ignore it.
+**Code:** `difficulty` field of `GenerateMazeOptions`, integer 1–5, in `packages/core/src/maze-domain.ts` (see ADR 015, ADR 050); the branch-length scaling lives in `packages/core/src/maze-algorithms/growing-tree.ts` (see ADR 032, ADR 061)
 **Do not confuse with:** —
 
 ## Maze type

@@ -6,8 +6,15 @@ const MAX_DIFFICULTY = 5;
 // Once the growing tree jumps to a dormant active cell (a wrong turn), keep
 // extending that same branch for at least this many cells before allowing
 // another jump — otherwise it tends to get boxed in by already-visited
-// neighbors after a single cell (see ADR 032).
-const MIN_BRANCH_COMMIT_LENGTH = 5;
+// neighbors after a single cell (see ADR 032). This minimum now scales with
+// difficulty (see ADR 061): the harder the maze, the longer a wrong turn is
+// forced to run before it's allowed to end, on top of the higher jump
+// frequency difficulty already drives (see ADR 015).
+const BRANCH_COMMIT_LENGTH_PER_DIFFICULTY_LEVEL = 8;
+
+function minBranchCommitLength(difficulty: number): number {
+	return difficulty * BRANCH_COMMIT_LENGTH_PER_DIFFICULTY_LEVEL;
+}
 
 type Axis = "vertical" | "horizontal";
 
@@ -72,6 +79,7 @@ export function generateGrowingTreeMaze({
 
 	const randomSelectionProbability =
 		(difficulty - MIN_DIFFICULTY) / (MAX_DIFFICULTY - MIN_DIFFICULTY);
+	const branchCommitLength = minBranchCommitLength(difficulty);
 
 	const crossings: MazeCrossing[] = [];
 	const crossingCells = new Set<string>();
@@ -107,7 +115,7 @@ export function generateGrowingTreeMaze({
 		) {
 			index = Math.floor(random() * active.length);
 			if (index !== active.length - 1) {
-				forcedCommitRemaining = MIN_BRANCH_COMMIT_LENGTH - 1;
+				forcedCommitRemaining = branchCommitLength - 1;
 			}
 		} else {
 			index = active.length - 1;

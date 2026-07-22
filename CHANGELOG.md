@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Higher difficulty now also makes wrong turns longer, not just more frequent: for the `rectangle` and `rectangle-crossing` maze types with the growing-tree algorithm, dead-end branches get noticeably longer as difficulty increases, making a wrong turn cost more time to notice at harder settings
+
 ## [0.11.0] - 2026-07-13
 
 ### Added
