@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-22
+
 ### Added
 
 - Higher difficulty now also makes wrong turns longer, not just more frequent: for the `rectangle` and `rectangle-crossing` maze types with the growing-tree algorithm, dead-end branches get noticeably longer as difficulty increases, making a wrong turn cost more time to notice at harder settings
@@ -171,7 +173,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fixed the maze PDF being drawn as a fully closed rectangle, with no visible entrance or exit opening
 
-[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/neolao/remarkable-maze-generator/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/neolao/remarkable-maze-generator/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/neolao/remarkable-maze-generator/compare/v0.9.0...v0.10.0
